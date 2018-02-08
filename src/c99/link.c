@@ -129,6 +129,8 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int* packetSize, i
   {
     writeINT16U(&packetBuffer[offset], packet->dataSize);
     offset += DATALENGTH_FIELD_SIZE;
+
+    // TODO bytestuffing
     for (int i = 0; i < packet->dataSize; i++)
     {
       packetBuffer[offset++] = packet->data[i];
@@ -143,7 +145,7 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int* packetSize, i
   }
 
   if (offset != *packetSize) {
-    return -2; // TODO enumerate errors
+    return offset; // TODO enumerate errors
   }
 
   return 0;
@@ -195,6 +197,7 @@ int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
   {
     packet->dataSize = readINT16U(&packetBuffer[offset]);
     offset += DATALENGTH_FIELD_SIZE;
+    // TODO remove bytestuffed chars
     for (int i = 0; i < packet->dataSize; i++)
     {
        packet->data[i] = packetBuffer[offset++];

@@ -1,5 +1,5 @@
-elp-example : main.o link.o
-	cc -o elp-example main.o
+elp-serialization : main.o link.o
+	cc -o elp-serialization main.o link.o
 
 main.o : main.c
 	cc -c main.c

@@ -58,7 +58,7 @@
 #define SRCADDR_FIELD_SIZE    2 // INT16U
 #define DESTADDR_FIELD_SIZE   2 // INT16U
 #define SEQNUM_FIELD_SIZE     2 // INT16U
-#define ACKBLOCK_FIELD_SIZE   2 // INT16U
+#define ACKBLOCK_FIELD_SIZE   4 // INT32U
 #define DATALENGTH_FIELD_SIZE 2 // INT16U
 #define CRC_FIELD_SIZE        4 // INT32U
 
@@ -87,21 +87,17 @@ typedef struct Packet {
   INT16U dataSize;
   INT08U data[MAX_DATA_SIZE];
   INT32U crcSum;
-
 } Packet;
 
 typedef struct Parser {
-  INT08U msg; // next byte being parsed
+  INT08U packetBuffer[MAX_HEADER_SIZE];
 
   INT08U state;
   INT08U delimCount;
-
   INT16U controlFlags;
 
   INT08U headerIndex;
   INT08U headerLength;
-  INT08U packetLength;
-  INT08U packetBuffer[MAX_HEADER_SIZE];
 
   INT16U dataIndex;
   INT16U dataLength;
@@ -112,7 +108,6 @@ typedef struct Parser {
   INT08U* crcSum;
 
   void (*packet_callback)(const Packet*);
-
 } Parser;
 
 int acceptPacket(Parser* parser);
@@ -122,7 +117,7 @@ int writePacketToBuffer(Packet* packet, INT08U* outBuffer, int* packetSize, int 
 int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer);
 
 /* DESCRIPTION:
- * ARGUMENTS: pdata the buffer, size the buffer size.
+ * ARGUMENTS: pdata the buffer, size length of pdata.
  * RETURNS: The CRC32 value for the buffer.
  */
 INT32U getCRC(INT08U* pdata, INT16U size);
