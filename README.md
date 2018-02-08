@@ -3,7 +3,7 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
 
 
 # Packet Structure
-![alt text][elp-packet.png]
+![alt text](elp-packet.png)
 
 Packets are delimited on the stream by 4 '<' characters.
 
