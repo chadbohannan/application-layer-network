@@ -3,17 +3,19 @@
  *					     Maia University Nanosat Program
  *
  *							INTERFACE
- * Filename	: link.h 
- * Created : 8, May 2006
- * Description : Manages connection sessions with groundstations.
+ * Filename	   : link.h
+ * Created     : 8, May 2006
+ * Description :
  **********************************************************************************************************************/
 #ifndef  LINK_H
 #define  LINK_H
-#ifdef   LINK_GLOBALS
-#define  LINK_EXT
-#else
-#define  LINK_EXT  extern
-#endif
+
+/**********************************************************************************************************************
+ *                  PRIMATIVES
+ **********************************************************************************************************************/
+#define INT08U unsigned char
+#define INT16U unsigned short
+#define INT32U unsigned long
 
 /**********************************************************************************************************************
  *                  RETURN CODES
@@ -22,67 +24,108 @@
 #define  HAMERR_TOOMANYBITS   -1 /* must be less than 12 bits to encode */
 #define  HAMERR_TOOMANYERR    -2 /* more bit flips than could be corrected were found */
 
-#define  LINK_NO_ERR           0
-#define  LINK_ERR             -3
-
-
- /**********************************************************************************************************************
- *                  MODULE  PARAMETER DEFINES
- **********************************************************************************************************************/ 
-#define  UPLINK_MAX_MSGS            16   /* Allocated space for the input msg queue */
-#define  UPLINK_TASK_STK_SIZE      256
-
-#define  DOWNLINK_MAX_MSGS          16   /* Allocated space for the input msg queue */
-#define  DOWNLINK_TASK_STK_SIZE    256
-
-/* CRC Formats */
-#define NO_CRC    0x03
-#define CRC16     0x1C
-#define CRC_CCITT 0xE0
-#define CRC32     0xFF
 
 /**********************************************************************************************************************
- *                  MODULE MESSAGE DEFINES
- **********************************************************************************************************************/ 
-#define  LINK_NO_MSG            0
-#define  LINK_SEND_MSG          1
-
-/**********************************************************************************************************************
- *                  GLOBALOCAL VARIABLES
+ *                  PROTOCOL DEFINITIONS
  **********************************************************************************************************************/
-LINK_EXT OS_STK     UpLinkStk[UPLINK_TASK_STK_SIZE];
+#define FRAME_LEADER_LENGTH 4
+#define FRAME_CF_LENGTH 2
+#define FRAME_LEADER 0x3C // '<' (ASCII)
+#define FRAME_ESCAPE 0xC3 // 'Ã' (Extended ASCII)
 
-LINK_EXT OS_EVENT*  DownLinkQueue;
-LINK_EXT void*      DownLinkMsgArray[DOWNLINK_MAX_MSGS]; /*pointer buffer for module msg queue*/
-LINK_EXT OS_STK     DownLinkStk[DOWNLINK_TASK_STK_SIZE];
+// Packet parsing state enumeration
+#define STATE_FINDSTART  0
+#define STATE_GET_CF     1
+#define STATE_GETHEADER  2
+#define STATE_GETDATA    3
+#define STATE_GETCRC     4
 
-/**********************************************************************************************************************
- *                  PROTOTYPES
- **********************************************************************************************************************/
+// Control Flag bit definitions
+#define CF_LINKSTATE  0x0100
+#define CF_TIMESTAMP  0x0080
+#define CF_CALLSIGN   0x0040
+#define CF_SRCADDR    0x0020
+#define CF_DESTADDR   0x0010
+#define CF_SEQNUM     0x0008
+#define CF_ACKBLOCK   0x0004
+#define CF_DATA       0x0002
+#define CF_CRC      0x0001
 
-/* DESCRIPTION : Initializes the modules message queue.
- * ARGUMENTS   : none
- * RETURNS     : error message
+// Packet header field sizes
+#define LINKSTATE_FIELD_SIZE  1 // INT08U enumerated
+#define TIMESTAMP_FIELD_SIZE  4 // INT32U seconds epoch
+#define CALLSIGN_FIELD_SIZE   8 // ASCII string
+#define SRCADDR_FIELD_SIZE    2 // INT16U
+#define DESTADDR_FIELD_SIZE   2 // INT16U
+#define SEQNUM_FIELD_SIZE     2 // INT16U
+#define ACKBLOCK_FIELD_SIZE   2 // INT16U
+#define DATALENGTH_FIELD_SIZE 2 // INT16U
+#define CRC_FIELD_SIZE        4 // INT32U
+
+// LinkState value enumerations (TODO support source routing)
+#define  LINK_CONNECT   0x01
+#define  LINK_CONNECTED 0x03
+#define  LINK_PING      0x05
+#define  LINK_PONG      0x07
+#define  LINK_ACKRESEND 0x09
+#define  LINK_NOACK     0x0B
+#define  LINK_CLOSE     0x0D
+
+#define MAX_HEADER_SIZE 37
+#define MAX_DATA_SIZE   4096
+#define MAX_PACKET_SIZE MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
+
+typedef struct Packet {
+  INT16U controlFlags;
+  INT08U linkState;
+  INT32U timeStamp;
+  INT08U callSign[CALLSIGN_FIELD_SIZE];
+  INT16U srcAddr;
+  INT16U destAddr;
+  INT16U seqNum;
+  INT32U ackBlock;
+  INT16U dataSize;
+  INT08U data[MAX_DATA_SIZE];
+  INT32U crcSum;
+
+} Packet;
+
+typedef struct Parser {
+  INT08U msg; // next byte being parsed
+
+  INT08U state;
+  INT08U delimCount;
+
+  INT16U controlFlags;
+
+  INT08U headerIndex;
+  INT08U headerLength;
+  INT08U packetLength;
+  INT08U packetBuffer[MAX_HEADER_SIZE];
+
+  INT16U dataIndex;
+  INT16U dataLength;
+  INT08U* data; // references the offset in packetbuffer where data starts
+
+  INT08U crcIndex;
+  INT08U crcLength;
+  INT08U* crcSum;
+
+  void (*packet_callback)(const Packet*);
+
+} Parser;
+
+int acceptPacket(Parser* parser);
+int parseBytes(Parser* parser, INT08U* buffer, int size);
+
+int writePacketToBuffer(Packet* packet, INT08U* outBuffer, int* packetSize, int bufferSize);
+int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer);
+
+/* DESCRIPTION:
+ * ARGUMENTS: pdata the buffer, size the buffer size.
+ * RETURNS: The CRC32 value for the buffer.
  */
-INT8U LinkInit(void);
-  
-/* DESCRIPTION : Recieves messages through a message queue from Command Processor. Messages contain data to downlink.
- * ARGUMENTS   : void *pdata - IN/OUT paramter, not used
- * RETURNS     : void
- */
-void DownLink(void *pdata);
-
-/* DESCRIPTION : Sends messages through a message queue to Command Processor. Messages contain data from GroundStation.
- * ARGUMENTS   : void *pdata - IN/OUT paramter, not used
- * RETURNS     : void
- */
-void UpLink(void *pdata);
-
-/* DESCRIPTION: 
- * ARGUMENTS: format must be one and only one of these CRC16, CRC_CCITT,CRC32, pdata the buffer, size the buffer size.
- * RETURNS: The CRC in the asked format.
- */
-INT32U getCRC(INT08U format, INT08U* pdata, INT16U size);
+INT32U getCRC(INT08U* pdata, INT16U size);
 
 /*
  * This encodes the CF using a modified Hamming (15,11).
@@ -116,5 +159,13 @@ INT16U CFHamEncode(INT16U value);
  *             [1111,0110,0100,0001]]; 0x826F
  */
 INT16U CFHamDecode(INT16U value);
+
+
+/* DESCRIPTION : This is a modified "Sparse Ones Bit Count".
+ *               Instead of counting the ones it just determines
+ *               if there was an odd or even count of bits by XORing the int.
+ * ARGUMENTS   : This is a 32 bit number to count the ones of.
+ * RETURNS     : Return 0x0 or 0x1. */
+INT08U IntXOR(INT32U n);
 
 #endif
