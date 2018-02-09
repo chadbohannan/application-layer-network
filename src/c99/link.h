@@ -20,10 +20,7 @@
 /**********************************************************************************************************************
  *                  RETURN CODES
  **********************************************************************************************************************/
-#define  HAMERR_NOERR          0 /* no errors */
-#define  HAMERR_TOOMANYBITS   -1 /* must be less than 12 bits to encode */
-#define  HAMERR_TOOMANYERR    -2 /* more bit flips than could be corrected were found */
-
+#define  ERROR_NONE          0 // no errors
 
 /**********************************************************************************************************************
  *                  PROTOCOL DEFINITIONS
@@ -52,6 +49,7 @@
 #define CF_CRC      0x0001
 
 // Packet header field sizes
+#define CF_FIELD_SIZE         2 // INT16U
 #define LINKSTATE_FIELD_SIZE  1 // INT08U enumerated
 #define TIMESTAMP_FIELD_SIZE  4 // INT32U seconds epoch
 #define CALLSIGN_FIELD_SIZE   8 // ASCII string
@@ -71,8 +69,8 @@
 #define  LINK_NOACK     0x0B
 #define  LINK_CLOSE     0x0D
 
-#define MAX_HEADER_SIZE 37
-#define MAX_DATA_SIZE   4096
+#define MAX_HEADER_SIZE 33
+#define MAX_DATA_SIZE   1024
 #define MAX_PACKET_SIZE MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 
 typedef struct Packet {
@@ -90,7 +88,7 @@ typedef struct Packet {
 } Packet;
 
 typedef struct Parser {
-  INT08U packetBuffer[MAX_HEADER_SIZE];
+  INT08U packetBuffer[MAX_PACKET_SIZE];
 
   INT08U state;
   INT08U delimCount;
@@ -107,14 +105,17 @@ typedef struct Parser {
   INT08U crcLength;
   INT08U* crcSum;
 
-  void (*packet_callback)(const Packet*);
+  void (*packet_callback)(Packet*);
 } Parser;
 
+int initPacket(Packet* packet);
+int writePacketToBuffer(Packet* packet, INT08U* outBuffer, int bufferSize);
+int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer);
+
+int initParser(Parser* parser, void(Packet*));
 int acceptPacket(Parser* parser);
 int parseBytes(Parser* parser, INT08U* buffer, int size);
 
-int writePacketToBuffer(Packet* packet, INT08U* outBuffer, int* packetSize, int bufferSize);
-int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer);
 
 /* DESCRIPTION:
  * ARGUMENTS: pdata the buffer, size length of pdata.

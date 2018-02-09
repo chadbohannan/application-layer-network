@@ -11,22 +11,38 @@
 
 INT16U readINT16U(INT08U* buffer);
 void writeINT16U(INT08U* buffer, INT16U value);
-INT16U readINT32U(INT08U* buffer);
-void writeINT32U(INT08U* buffer, INT16U value);
+INT32U readINT32U(INT08U* buffer);
+void writeINT32U(INT08U* buffer, INT32U value);
+
+int byteStuffedCopy(INT08U* buffer, INT08U* source, int sourceLength) {
+  int delimCount = 0;
+  int offset = 0;
+  for (int i = 0; i < sourceLength; i++)
+  {
+    INT08U byt = source[i];
+    buffer[offset++] = byt;
+    delimCount = (byt == FRAME_LEADER) ? delimCount + 1 : 0;
+    if (delimCount == (FRAME_LEADER_LENGTH - 1) )
+    {
+      buffer[offset++] = FRAME_ESCAPE;
+      delimCount = 0;
+    }
+  }
+  return offset;
+}
 
 int headerLength(INT16U controlFlags)
 {
-  int headerLength = 6;
-  if(controlFlags & CF_LINKSTATE) headerLength += LINKSTATE_FIELD_SIZE;
-  if(controlFlags & CF_TIMESTAMP) headerLength += TIMESTAMP_FIELD_SIZE;
-  if(controlFlags & CF_CALLSIGN) headerLength += CALLSIGN_FIELD_SIZE;
-  if(controlFlags & CF_SRCADDR) headerLength += SRCADDR_FIELD_SIZE;
-  if(controlFlags & CF_DESTADDR) headerLength += DESTADDR_FIELD_SIZE;
-  if(controlFlags & CF_SEQNUM) headerLength += SEQNUM_FIELD_SIZE;
-  if(controlFlags & CF_ACKBLOCK) headerLength += ACKBLOCK_FIELD_SIZE;
-  if(controlFlags & CF_DATA) headerLength += DATALENGTH_FIELD_SIZE;
-  if(controlFlags & CF_CRC) headerLength += CRC_FIELD_SIZE;
-  return headerLength;
+  int len = 6;
+  if(controlFlags & CF_LINKSTATE) len += LINKSTATE_FIELD_SIZE;
+  if(controlFlags & CF_TIMESTAMP) len += TIMESTAMP_FIELD_SIZE;
+  if(controlFlags & CF_CALLSIGN) len += CALLSIGN_FIELD_SIZE;
+  if(controlFlags & CF_SRCADDR) len += SRCADDR_FIELD_SIZE;
+  if(controlFlags & CF_DESTADDR) len += DESTADDR_FIELD_SIZE;
+  if(controlFlags & CF_SEQNUM) len += SEQNUM_FIELD_SIZE;
+  if(controlFlags & CF_ACKBLOCK) len += ACKBLOCK_FIELD_SIZE;
+  if(controlFlags & CF_DATA) len += DATALENGTH_FIELD_SIZE;
+  return len;
 }
 
 int headerFieldOffset(INT16U controlFlags, INT16U field)
@@ -59,10 +75,24 @@ int headerFieldOffset(INT16U controlFlags, INT16U field)
   return -4; // TODO enumerate errors
 }
 
-
-int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int* packetSize, int bufferSize)
+int initPacket(Packet* packet)
 {
-  int offset;
+  packet->controlFlags = 0;
+  packet->linkState = 0;
+  packet->timeStamp = 0;
+  packet->srcAddr = 0;
+  packet->destAddr = 0;
+  packet->seqNum = 0;
+  packet->ackBlock = 0;
+  packet->dataSize = 0;
+  for (int i = 0; i < CALLSIGN_FIELD_SIZE; i++)
+    packet->callSign[i] = 0;
+  return 0;
+}
+
+int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int bufferSize)
+{
+  INT08U crcBuffer[MAX_PACKET_SIZE];
 
   // establish packet structure
   packet->controlFlags = CF_CRC;
@@ -75,27 +105,25 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int* packetSize, i
   if (packet->ackBlock)    packet->controlFlags |= CF_ACKBLOCK;
   if (packet->dataSize)    packet->controlFlags |= CF_DATA;
 
-  *packetSize = headerLength(packet->controlFlags) + packet->dataSize + CRC_FIELD_SIZE;
-  if (bufferSize < *packetSize) {
-    return -1; // TODO enumerate errors
-  }
+  // set EDAC bits
+  packet->controlFlags = CFHamEncode(packet->controlFlags);
 
-  offset = 0;
+  int offset = 0;
   for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
-  packetBuffer[offset++] = FRAME_LEADER;
+    crcBuffer[offset++] = FRAME_LEADER;
 
-  writeINT16U(&packetBuffer[offset], CFHamEncode(packet->controlFlags));
-  offset += 2;
+  writeINT16U(&crcBuffer[offset], packet->controlFlags);
+  offset += CF_FIELD_SIZE;
 
   if (packet->controlFlags & CF_LINKSTATE)
   {
-    packetBuffer[offset] = packet->linkState;
+    crcBuffer[offset] = packet->linkState;
     offset += LINKSTATE_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_TIMESTAMP)
   {
-    writeINT32U(&packetBuffer[offset], packet->timeStamp);
+    writeINT32U(&crcBuffer[offset], packet->timeStamp);
     offset += TIMESTAMP_FIELD_SIZE;
   }
 
@@ -103,58 +131,68 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int* packetSize, i
   {
     for (int i = 0; i < CALLSIGN_FIELD_SIZE; i++)
     {
-      packetBuffer[offset++] = packet->callSign[i];
+      crcBuffer[offset++] = packet->callSign[i];
     }
   }
 
   if (packet->controlFlags & CF_SRCADDR)
   {
-    writeINT16U(&packetBuffer[offset], packet->srcAddr);
+    writeINT16U(&crcBuffer[offset], packet->srcAddr);
     offset += SRCADDR_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_DESTADDR)
   {
-    writeINT16U(&packetBuffer[offset], packet->destAddr);
+    writeINT16U(&crcBuffer[offset], packet->destAddr);
     offset += DESTADDR_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_SEQNUM)
   {
-    writeINT16U(&packetBuffer[offset], packet->seqNum);
+    writeINT16U(&crcBuffer[offset], packet->seqNum);
     offset += SEQNUM_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_DATA)
   {
-    writeINT16U(&packetBuffer[offset], packet->dataSize);
+    writeINT16U(&crcBuffer[offset], packet->dataSize);
     offset += DATALENGTH_FIELD_SIZE;
 
-    // TODO bytestuffing
+    // copy data block into crcBuffer
     for (int i = 0; i < packet->dataSize; i++)
     {
-      packetBuffer[offset++] = packet->data[i];
+      crcBuffer[offset++] = packet->data[i];
     }
   }
 
+  // compute CRC and append it to the buffer
   if (packet->controlFlags & CF_CRC)
   {
-    packet->crcSum = getCRC(packetBuffer, offset);
-    writeINT32U(&packetBuffer[offset], packet->crcSum);
+    packet->crcSum = getCRC(crcBuffer, offset);
+    writeINT32U(&crcBuffer[offset], packet->crcSum);
     offset += CRC_FIELD_SIZE;
   }
+  int crcBufferSize = offset;
 
-  if (offset != *packetSize) {
-    return offset; // TODO enumerate errors
-  }
+  // write the non-stuffed header
+  offset = 0;
+  for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
+    packetBuffer[offset++] = FRAME_LEADER;
 
-  return 0;
+  // byte-stuff the rest
+  int n = byteStuffedCopy(&packetBuffer[offset], &crcBuffer[offset], crcBufferSize-offset);
+  offset = offset + n;
+
+  return offset;
 }
 
+// populates packet fields from packet contained in packetBuffer
 int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
 {
-  int offset = FRAME_LEADER_LENGTH + FRAME_CF_LENGTH;
+  int offset = FRAME_LEADER_LENGTH;
   packet->controlFlags = readINT16U(&packetBuffer[offset]);
+  offset += CF_FIELD_SIZE;
+
   if (packet->controlFlags & CF_LINKSTATE)
   {
     packet->linkState = packetBuffer[offset];
@@ -197,7 +235,6 @@ int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
   {
     packet->dataSize = readINT16U(&packetBuffer[offset]);
     offset += DATALENGTH_FIELD_SIZE;
-    // TODO remove bytestuffed chars
     for (int i = 0; i < packet->dataSize; i++)
     {
        packet->data[i] = packetBuffer[offset++];
@@ -208,12 +245,29 @@ int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
   {
     packet->crcSum = readINT32U(&packetBuffer[offset]);
   }
+
+  return 0;
+}
+
+int initParser(Parser* parser, void (*packet_callback)(Packet*))
+{
+  parser->state = STATE_FINDSTART;
+  parser->delimCount = 0;
+  parser->controlFlags = 0;
+  parser->headerIndex = 0;
+  parser->headerLength = 0;
+  parser->dataIndex = 0;
+  parser->dataLength = 0;
+  parser->crcIndex = 0;
+  parser->crcLength = 0;
+  parser->packet_callback = packet_callback;
   return 0;
 }
 
 int acceptPacket(Parser* parser)
 {
   Packet packet; // declare memory on the stack
+  initPacket(&packet);
 
   // populate a Packet struct from the raw data
   readPacketFromBuffer(&packet, parser->packetBuffer);
@@ -278,8 +332,9 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
       parser->headerIndex++;
       if(parser->headerIndex==6)
       { /* Ham CF */
-        parser->controlFlags = CFHamDecode(*((INT16U*)&parser->packetBuffer[FRAME_LEADER_LENGTH]));
-        (*((INT16U*)&parser->packetBuffer[FRAME_LEADER_LENGTH])) = parser->controlFlags;
+        INT16U cf = readINT16U(&parser->packetBuffer[FRAME_LEADER_LENGTH]);
+        parser->controlFlags = CFHamDecode(cf);
+        writeINT16U(&parser->packetBuffer[FRAME_LEADER_LENGTH], parser->controlFlags);
         parser->headerLength = headerLength(parser->controlFlags);
         parser->state = STATE_GETHEADER;
       }
@@ -298,7 +353,8 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
         if (parser->controlFlags & CF_DATA)
         {
           parser->dataIndex = 0;
-          parser->dataLength = (*((INT16U*)&parser->packetBuffer[headerFieldOffset(parser->controlFlags, CF_DATA)]));
+          int dataOffset = headerFieldOffset(parser->controlFlags, CF_DATA);
+          parser->dataLength = readINT16U(&parser->packetBuffer[dataOffset]);
           parser->data = parser->packetBuffer + parser->headerLength; // set the data pointer to an offset in packetBuffer
           parser->state = STATE_GETDATA;
         }
@@ -320,6 +376,7 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
     case STATE_GETDATA:
       parser->data[parser->dataIndex] = msg;
       parser->dataIndex++;
+
       if(parser->dataIndex >= parser->dataLength)
       {
         if (parser->controlFlags & CF_CRC)
@@ -341,7 +398,9 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
       if(parser->crcIndex >= parser->crcLength)
       {
         int checkSumInputLength = parser->headerLength+parser->dataLength;
-        if ( readINT32U(parser->crcSum) != getCRC(parser->packetBuffer, checkSumInputLength))
+        INT32U expectedCRC = readINT32U(parser->crcSum);
+        INT32U computedCRC = getCRC(parser->packetBuffer, checkSumInputLength);
+        if ( expectedCRC != computedCRC)
         { // TODO error reporting
           parser->state = STATE_FINDSTART;
         } else {
@@ -430,9 +489,9 @@ INT08U IntXOR(INT32U n)
 
 INT16U readINT16U(INT08U* buffer)
 {
-    INT16U value = buffer[0] << 8;
-    value |= buffer[1];
-    return value;
+  INT16U value = ((INT16U)(buffer[0])) << 8;
+  value |= buffer[1];
+  return value;
 }
 
 void writeINT16U(INT08U* buffer, INT16U value)
@@ -441,19 +500,19 @@ void writeINT16U(INT08U* buffer, INT16U value)
   buffer[1] = value & 0xFF;
 }
 
-INT16U readINT32U(INT08U* buffer)
+INT32U readINT32U(INT08U* buffer)
 {
-    INT32U value = buffer[0] << 24;
-    value |= buffer[1] << 16;
-    value |= buffer[2] << 8;
-    value |= buffer[3];
-    return value;
+  INT32U value = ((INT32U)(buffer[0])) << 24;
+  value |= ((INT32U)(buffer[1])) << 16;
+  value |= ((INT32U)(buffer[2])) << 8;
+  value |= ((INT32U)(buffer[3]));
+  return value;
 }
 
-void writeINT32U(INT08U* buffer, INT16U value)
+void writeINT32U(INT08U* buffer, INT32U value)
 {
   buffer[0] = value >> 24 & 0xFF;
-  buffer[0] = value >> 16 & 0xFF;
-  buffer[0] = value >> 8 & 0xFF;
-  buffer[1] = value & 0xFF;
+  buffer[1] = value >> 16 & 0xFF;
+  buffer[2] = value >> 8 & 0xFF;
+  buffer[3] = value & 0xFF;
 }
