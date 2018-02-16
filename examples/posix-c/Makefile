@@ -11,4 +11,4 @@ parser.o : ../../src/c99/parser.c ../../src/c99/parser.h
 		cc -c ../../src/c99/parser.c ../../src/c99/parser.h
 
 clean :
-	rm  -f *.o packetstream.*
+	rm  -f *.o packetstream.* ../../src/c99/*.h.*

@@ -1,7 +1,12 @@
 #ifndef ELPACKET_H
 #define ELPACKET_H
 
-#include "types.h"
+/**********************************************************************************************************************
+ *                  PRIMATIVES
+ **********************************************************************************************************************/
+#define INT08U unsigned char
+#define INT16U unsigned short
+#define INT32U unsigned long
 
 // Packet framing
 #define FRAME_LEADER_LENGTH 4
