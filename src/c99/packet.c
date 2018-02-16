@@ -4,14 +4,11 @@ int initPacket(Packet* packet)
 {
   packet->controlFlags = 0;
   packet->linkState = 0;
-  packet->timeStamp = 0;
   packet->srcAddr = 0;
   packet->destAddr = 0;
   packet->seqNum = 0;
   packet->ackBlock = 0;
   packet->dataSize = 0;
-  for (int i = 0; i < CALLSIGN_FIELD_SIZE; i++)
-    packet->callSign[i] = 0;
   return 0;
 }
 
@@ -36,8 +33,6 @@ int headerLength(INT16U controlFlags)
 {
   int len = 6;
   if(controlFlags & CF_LINKSTATE) len += LINKSTATE_FIELD_SIZE;
-  if(controlFlags & CF_TIMESTAMP) len += TIMESTAMP_FIELD_SIZE;
-  if(controlFlags & CF_CALLSIGN) len += CALLSIGN_FIELD_SIZE;
   if(controlFlags & CF_SRCADDR) len += SRCADDR_FIELD_SIZE;
   if(controlFlags & CF_DESTADDR) len += DESTADDR_FIELD_SIZE;
   if(controlFlags & CF_SEQNUM) len += SEQNUM_FIELD_SIZE;
@@ -52,12 +47,6 @@ int headerFieldOffset(INT16U controlFlags, INT16U field)
 
   if (field == CF_LINKSTATE) return offset;
   if (controlFlags & CF_LINKSTATE) offset += LINKSTATE_FIELD_SIZE;
-
-  if (field == CF_TIMESTAMP) return offset;
-  if (controlFlags & CF_TIMESTAMP) offset += TIMESTAMP_FIELD_SIZE;
-
-  if (field == CF_CALLSIGN) return offset;
-  if (controlFlags & CF_CALLSIGN) offset += CALLSIGN_FIELD_SIZE;
 
   if (field == CF_SRCADDR) return offset;
   if (controlFlags & CF_SRCADDR) offset += SRCADDR_FIELD_SIZE;
@@ -84,8 +73,6 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int bufferSize)
   // establish packet structure
   packet->controlFlags = CF_CRC;
   if (packet->linkState)   packet->controlFlags |= CF_LINKSTATE;
-  if (packet->timeStamp)   packet->controlFlags |= CF_TIMESTAMP;
-  if (packet->callSign[0]) packet->controlFlags |= CF_CALLSIGN;
   if (packet->srcAddr)     packet->controlFlags |= CF_SRCADDR;
   if (packet->destAddr)    packet->controlFlags |= CF_DESTADDR;
   if (packet->seqNum)      packet->controlFlags |= CF_SEQNUM;
@@ -106,20 +93,6 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int bufferSize)
   {
     crcBuffer[offset] = packet->linkState;
     offset += LINKSTATE_FIELD_SIZE;
-  }
-
-  if (packet->controlFlags & CF_TIMESTAMP)
-  {
-    writeINT32U(&crcBuffer[offset], packet->timeStamp);
-    offset += TIMESTAMP_FIELD_SIZE;
-  }
-
-  if (packet->controlFlags & CF_CALLSIGN)
-  {
-    for (int i = 0; i < CALLSIGN_FIELD_SIZE; i++)
-    {
-      crcBuffer[offset++] = packet->callSign[i];
-    }
   }
 
   if (packet->controlFlags & CF_SRCADDR)
@@ -184,20 +157,6 @@ int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
   {
     packet->linkState = packetBuffer[offset];
     offset += LINKSTATE_FIELD_SIZE;
-  }
-
-  if (packet->controlFlags & CF_TIMESTAMP)
-  {
-    packet->timeStamp = readINT32U(&packetBuffer[offset]);
-    offset += TIMESTAMP_FIELD_SIZE;
-  }
-
-  if (packet->controlFlags & CF_CALLSIGN)
-  {
-    for (int i = 0; i < CALLSIGN_FIELD_SIZE; i++)
-    {
-      packet->callSign[i] = packetBuffer[offset++];
-    }
   }
 
   if (packet->controlFlags & CF_SRCADDR)
