@@ -16,36 +16,44 @@ int testText1Len = strlen(testText1);
 int testText2Len = strlen(testText2);
 int testText3Len = strlen(testText3);
 
-FILE* f2; // c doesn't have closures, so we make the output file handle global
+FILE* outFile; // c doesn't have closures, so we make the output file handle global
 void packet_callback(Packet* packet) {
   INT08U buffer[MAX_PACKET_SIZE];
   int packetSize = writePacketToBuffer(packet, buffer, MAX_PACKET_SIZE);
-  fwrite(buffer, 1, packetSize, f2);
-
-  printf("parsed a packet %d byte packet with %d data bytes\n", packetSize, packet->dataSize);
+  fwrite(buffer, 1, packetSize, outFile);
+  // printf("parsed a packet %d byte packet with %d data bytes\n", packetSize, packet->dataSize);
 }
 
- int main()
- {
-   FILE *f1 = fopen("packetstream.input", "a");
+int writeNewPacketsToFile();
+int streamPacketsToNewFile();
 
-   Packet packet;
-   initPacket(&packet);
+int main()
+{
+  writeNewPacketsToFile();
+  streamPacketsToNewFile();
+}
+
+int writeNewPacketsToFile()
+{
+   FILE *f = fopen("packetstream.input", "a");
+
+   Packet packet; // define a packet on the stack that will be used several times
+   initPacket(&packet); // zero out the packet
    INT08U buffer[MAX_PACKET_SIZE];
 
    // first packet
    memcpy(packet.data, testText1, testText1Len);
    packet.dataSize = testText1Len;
    int packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   printf("writePacketToBuffer1 packetSize:%d\n", packetSize);
-   fwrite(buffer, packetSize, 1, f1);
+   // printf("writePacketToBuffer1 packetSize:%d\n", packetSize);
+   fwrite(buffer, packetSize, 1, f);
 
    // second packet
    memcpy(packet.data, testText2, testText2Len);
    packet.dataSize = testText2Len;
    packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   printf("writePacketToBuffer2 packetSize:%d\n", packetSize);
-   fwrite(buffer, packetSize, 1, f1);
+   // printf("writePacketToBuffer2 packetSize:%d\n", packetSize);
+   fwrite(buffer, packetSize, 1, f);
 
    // third pcket
    packet.srcAddr = 1;
@@ -53,30 +61,34 @@ void packet_callback(Packet* packet) {
    memcpy(packet.data, testText3, testText3Len);
    packet.dataSize = testText3Len;
    packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   printf("writePacketToBuffer3 packetSize:%d\n", packetSize);
-   fwrite(buffer, packetSize, 1, f1);
+   // printf("writePacketToBuffer3 packetSize:%d\n", packetSize);
+   fwrite(buffer, packetSize, 1, f);
 
    // finished phase 1
-   fclose(f1);
+   fclose(f);
+   return 0;
+}
 
-   // open the input file, parse packets, rewrite them to a second file
+// open the input file, parse packets, rewrite them to a second file
+int streamPacketsToNewFile()
+{
    Parser parser;
    initParser(&parser, packet_callback);
 
-   f1 = fopen("packetstream.input", "r");
-   f2 = fopen("packetstream.output", "w");
-   if (f1 && f2) {
+   FILE* inFile = fopen("packetstream.input", "r");
+   outFile = fopen("packetstream.output", "w");
+   if (inFile && outFile) {
      int chunkSize = 5;// read input 5 bytes at a time
      INT08U buff[chunkSize];
-     int size = fread(buff, 1, chunkSize, f1);
+     int size = fread(buff, 1, chunkSize, inFile);
      while (size)
      {
        parseBytes(&parser, buff, size);
-       size = fread(buff, 1, chunkSize, f1);
+       size = fread(buff, 1, chunkSize, inFile);
      }
    }
-   fclose(f1);
-   fclose(f2);
+   fclose(inFile);
+   fclose(outFile);
 
    if (parser.state != STATE_FINDSTART) {
      printf("Parser in ended in a bad state:%d\n", parser.state);
@@ -85,4 +97,5 @@ void packet_callback(Packet* packet) {
    {
      printf("completed successfully\n");
    }
+   return 0;
  }
