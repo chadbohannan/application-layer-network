@@ -7,7 +7,7 @@
  * Created	  : 15, Nov 2006
  * Description:
  **********************************************************************************************************************/
-#include "link.h"
+#include "parser.h"
 
 INT16U readINT16U(INT08U* buffer);
 void writeINT16U(INT08U* buffer, INT16U value);

@@ -7,7 +7,7 @@
 
 #include "stdio.h"
 #include "strings.h"
-#include "../../src/c99/link.h"
+#include "../../src/c99/parser.h"
 
 const char testText1[] = "Bytestuffing is used only when '<<<<' occurs mid-frame.";
 const char testText2[] = "The CRC is calculated over both the header and the data.";
@@ -27,7 +27,7 @@ void packet_callback(Packet* packet) {
 
  int main()
  {
-   FILE *f1 = fopen("packets.input", "a");
+   FILE *f1 = fopen("packetstream.input", "a");
 
    Packet packet;
    initPacket(&packet);
@@ -63,8 +63,8 @@ void packet_callback(Packet* packet) {
    Parser parser;
    initParser(&parser, packet_callback);
 
-   f1 = fopen("packets.input", "r");
-   f2 = fopen("packets.output", "w");
+   f1 = fopen("packetstream.input", "r");
+   f2 = fopen("packetstream.output", "w");
    if (f1 && f2) {
      int chunkSize = 5;// read input 5 bytes at a time
      INT08U buff[chunkSize];
