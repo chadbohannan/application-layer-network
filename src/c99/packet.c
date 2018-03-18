@@ -12,17 +12,22 @@ int initPacket(Packet* packet)
   return 0;
 }
 
-int byteStuffedCopy(INT08U* buffer, INT08U* source, int sourceLength) {
+int framedCopy(INT08U* frame, INT08U* source, int sourceLength) {
   int delimCount = 0;
   int offset = 0;
+
+  // write frame leader
+  for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
+    frame[offset++] = FRAME_LEADER;
+
   for (int i = 0; i < sourceLength; i++)
   {
     INT08U byt = source[i];
-    buffer[offset++] = byt;
+    frame[offset++] = byt;
     delimCount = (byt == FRAME_LEADER) ? delimCount + 1 : 0;
     if (delimCount == (FRAME_LEADER_LENGTH - 1) )
     {
-      buffer[offset++] = FRAME_ESCAPE;
+      frame[offset++] = FRAME_ESCAPE;
       delimCount = 0;
     }
   }
@@ -31,7 +36,7 @@ int byteStuffedCopy(INT08U* buffer, INT08U* source, int sourceLength) {
 
 int headerLength(INT16U controlFlags)
 {
-  int len = 6;
+  int len = 2; // length of control flags
   if(controlFlags & CF_LINKSTATE) len += LINKSTATE_FIELD_SIZE;
   if(controlFlags & CF_SRCADDR) len += SRCADDR_FIELD_SIZE;
   if(controlFlags & CF_DESTADDR) len += DESTADDR_FIELD_SIZE;
@@ -43,7 +48,7 @@ int headerLength(INT16U controlFlags)
 
 int headerFieldOffset(INT16U controlFlags, INT16U field)
 {
-  int offset = 6;
+  int offset = 2;
 
   if (field == CF_LINKSTATE) return offset;
   if (controlFlags & CF_LINKSTATE) offset += LINKSTATE_FIELD_SIZE;
@@ -66,9 +71,9 @@ int headerFieldOffset(INT16U controlFlags, INT16U field)
 }
 
 // writes a bytestuffed frame that is ready to stream out
-int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int bufferSize)
+int writePacketToFrameBuffer(Packet* packet, INT08U* frameBuffer, int bufferSize)
 {
-  INT08U crcBuffer[MAX_PACKET_SIZE];
+  INT08U packetBuffer[MAX_PACKET_SIZE];
 
   // establish packet structure
   packet->controlFlags = CF_CRC;
@@ -82,74 +87,64 @@ int writePacketToBuffer(Packet* packet, INT08U* packetBuffer, int bufferSize)
   // set EDAC bits
   packet->controlFlags = CFHamEncode(packet->controlFlags);
 
-  int offset = 0;
-  for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
-    crcBuffer[offset++] = FRAME_LEADER;
+  writeINT16U(packetBuffer, packet->controlFlags);
 
-  writeINT16U(&crcBuffer[offset], packet->controlFlags);
-  offset += CF_FIELD_SIZE;
+  int offset = CF_FIELD_SIZE;
 
   if (packet->controlFlags & CF_LINKSTATE)
   {
-    crcBuffer[offset] = packet->linkState;
+    packetBuffer[offset] = packet->linkState;
     offset += LINKSTATE_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_SRCADDR)
   {
-    writeINT16U(&crcBuffer[offset], packet->srcAddr);
+    writeINT16U(&packetBuffer[offset], packet->srcAddr);
     offset += SRCADDR_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_DESTADDR)
   {
-    writeINT16U(&crcBuffer[offset], packet->destAddr);
+    writeINT16U(&packetBuffer[offset], packet->destAddr);
     offset += DESTADDR_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_SEQNUM)
   {
-    writeINT16U(&crcBuffer[offset], packet->seqNum);
+    writeINT16U(&packetBuffer[offset], packet->seqNum);
     offset += SEQNUM_FIELD_SIZE;
   }
 
   if (packet->controlFlags & CF_DATA)
   {
-    writeINT16U(&crcBuffer[offset], packet->dataSize);
+    writeINT16U(&packetBuffer[offset], packet->dataSize);
     offset += DATALENGTH_FIELD_SIZE;
 
-    // copy data block into crcBuffer
+    // copy data block into packetBuffer
     for (int i = 0; i < packet->dataSize; i++)
     {
-      crcBuffer[offset++] = packet->data[i];
+      packetBuffer[offset++] = packet->data[i];
     }
   }
 
   // compute CRC and append it to the buffer
   if (packet->controlFlags & CF_CRC)
   {
-    packet->crcSum = getCRC(crcBuffer, offset);
-    writeINT32U(&crcBuffer[offset], packet->crcSum);
+    packet->crcSum = getCRC(packetBuffer, offset);
+    writeINT32U(&packetBuffer[offset], packet->crcSum);
     offset += CRC_FIELD_SIZE;
   }
-  int crcBufferSize = offset;
 
-  // write the non-stuffed header
-  offset = 0;
-  for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
-    packetBuffer[offset++] = FRAME_LEADER;
+  // frame the packet with byte-stuffing
+  int byteCount = framedCopy(frameBuffer, packetBuffer, offset);
 
-  // byte-stuff the rest
-  int n = byteStuffedCopy(&packetBuffer[offset], &crcBuffer[offset], crcBufferSize-offset);
-  offset = offset + n;
-
-  return offset;
+  return byteCount;
 }
 
 // populates packet fields from packet contained in packetBuffer
 int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
 {
-  int offset = FRAME_LEADER_LENGTH;
+  int offset = 0;
   packet->controlFlags = readINT16U(&packetBuffer[offset]);
   offset += CF_FIELD_SIZE;
 

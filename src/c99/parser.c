@@ -30,7 +30,7 @@ int acceptPacket(Parser* parser)
   initPacket(&packet);
 
   // populate a Packet struct from the raw data
-  readPacketFromBuffer(&packet, parser->packetBuffer);
+  readPacketFromBuffer(&packet, parser->frameBuffer);
 
   // deliver to application code
   if (parser->packet_callback) {
@@ -65,9 +65,7 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
       parser->delimCount++;
       if(parser->delimCount == FRAME_LEADER_LENGTH)
       {
-        for (int i = 0; i < FRAME_LEADER_LENGTH; i++)
-          parser->packetBuffer[i] = FRAME_LEADER;
-        parser->headerIndex = FRAME_LEADER_LENGTH;
+        parser->headerIndex = 0;
         parser->state = STATE_GET_CF;
         continue;
       }
@@ -88,13 +86,13 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
         parser->state = STATE_FINDSTART;
         break;
       }
-      parser->packetBuffer[parser->headerIndex] = msg;
+      parser->frameBuffer[parser->headerIndex] = msg;
       parser->headerIndex++;
-      if(parser->headerIndex==6)
+      if(parser->headerIndex==2)
       { /* Ham CF */
-        INT16U cf = readINT16U(&parser->packetBuffer[FRAME_LEADER_LENGTH]);
+        INT16U cf = readINT16U(parser->frameBuffer);
         parser->controlFlags = CFHamDecode(cf);
-        writeINT16U(&parser->packetBuffer[FRAME_LEADER_LENGTH], parser->controlFlags);
+        writeINT16U(parser->frameBuffer, parser->controlFlags);
         parser->headerLength = headerLength(parser->controlFlags);
         parser->state = STATE_GETHEADER;
       }
@@ -106,7 +104,7 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
         parser->state = STATE_FINDSTART;
         break;
       }
-      parser->packetBuffer[parser->headerIndex] = msg;
+      parser->frameBuffer[parser->headerIndex] = msg;
       parser->headerIndex++;
       if(parser->headerIndex>=parser->headerLength)
       {
@@ -114,8 +112,8 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
         {
           parser->dataIndex = 0;
           int dataOffset = headerFieldOffset(parser->controlFlags, CF_DATA);
-          parser->dataLength = readINT16U(&parser->packetBuffer[dataOffset]);
-          parser->data = parser->packetBuffer + parser->headerLength; // set the data pointer to an offset in packetBuffer
+          parser->dataLength = readINT16U(&parser->frameBuffer[dataOffset]);
+          parser->data = parser->frameBuffer + parser->headerLength; // set the data pointer to an offset in frameBuffer
           parser->state = STATE_GETDATA;
         }
         else if (parser->controlFlags & CF_CRC)
@@ -159,7 +157,7 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
       {
         int checkSumInputLength = parser->headerLength+parser->dataLength;
         INT32U expectedCRC = readINT32U(parser->crcSum);
-        INT32U computedCRC = getCRC(parser->packetBuffer, checkSumInputLength);
+        INT32U computedCRC = getCRC(parser->frameBuffer, checkSumInputLength);
         if ( expectedCRC != computedCRC)
         { // TODO error reporting
           parser->state = STATE_FINDSTART;

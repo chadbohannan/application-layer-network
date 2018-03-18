@@ -19,7 +19,7 @@ int testText3Len = strlen(testText3);
 FILE* outFile; // c doesn't have closures, so we make the output file handle global
 void packet_callback(Packet* packet) {
   INT08U buffer[MAX_PACKET_SIZE];
-  int packetSize = writePacketToBuffer(packet, buffer, MAX_PACKET_SIZE);
+  int packetSize = writePacketToFrameBuffer(packet, buffer, MAX_PACKET_SIZE);
   fwrite(buffer, 1, packetSize, outFile);
   // printf("parsed a packet %d byte packet with %d data bytes\n", packetSize, packet->dataSize);
 }
@@ -44,15 +44,15 @@ int writeNewPacketsToFile()
    // first packet
    memcpy(packet.data, testText1, testText1Len);
    packet.dataSize = testText1Len;
-   int packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   // printf("writePacketToBuffer1 packetSize:%d\n", packetSize);
+   int packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
+   // printf("writePacketToFrameBuffer1 packetSize:%d\n", packetSize);
    fwrite(buffer, packetSize, 1, f);
 
    // second packet
    memcpy(packet.data, testText2, testText2Len);
    packet.dataSize = testText2Len;
-   packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   // printf("writePacketToBuffer2 packetSize:%d\n", packetSize);
+   packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
+   // printf("writePacketToFrameBuffer2 packetSize:%d\n", packetSize);
    fwrite(buffer, packetSize, 1, f);
 
    // third pcket
@@ -60,8 +60,8 @@ int writeNewPacketsToFile()
    packet.destAddr = 2;
    memcpy(packet.data, testText3, testText3Len);
    packet.dataSize = testText3Len;
-   packetSize = writePacketToBuffer(&packet, buffer, MAX_PACKET_SIZE);
-   // printf("writePacketToBuffer3 packetSize:%d\n", packetSize);
+   packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
+   // printf("writePacketToFrameBuffer3 packetSize:%d\n", packetSize);
    fwrite(buffer, packetSize, 1, f);
 
    // finished phase 1

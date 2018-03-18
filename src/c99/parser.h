@@ -38,7 +38,7 @@
 #define  LINK_CLOSE     0x0D
 
 typedef struct Parser {
-  INT08U packetBuffer[MAX_PACKET_SIZE];
+  INT08U frameBuffer[MAX_PACKET_SIZE];
 
   INT08U state;
   INT08U delimCount;

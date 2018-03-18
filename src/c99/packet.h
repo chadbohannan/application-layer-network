@@ -57,7 +57,7 @@ typedef struct Packet {
 int initPacket(Packet* packet);
 int headerLength(INT16U controlFlags);
 int headerFieldOffset(INT16U controlFlags, INT16U field);
-int writePacketToBuffer(Packet* packet, INT08U* outBuffer, int bufferSize);
+int writePacketToFrameBuffer(Packet* packet, INT08U* outBuffer, int bufferSize);
 int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer);
 
 
