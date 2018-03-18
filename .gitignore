@@ -1,5 +1,6 @@
 *.gch
 *.o
+*.pyc
 elp-serialization
 packets.input
 packets.output
