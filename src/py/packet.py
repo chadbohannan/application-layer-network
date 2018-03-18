@@ -210,14 +210,14 @@ class Packet:
             frameBuffer.append(byt)
             delimCount = (0, delimCount + 1)[byt == Packet.FRAME_LEADER]
             if (delimCount == (Packet.FRAME_LEADER_LENGTH - 1) ):
-                frameBuffer.append(FPacket.RAME_ESCAPE)
+                frameBuffer.append(Packet.FRAME_ESCAPE)
                 delimCount = 0
 
         return frameBuffer
 
     def toPacketBuffer(self): # returns a un-framed array
         # establish packet structure
-        self.controlFlags = CF_CRC
+        self.controlFlags = Packet.CF_CRC
         if (self.linkState):   self.controlFlags |= Packet.CF_LINKSTATE
         if (self.srcAddr):     self.controlFlags |= Packet.CF_SRCADDR
         if (self.destAddr):    self.controlFlags |= Packet.CF_DESTADDR
@@ -251,9 +251,10 @@ class Packet:
         # compute CRC and append it to the buffer
         if (self.controlFlags & Packet.CF_CRC):
             self.crcSum = crc(packetBuffer);
-            packetBuffer.extend(writeINT32U(self.crcSum))
-            offset += Packet.CRC_FIELD_SIZE;
-        return None
+            crcBytes = writeINT32U(self.crcSum)
+            packetBuffer.extend(crcBytes)
+
+        return packetBuffer
 
     # unpacks a recieved packet into local variables
     def parsePacketBytes(self, packetBuffer):

@@ -5,6 +5,9 @@ from parser import Parser
 
 def packet_callback(packet):
     print 'packet parsed with %d data bytes: %s' % (packet.dataSize, "".join(map(chr, packet.data)))
+    fname = "packetstream.output"
+    with open(fname, "ab") as f:
+        f.write("".join(map(chr, packet.toFramedBuffer())))
 
 def main():
     # TODO parse packets from the input file
