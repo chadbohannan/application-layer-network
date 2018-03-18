@@ -1,6 +1,5 @@
 import sys
 sys.path.insert(0, "../../src/py")
-
 from packet import Packet, readINT32U, writeINT32U
 from parser import Parser
 

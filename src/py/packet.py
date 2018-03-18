@@ -274,9 +274,8 @@ class Packet:
             return None
 
         cfBytes = packetBuffer[0:Packet.CF_FIELD_SIZE]
-        self.controlFlags = readINT16U(cfBytes)
+        self.controlFlags = CFHamDecode(readINT16U(cfBytes))
         offset = Packet.CF_FIELD_SIZE # length of controlFlags
-        # self.controlFlags = CFHamDecode(self.controlFlags)
 
         if(self.controlFlags & Packet.CF_LINKSTATE):
             self.linkState = packetBuffer[offset]

@@ -84,8 +84,8 @@ class Parser:
                     self.frameBuffer.append(msg)
                     self.headerIndex += 1
                     if (self.headerIndex == 2):
-                        self.controlFlags = readINT16U(self.frameBuffer)
-                        # self.controlFlags = CFHamDecode(cf)
+                        cf = readINT16U(self.frameBuffer)
+                        self.controlFlags = CFHamDecode(cf)
                         self.headerLength = Packet.headerLength(self.controlFlags)
                         self.state = Parser.STATE_GETHEADER
 
