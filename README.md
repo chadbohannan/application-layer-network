@@ -21,11 +21,9 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
   <tr>
     <td></td>
     <td colspan="8">ELP Packet</td>
-    <td>CRC</td>
   </tr>
   <tr>
-    <td colspan="9">ELP Packet</td>
-    <td>CRC</td>
+    <td colspan="9">ELP Frame</td>
   </tr>
 </table>
 
