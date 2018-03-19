@@ -23,7 +23,7 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
     <td colspan="8" align="center">ELP Packet</td>
   </tr>
   <tr>
-    <td colspan="9 align="center"">ELP Frame</td>
+    <td colspan="9 align="center">ELP Frame</td>
   </tr>
 </table>
 
