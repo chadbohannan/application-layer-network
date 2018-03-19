@@ -1,6 +1,8 @@
 # expanding-link-protocol
 Source, documentation and examples of ELP packet handlers in multiple programming languages.
 
+# Packet Structure
+
 <table>
   <tr>
     <td>Frame Leader*</td>
@@ -13,6 +15,18 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
     <td>Data</td>
     <td>CRC</td>
   </tr>
+  <tr>
+    <td>4</td>
+    <td>2</td>
+    <td>2</td>
+    <td>2</td>
+    <td>2</td>
+    <td>4</td>
+    <td>2</td>
+    <td>Variable</td>
+    <td>4</td>
+  </tr>
+
   <tr>
     <td>"<<<<"</td>
     <td colspan="7">CRC Content</td>
@@ -27,9 +41,7 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
   </tr>
 </table>
 
-
-# Packet Structure
-![alt text](elp-packet.png)
+<!-- ![alt text](elp-packet.png) -->
 
 Packets are delimited on the stream by 4 '<' characters.
 
