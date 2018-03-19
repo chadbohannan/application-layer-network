@@ -4,8 +4,8 @@ Source, documentation and examples of ELP packet handlers in multiple programmin
 | Frame Leader*  | Control Flags* | Source Addr  | Dest Addr| Seq Num | Ack Block | Data Length | Data | CRC
 | ------------- |------------- | ----- | --- | --- | --- | --- | --- | ---
 | <<<<      | 2 bytes | 2 bytes | 2 bytes | 2 bytes | 4 bytes | 2 bytes | variable | 4 bytes
-| Span <td colspan=1>Framing  <td colspan=7>CRC content <td colspan=1>CRC value
-| Span <td colspan=1>Framing  <td colspan=7>ELP Packet
+| Framing  <td colspan=7>CRC content <td colspan=1>CRC value
+| Framing  <td colspan=8>ELP Packet
 
 
 # Packet Structure
