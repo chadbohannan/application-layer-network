@@ -1,11 +1,33 @@
 # expanding-link-protocol
 Source, documentation and examples of ELP packet handlers in multiple programming languages.
 
-| Frame Leader*  | Control Flags* | Source Addr  | Dest Addr| Seq Num | Ack Block | Data Length | Data | CRC |
-| ------------- |------------- | ----- | --- | --- | --- | --- | --- | --- |
-| <<<<      | 2 bytes | 2 bytes | 2 bytes | 2 bytes | 4 bytes | 2 bytes | variable | 4 bytes|
-| Framing  <td colspan=7>CRC content <td colspan=1>CRC value |
-| Framing  <td colspan=8>ELP Packet |
+<table>
+  <tr>
+    <td>Frame Leader*</td>
+    <td>Control Flags*</td>
+    <td>Source</td>
+    <td>Destination</td>
+    <td>Seq Num</td>
+    <td>Ack Block</td>
+    <td>Data Length</td>
+    <td>Data</td>
+    <td>CRC</td>
+  </tr>
+  <tr>
+    <td>"<<<<"</td>
+    <td colspan="7">CRC Content</td>
+    <td>CRC</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td colspan="8">ELP Packet</td>
+    <td>CRC</td>
+  </tr>
+  <tr>
+    <td colspan="9">ELP Packet</td>
+    <td>CRC</td>
+  </tr>
+</table>
 
 
 # Packet Structure
