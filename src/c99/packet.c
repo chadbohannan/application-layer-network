@@ -176,18 +176,25 @@ int readPacketFromBuffer(Packet* packet, INT08U* packetBuffer)
   {
     packet->dataSize = readINT16U(&packetBuffer[offset]);
     offset += DATALENGTH_FIELD_SIZE;
+    INT32U computedCRC = getCRC(packetBuffer, offset);
+    INT32U frameCRC = readINT32U(&packetBuffer[offset]);
+    if (computedCRC != frameCRC)
+    {
+        // TODO report error
+        return 0;
+    }
     for (int i = 0; i < packet->dataSize; i++)
     {
        packet->data[i] = packetBuffer[offset++];
     }
-  }
+ }
 
   if (packet->controlFlags & CF_CRC)
   {
     packet->crcSum = readINT32U(&packetBuffer[offset]);
   }
 
-  return 0;
+  return offset;
 }
 
 
