@@ -15,9 +15,8 @@ void packet_callback(Packet* packet) {
   INT08U buffer[MAX_PACKET_SIZE];
   int packetSize = writePacketToFrameBuffer(packet, buffer, MAX_PACKET_SIZE);
   fwrite(buffer, 1, packetSize, outFile);
-  // printf("parsed a packet %d byte packet with %d data bytes\n", packetSize, packet->dataSize);
+  printf("parsed a packet %d byte packet with %d data bytes, crc:%lx\n", packetSize, packet->dataSize, packet->crcSum);
 }
-
 
 int writeNewPacketsToFile()
 {
@@ -38,14 +37,14 @@ int writeNewPacketsToFile()
   memcpy(packet.data, testText1, testText1Len);
   packet.dataSize = testText1Len;
   int packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
-  // printf("writePacketToFrameBuffer1 packetSize:%d\n", packetSize);
+  // printf("writePacketToFrameBuffer1 packetSize:%d, dataSize:%d, crc:%lx\n", packetSize, testText1Len, packet.crcSum);
   fwrite(buffer, packetSize, 1, f);
 
   // second packet
   memcpy(packet.data, testText2, testText2Len);
   packet.dataSize = testText2Len;
   packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
-  // printf("writePacketToFrameBuffer2 packetSize:%d\n", packetSize);
+  // printf("writePacketToFrameBuffer2 packetSize:%d, dataSize:%d, crc:%lx\n", packetSize, testText2Len, packet.crcSum);
   fwrite(buffer, packetSize, 1, f);
 
   // third pcket
@@ -54,7 +53,7 @@ int writeNewPacketsToFile()
   memcpy(packet.data, testText3, testText3Len);
   packet.dataSize = testText3Len;
   packetSize = writePacketToFrameBuffer(&packet, buffer, MAX_PACKET_SIZE);
-  // printf("writePacketToFrameBuffer3 packetSize:%d\n", packetSize);
+  // printf("writePacketToFrameBuffer3 packetSize:%d, dataSize:%d, crc:%lx\n", packetSize, testText3Len, packet.crcSum);
   fwrite(buffer, packetSize, 1, f);
 
   // finished phase 1
@@ -92,11 +91,10 @@ int streamPacketsToNewFile()
   }
   return 0;
 }
- 
+
 int main()
 {
 
   writeNewPacketsToFile();
   streamPacketsToNewFile();
 }
-

@@ -9,6 +9,8 @@
  **********************************************************************************************************************/
 #include "parser.h"
 
+#include <stdio.h>
+
 int initParser(Parser* parser, void (*packet_callback)(Packet*))
 {
   parser->state = STATE_FINDSTART;
@@ -33,9 +35,12 @@ int acceptPacket(Parser* parser)
   readPacketFromBuffer(&packet, parser->frameBuffer);
 
   // deliver to application code
-  if (parser->packet_callback) {
+  if (parser->packet_callback)
+  {
     parser->packet_callback(&packet);
-  } else {
+  }
+  else
+  {
     return -3; // TODO enumerate errors
   }
   parser->state = STATE_FINDSTART;
@@ -144,7 +149,8 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
           parser->crcSum = parser->data + parser->dataLength;
           parser->state = STATE_GETCRC;
         }
-        else {
+        else
+        {
           acceptPacket(parser);
         }
       }
@@ -156,13 +162,17 @@ int parseBytes(Parser* parser, INT08U* buffer, int numBytes)
       if(parser->crcIndex >= parser->crcLength)
       {
         int checkSumInputLength = parser->headerLength+parser->dataLength;
-        INT32U expectedCRC = readINT32U(parser->crcSum);
         INT32U computedCRC = getCRC(parser->frameBuffer, checkSumInputLength);
-        if ( expectedCRC != computedCRC)
-        { // TODO error reporting
-          parser->state = STATE_FINDSTART;
-        } else {
+        INT32U expectedCRC = readINT32U(parser->crcSum);
+        if ( expectedCRC == computedCRC)
+        {
           acceptPacket(parser);
+        }
+        else
+        {
+           // TODO error reporting
+           // printf("crc error, %lx != %lx\n", expectedCRC, computedCRC);
+           parser->state = STATE_FINDSTART;
         }
       }
       break; /* end STATE_GETCRC */
