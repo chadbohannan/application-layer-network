@@ -196,7 +196,7 @@ namespace ELP
 
         public static uint readUINT32(byte[] pData, int offset)
         {
-            uint value = (uint)((pData[offset] & 0x00FF) << 24);
+            uint value = (uint)(pData[offset] << 24);
             value |= (uint)(pData[offset + 1] << 16);
             value |= (uint)(pData[offset + 2] << 8);
             value |= pData[offset + 3];
@@ -295,7 +295,6 @@ namespace ELP
                     Console.Out.WriteLine("CRC OK");
                 }
             }
-
         }
 
         public void clear()
@@ -339,24 +338,24 @@ namespace ELP
         /// <param name="pdata">The byte array.</param>
         /// <returns>The CRC'ed value of input.</returns>
         static public uint CRC32(byte[] pdata, ushort start, ushort stop)
-        {           
+        {
             uint crc = 0xFFFFFFFF;
-            for (int i = start; i < stop; i++)
+            for (ushort i = start; i < stop; i++)
             {
                 byte c = pdata[i];
-                for (int j = 0x01; j <= 0x80; j <<= 1)
+                for (ushort j = 0x01; j <= 0x80; j <<= 1)
                 {
                     uint bit = crc & 0x80000000;
                     crc <<= 1;
                     if ((c & j) > 0) bit ^= 0x80000000;
-                    if (bit > 0) crc ^= 0x41C11DB7;
+                    if (bit > 0) crc ^= 0x4C11DB7;
                 }
             }
             /* Reverse */
-            crc = (((crc & 0x55555555) << 1) | ((crc & 0xAAAAAAAA) >> 1));
-            crc = (((crc & 0x33333333) << 2) | ((crc & 0xCCCCCCCC) >> 2));
-            crc = (((crc & 0x0F0F0F0F) << 4) | ((crc & 0xF0F0F0F0) >> 4));
-            crc = (((crc & 0x00FF00FF) << 8) | ((crc & 0xFF00FF00) >> 8));
+            crc = (((crc & 0x55555555) <<  1) | ((crc & 0xAAAAAAAA) >>  1));
+            crc = (((crc & 0x33333333) <<  2) | ((crc & 0xCCCCCCCC) >>  2));
+            crc = (((crc & 0x0F0F0F0F) <<  4) | ((crc & 0xF0F0F0F0) >>  4));
+            crc = (((crc & 0x00FF00FF) <<  8) | ((crc & 0xFF00FF00) >>  8));
             crc = (((crc & 0x0000FFFF) << 16) | ((crc & 0xFFFF0000) >> 16));
             return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
         }
@@ -371,7 +370,7 @@ namespace ELP
                     uint bit = crc & 0x80000000;
                     crc <<= 1;
                     if ((c & j) > 0) bit ^= 0x80000000;
-                    if (bit > 0) crc ^= 0x41C11DB7;
+                    if (bit > 0) crc ^= 0x4C11DB7;
                 }
             }
             /* Reverse */
