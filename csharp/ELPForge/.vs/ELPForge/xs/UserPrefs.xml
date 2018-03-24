@@ -1,0 +1,14 @@
+﻿<Properties StartupConfiguration="{15B23AD2-4F86-476C-8169-3DC9D23AC946}|Default">
+  <MonoDevelop.Ide.Workbench ActiveDocument="ELPForge/Program.cs">
+    <Files>
+      <File FileName="ELPForge/Program.cs" Line="32" Column="14" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MultiItemStartupConfigurations />
+  <MonoDevelop.Ide.ItemProperties.ELPForge PreferredExecutionTarget="MonoDevelop.Default" />
+</Properties>

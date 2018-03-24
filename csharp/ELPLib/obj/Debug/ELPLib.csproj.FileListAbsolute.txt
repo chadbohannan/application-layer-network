@@ -1,0 +1,5 @@
+/Users/chad/workspace/expanding-link-protocol/src/csharp/ELPLib/bin/Debug/ELPLib.dll
+/Users/chad/workspace/expanding-link-protocol/src/csharp/ELPLib/bin/Debug/ELPLib.pdb
+/Users/chad/workspace/expanding-link-protocol/src/csharp/ELPLib/obj/Debug/ELPLib.csproj.CoreCompileInputs.cache
+/Users/chad/workspace/expanding-link-protocol/src/csharp/ELPLib/obj/Debug/ELPLib.dll
+/Users/chad/workspace/expanding-link-protocol/src/csharp/ELPLib/obj/Debug/ELPLib.pdb

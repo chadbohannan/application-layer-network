@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "../../src/c99/parser.h"
+#include "../src/parser.h"
 
 
 FILE* outFile; // c doesn't have closures, so we make the output file handle global

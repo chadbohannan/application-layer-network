@@ -1,0 +1,9 @@
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/bin/Debug/ELPForge.exe.config
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/bin/Debug/ELPForge.exe
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/bin/Debug/ELPForge.pdb
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/bin/Debug/ELPLib.dll
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/bin/Debug/ELPLib.pdb
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/obj/Debug/ELPForge.csprojResolveAssemblyReference.cache
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/obj/Debug/ELPForge.csproj.CoreCompileInputs.cache
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/obj/Debug/ELPForge.exe
+/Users/chad/workspace/expanding-link-protocol/examples/ELPForge/ELPForge/obj/Debug/ELPForge.pdb

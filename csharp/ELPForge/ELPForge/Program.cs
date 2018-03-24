@@ -31,7 +31,7 @@ namespace ELPForge
                 
             }
             Console.Out.WriteLine("press Enter to quit");
-            Console.In.ReadLine();
+            string r  = Console.In.ReadLine();
         }
     }
 }
