@@ -46,10 +46,64 @@ This library offers a working packetizer & parser 'off the shelf' useful for app
   </tr>
 </table>
 
-<!-- ![alt text](elp-packet.png) -->
 
-Packet frames are delimited by four 0x3C ('<') characters. Frames will have 0xC3 bytes inserted into the byte sequence after three '<' occur in sequence a packet.
+Frames are delimited by four 0x3C ('<') characters. If contain data that would appear to indicate a frame delimiter then there will be a 0xC3 byte inserted ('byte stuffed') into the byte sequence after three '<' occur in sequence a packet.
 
-The controlFlags field is a set of bit flags that indicate the presence of header fields. The shortest valid packet is 6 bytes: 4 '<' and 2 null (zero) bytes; the 'empty' packet can be used to keep links alive when no data is available.
+A Frame contains a single Packet which starts with a two byte sequence of Control Flag bits. Of these 16 bits, 4 are used for forward error correction, 1 is static to prevent the frame delimeter byte ever being the first control byte, and the remaining 11 flag bits used to indicate which fields are present in the packet header.
 
-There are 11 bits available in the Control Flags field. The remaining bits are used to calculate Hamming bits for forward error correction (helpful on links with poor connectivity or high bit errors rates). The implementations make some attempt to parameterize the fields defined by this protocol.
+If the Data flag is set the Data Length field will be followed by the number of bytes indicated.
+
+If the CRC flag is set the last for bytes of the packet will be a CRC32 result of the prior bytes (unframed packet).
+
+To be valid an ELP fram must contain a frame delimiter and 2 control flag bytes, it need not contain content, thus the minimum length of an ELP packet is 6 bytes; 4 delimeter bytes and 2 control bytes that contain only zeros. The largest packet supported by this implementation is composed by setting all 7 packet fields and maximizing data capacity is 65556 bytes. Such packets are expected when reliable mesh-networking protocols utilize all fields support content fragmentation and resequencing.
+
+
+# Goals
+This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-organizing software applications across a broad range of application domians. The lofty goal of this repository is to provide intercompatable libraries with few dependencies so that new projects can be prototyped quickly, even if multiple languges and code bases are need to achieve nessessary functionality.
+ELP intends to make as small a footprint in your application as possible, allowing for other technologies to replace it as your project matures and evolves.
+
+# Planning
+Here's the current state of intention:
+ * Define Packet
+   * 4 byte frame leader
+   * 2 control bytes with 11 usable bits
+   * 7 packet fields (4 unused control bits)
+   * CRC32
+ * Parse Packets
+   * Buffers streaming input
+   * Validated packets are accepted
+ * Encapuslate Serial Links (single hop)
+   * Assume full-duplix links, for now
+   * Only protocol is framed packet transmission
+ * Ad Hoc Networking (packet routing)
+   * Develop protocol based on  [AODV](https://en.wikipedia.org/wiki/Ad_hoc_On-Demand_Distance_Vector_Routing) for multihop mesh networking
+   * Encapsulate protocol handler into local mesh gateway
+ * Transmission Control (end-to-end or 'socket' reliability)
+   * Synchronize sequence numbers
+   * Retransmit lost packets from rotating buffer
+   * Ought to work both with a single-hop link or multi-hop socket
+
+
+# Repository Status
+
+Here's how far the intent has manifested:
+
+## [C99](./c99/README.md)
+ * Packet implemented but could be more efficient
+ * Parser done.
+
+## [C#](./csharp/README.md)
+ * Packet done.
+ * Parser done.
+
+## [Go](./go/README.md)
+ * Not started
+
+## [Java](./java/README.md)
+ * Started
+
+ ## [python](./python/README.md)
+ * Packet done.
+ * Parser done.
+
+ 
