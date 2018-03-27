@@ -15,7 +15,7 @@ void packet_callback(Packet* packet) {
   INT08U buffer[MAX_PACKET_SIZE];
   int packetSize = writePacketToFrameBuffer(packet, buffer, MAX_PACKET_SIZE);
   fwrite(buffer, 1, packetSize, outFile);
-  printf("parsed a %d byte frame with %d data bytes, crc:%lx\n", packetSize, packet->dataSize, packet->crcSum);
+  printf("parsed a %d byte frame with %d data bytes, crc:%x\n", packetSize, packet->dataSize, packet->crcSum);
 }
 
 int writeNewPacketsToFile()
