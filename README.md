@@ -102,7 +102,7 @@ Here's how far the intent has manifested:
 ## [Java](./java/README.md)
  * Started
 
- ## [python](./python/README.md)
+ ## [Python 2.7](./python/README.md)
  * Packet done.
  * Parser done.
 

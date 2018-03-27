@@ -1,8 +1,9 @@
 package main
 
 import (
-	"elp"
 	"fmt"
+
+	"github.com/chadbohannan/expanding-link-protocol/go/elp"
 )
 
 func maine() {

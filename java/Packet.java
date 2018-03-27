@@ -1,8 +1,8 @@
 import java.util.ArrayList;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
-/// <summary>
-/// Packet class declaration.
-/// </summary>
+// Packet class declaration.
 public class Packet {
     static private byte IntXOR(int n) {
         byte cnt = 0x0;
@@ -64,17 +64,17 @@ public class Packet {
     }
 
     public class ControlFlag {
-        public static final byte unused4=0x0400;
-        public static final byte unused3=0x0200;
-        public static final byte unused2=0x0100;
-        public static final byte unused1=0x0080;
-        public static final byte linkState=0x0040;
-        public static final byte scrAddr=0x0020;
-        public static final byte destAddr=0x0010;
-        public static final byte seqNum=0x0008;
-        public static final byte ackBlock=0x0004;
-        public static final byte data=0x0002;
-        public static final byte crc=0x0001;
+        public static final int unused4=0x0400;
+        public static final int unused3=0x0200;
+        public static final int unused2=0x0100;
+        public static final int unused1=0x0080;
+        public static final int linkState=0x0040;
+        public static final int scrAddr=0x0020;
+        public static final int destAddr=0x0010;
+        public static final int seqNum=0x0008;
+        public static final int ackBlock=0x0004;
+        public static final int data=0x0002;
+        public static final int crc=0x0001;
     }
 
     public class LinkState {
@@ -87,9 +87,9 @@ public class Packet {
         public static final byte CLOSE = 0x0D;
     }
 
-    public static final byte FrameLeader = 0x3C;
-    public static final byte FrameLeaderLength = 4;
-    public static final byte FrameEscape = 0xC3;
+    public static final byte FrameLeader = (byte) 0x3C;
+    public static final byte FrameEscape = (byte) 0xC3;
+    public static final int FrameLeaderLength = 4;
 
     public byte LinkState;
     public short SourceAddress;
@@ -113,28 +113,43 @@ public class Packet {
         init(pData);
     }
 
-    public static Integer readUINT16(byte[] pData, int offset) {
-        Integer value = new Integer(pData[offset] << 8);
-        value |= pData[offset + 1];
+    public Packet(ArrayList<Byte> byteList) {
+        byte[] buf = new byte[byteList.size()];
+        for (int i = 0; i < byteList.size(); i++)
+            buf[i] = byteList.get(i);
+        init(buf);
+    }
+
+    public static short readUINT16(byte[] pData, int offset) {
+        short value = (short)((pData[offset] << 8) & 0xFF00);
+        value |= (pData[offset + 1] & (short)0x00FF);
         return value;
     }
 
-    public static byte[] writeUINT16(Integer value) {
+    public static byte[] writeUINT16(int value) {
         byte[] bytes = new byte[2];
         bytes[0] = (byte) (value >> 8);
         bytes[1] = (byte) (value & 0x00FF);
         return bytes;
     }
 
-    public static long readUINT32(byte[] pData, int offset) {
-        long value = new Integer(pData[offset] << 24);
-        value |= (pData[offset + 1] << 16);
-        value |= (pData[offset + 2] << 8);
-        value |= pData[offset + 3];
+    public static byte[] toByteArray(ArrayList<Byte> list) {
+        byte[] array = new byte[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            array[i] = list.get(i);
+        }
+        return array;
+    }
+
+    public static int readUINT32(byte[] pData, int offset) {
+        int value = (int)((pData[offset] << 24) & 0xFF000000);
+        value |= (int)((pData[offset + 1] << 16) & 0x00FF0000);
+        value |= (int)((pData[offset + 2] << 8) & 0x0000FF00);
+        value |= (int)((pData[offset + 3]) & 0x000000FF);
         return value;
     }
 
-    public static byte[] writeUINT32(long value) {
+    public static byte[] writeUINT32(int value) {
         byte[] bytes = new byte[4];
         bytes[0] = (byte) (value >> 24);
         bytes[1] = (byte) (value >> 16 & 0x00FF);
@@ -143,7 +158,7 @@ public class Packet {
         return bytes;
     }
 
-    public static int fieldOffset(short controlFlags, ControlFlag field) {
+    public static int fieldOffset(short controlFlags, int field) {
         int offset = 2; // ControlFlag bytes
         if (field == ControlFlag.linkState)
             return offset;
@@ -208,10 +223,9 @@ public class Packet {
             int crcPacket = readUINT32(pData, offset);
             int crcCalc = CRC32(pData, 0, offset);
             if (crcPacket != crcCalc) {
-                String msg = String.Format("CRC error, {0:X8} != {1:X8}", crcPacket, crcCalc);
-                Console.Out.WriteLine(msg);
+                System.out.printf("CRC error, %x != %x\n", crcPacket, crcCalc);
             } else {
-                Console.Out.WriteLine("CRC OK");
+                System.out.printf("CRC OK\n");
             }
         }
     }
@@ -225,9 +239,7 @@ public class Packet {
         Data = new byte[] {};
     }
 
-    /// <summary>
-    /// returns the hamming encoded Control Field 
-    /// </summary>
+    // returns the hamming encoded Control Field 
     public short ControlField() {
         short controlField = 0;
         if (LinkState != 0) controlField |= ControlFlag.linkState;
@@ -235,146 +247,144 @@ public class Packet {
         if (DestinationAddress != 0) controlField |= ControlFlag.destAddr;
         if (SequenceNum != 0) controlField |= ControlFlag.seqNum;
         if (AcknowledgeBlock != 0) controlField |= ControlFlag.ackBlock;
-        if (Data.Length != 0) controlField |= ControlFlag.data;
+        if (Data != null && Data.length != 0) controlField |= ControlFlag.data;
         controlField |= ControlFlag.crc; // TODO enable control of CRC
         controlField = Encode(controlField);
         return controlField;
     }
 
-    /// <summary>
-    /// Calculate ELP's prefered 32 bit Cyclic Redundancy Check of a byte array
-    /// </summary>
-    /// <param name="pdata">The byte array.</param>
-    /// <returns>The CRC'ed value of input.</returns>
+    // Calculate 32 bit Cyclic Redundancy Check of a byte array
     static public int CRC32(byte[] pdata, int start, int stop) {
-        int crc = 0xFFFFFFFF;
-        for (int i = start; i < stop; i++) {
-            byte c = pdata[i];
-            for (int j = 0x01; j <= 0x80; j <<= 1) {
-                int bit = crc & 0x80000000;
-                crc <<= 1;
-                if ((c & j) > 0)
-                    bit ^= 0x80000000;
-                if (bit > 0)
-                    crc ^= 0x4C11DB7;
-            }
-        }
-        /* Reverse */
-        crc = (((crc & 0x55555555) << 1) | ((crc & 0xAAAAAAAA) >> 1));
-        crc = (((crc & 0x33333333) << 2) | ((crc & 0xCCCCCCCC) >> 2));
-        crc = (((crc & 0x0F0F0F0F) << 4) | ((crc & 0xF0F0F0F0) >> 4));
-        crc = (((crc & 0x00FF00FF) << 8) | ((crc & 0xFF00FF00) >> 8));
-        crc = (((crc & 0x0000FFFF) << 16) | ((crc & 0xFFFF0000) >> 16));
-        return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
+        Checksum checksum = new CRC32();
+        checksum.update(pdata, start, stop);
+        return (int)checksum.getValue();
+
+        // int crc = 0xFFFFFFFF;
+        // for (int i = start; i < stop; i++) {
+        //     byte c = pdata[i];
+        //     System.out.printf("c:%x ", c);
+        //     for (int j = 0x01; j <= 0x80; j <<= 1) {
+        //         int bit = crc & 0x80000000;
+        //         System.out.printf("Debug A %d: bit:%x\n", i, bit);
+        //         crc <<= 1;
+        //         System.out.printf("Debug B %d: crc:%x\n", i, crc);
+        //         System.out.printf("c & j %x\n", c & j);
+        //         if ((c & j) != 0)
+        //             bit ^= 0x80000000;
+        //         System.out.printf("Debug C %d: bit:%x\n", i, bit);
+        //         if (bit > 0)
+        //             crc ^= 0x4C11DB7;
+        //         System.out.printf("Debug D %d: crc:%x\n", i, crc);
+        //     }
+        //     System.out.printf("Debug E %d: crc:%x\n", i, crc);
+        // }
+        // System.out.printf("Debug F: crc:%x\n", crc);
+        // /* Reverse */
+        // crc = (((crc & 0x55555555) << 1) | ((crc & 0xAAAAAAAA) >> 1));
+        // crc = (((crc & 0x33333333) << 2) | ((crc & 0xCCCCCCCC) >> 2));
+        // crc = (((crc & 0x0F0F0F0F) << 4) | ((crc & 0xF0F0F0F0) >> 4));
+        // crc = (((crc & 0x00FF00FF) << 8) | ((crc & 0xFF00FF00) >> 8));
+        // crc = (((crc & 0x0000FFFF) << 16) | ((crc & 0xFFFF0000) >> 16));
+        // return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
     }
 
-    /// <summary>
-    /// Creates a byte array containing the serialized packet framed for transmission.
-    /// </summary>
-    /// <returns>The byte stuffed packet buffer ready for transmission.</returns>
+    // Creates a byte array containing the serialized packet framed for transmission
     private byte[] toFrameBuffer()
     {
-        ArrayList byteBuffer = new ArrayList();
+        ArrayList<Byte> byteBuffer = new ArrayList<>();
         for (int i = 0; i < FrameLeaderLength; i++)
-            byteBuffer.Add(FrameLeader);
+            byteBuffer.add(FrameLeader);
 
         int count = 0;
-        ArrayList<byte> buf = toPacketBuffer();
-        for (int i = 0; i < buf.length; i++) {
-            byteBuffer.Add(buf[i]);
+        ArrayList<Byte> content = toPacketBuffer();
+        for (int i = 0; i < content.size(); i++) {
+            Byte b = content.get(i);
+            byteBuffer.add(b);
             if (b == FrameLeader) {
                 ++count;
                 if (count == 3) {
-                    byteBuffer.Add((byte)FrameEscape);
+                    byteBuffer.add(FrameEscape);
                     count = 0;
                 }
             }
             else count = 0;
         }
-        byte[] returnBuf = new byte[byteBuffer.Count];
-        for (int i = 0; i < byteBuffer.Count; i++)
+        // make a primative byte array and deep copy into it
+        byte[] returnBuf = new byte[byteBuffer.size()];
+        for (int i = 0; i < byteBuffer.size(); i++)
             returnBuf[i] = (byte)(byteBuffer.get(i));
         return returnBuf;
     }
 
-    /// <summary>
-    /// returns a byte array of the Packet
-    /// </summary>
-    public LinkedList toPacketBuffer() {
-        LinkedList list = new LinkedList();
+    // returns a byte array of the Packet
+    public ArrayList<Byte> toPacketBuffer() {
+        ArrayList<Byte> list = new ArrayList<>();
 
-        int controlField = ControlField;
+        int controlField = ControlField();
         byte[] cf = writeUINT16(controlField);
         for (int i = 0; i < cf.length; i++)
-            list.AddLast(cf[i]);
+            list.add(cf[i]);
 
         if ((controlField & ControlFlag.linkState) != 0) {
-            list.AddLast(LinkState);
+            list.add(LinkState);
         }
         if ((controlField & ControlFlag.scrAddr) != 0) {
             byte[] buf = writeUINT16(SourceAddress);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
         }
         if((controlField & ControlFlag.destAddr)!=0) {
             byte[] buf = writeUINT16(DestinationAddress);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
         }
         if((controlField & ControlFlag.seqNum)!=0) {
             byte[] buf = writeUINT16(SequenceNum);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
         }
         if((controlField & ControlFlag.ackBlock)!=0) {
             byte[] buf = writeUINT32(AcknowledgeBlock);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
         }
         if((controlField &  ControlFlag.data)!=0) {
-            byte[] buf = writeUINT16(Data.Length);
+            // first metadata
+            byte[] buf = writeUINT16(Data.length);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
 
-            // then the data
+            // then data
             for (int i = 0; i < Data.length; i++)
-                list.AddLast(Data[i]);
+                list.add(Data[i]);
         }
         if((controlField & ControlFlag.crc)!=0) {
-            int crcValue = CRC32(list);
+            int crcValue = CRC32(toByteArray(list), 0, list.size());
             byte[] buf = writeUINT32(crcValue);
             for (int i = 0; i < buf.length; i++)
-                list.AddLast(buf[i]);
+                list.add(buf[i]);
         }
-
         return list;
     }
 
-    /// <summary>
-    /// Summary description for Packet.
-    /// </summary>
+    // Summary description for Packet.
     public String toString() {
-        short controlField = ControlField;
-        byte[] cf = BitConverter.GetBytes(controlField);
-
-        StringBuilder sb = new StringBuilder();
-        sb.AppendFormat("{0:X2}", cf[1]);
-        sb.AppendFormat("{0:X2}", cf[0]);
-
+        short controlField = ControlField();
+        byte[] cf = writeUINT16(controlField);
+        String s = String.format("%x%x", cf[0], cf[1]);
         if ((controlField & ControlFlag.linkState) != 0)
-            sb.AppendFormat("{0:X2}", LinkState);
+            s += String.format("%x", LinkState);
         if ((controlField & ControlFlag.scrAddr) != 0)
-            sb.AppendFormat("{0:X4}", SourceAddress);
+            s += String.format("%x", SourceAddress);
         if ((controlField & ControlFlag.destAddr) != 0)
-            sb.AppendFormat("{0:X4}", DestinationAddress);
+            s += String.format("%x", DestinationAddress);
         if ((controlField & ControlFlag.seqNum) != 0)
-            sb.AppendFormat("{0:X4}", SequenceNum);
+            s += String.format("%x", SequenceNum);
         if ((controlField & ControlFlag.ackBlock) != 0)
-            sb.AppendFormat("{0:X8}", AcknowledgeBlock);
+            s += String.format("%x", AcknowledgeBlock);
         if ((controlField & ControlFlag.data) != 0)
-            sb.AppendFormat("{0:X4}", Data.Length);
-
-        return sb.ToString();
+            s += String.format("%x", Data.length);
+        return s;
     }
 
 }
