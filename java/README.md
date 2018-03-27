@@ -1,5 +1,5 @@
 # Status
 
-Started - not functional
+Packet implemented but depends on java.util.zip for CRC32 computation.
 
-Java doesn't have signed types? That's a little weird...
+Parser not started.

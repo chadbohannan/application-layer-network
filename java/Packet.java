@@ -97,6 +97,7 @@ public class Packet {
     public short SequenceNum;
     public int AcknowledgeBlock;
     public byte[] Data;
+    public int CRC;
     
     public Packet() { }
 
@@ -223,9 +224,11 @@ public class Packet {
             int crcPacket = readUINT32(pData, offset);
             int crcCalc = CRC32(pData, 0, offset);
             if (crcPacket != crcCalc) {
+                // TODO error handling
                 System.out.printf("CRC error, %x != %x\n", crcPacket, crcCalc);
+                CRC = -1;
             } else {
-                System.out.printf("CRC OK\n");
+                CRC = crcPacket;
             }
         }
     }

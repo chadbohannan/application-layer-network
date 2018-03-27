@@ -1,35 +1,35 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
+
 
 public class Example {
 
     public static void main(String[] args) {
-        // Prints "Hello, World" to the terminal window.
-        System.out.println("Hello, World");
-
-        Packet p1 = new Packet();
-        p1.DestinationAddress = 43;
-        
-        ArrayList<Byte> byteList = p1.toPacketBuffer();
-        System.out.println(byteList);
-
-        Packet p2 = new Packet(byteList);
-        System.out.println(p2.toPacketBuffer());
-
-        byte[] bytes = new byte[]{
-            (byte) 0x7F,
-            (byte) 0xFF,
-            (byte) 0xFF,
-            (byte) 0xFF
+        Parser.IPacketHandler handler = new Parser.IPacketHandler(){
+            public void onPacket(Packet p) {
+                for (int i = 0; i < p.Data.length; i++)
+                    System.out.print((char) p.Data[i]);
+                System.out.printf("\n%d data bytes, crc=%x\n", p.Data.length, p.CRC);
+            }
         };
 
-        int v1 = Packet.readUINT32(bytes, 0);
-        System.out.println(v1);
-
-        byte[] a = Packet.writeUINT32(v1);
-        System.out.println(a);
-
-        int v2 = Packet.readUINT32(a, 0);
-        System.out.println(v2);
+        Parser parser = new Parser(handler);
+        File file = new File("packetstream.input");
+        
+        try {
+            FileInputStream is = new FileInputStream(file);
+            byte[] b = new byte[5];
+            int l = is.read(b);
+            while (l > 0) {
+                parser.readBytes(b);
+                l = is.read(b);
+            }
+            is.close();
+        } catch(Exception e){
+            System.out.println(e.getMessage());
+        }
 
     }
 
