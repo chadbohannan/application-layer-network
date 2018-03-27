@@ -2,7 +2,7 @@
 Source, documentation and examples of ELP packet handlers in multiple programming languages.
 
 # Why?
-Packet frames are a useful means of moving data through a network. This library attempts to offer a packet composer/parser compatable with itself across several languages without the development overhead of related solutions such as (Protocol Buffers)[https://developers.google.com/protocol-buffers/].
+Packet frames are a useful means of moving data through a network. This library attempts to offer a packet composer/parser compatable with itself across several languages without the development overhead of related solutions such as [Protocol Buffers](https://developers.google.com/protocol-buffers/).
 
 This library offers a working packetizer & parser 'off the shelf' useful for applications build across heterogenous runtimes such as occur when linking sensor networks to cloud technologies.
 
@@ -59,8 +59,7 @@ To be valid an ELP fram must contain a frame delimiter and 2 control flag bytes,
 
 
 # Goals
-This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-organizing software applications across a broad range of application domians. The lofty goal of this repository is to provide intercompatable libraries with few dependencies so that new projects can be prototyped quickly, even if multiple languges and code bases are need to achieve nessessary functionality.
-ELP intends to make as small a footprint in your application as possible, allowing for other technologies to replace it as your project matures and evolves.
+This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-organizing software applications across a broad range of application domians.
 
 # Planning
 Here's the current state of intention:
@@ -75,10 +74,10 @@ Here's the current state of intention:
  * Encapuslate Serial Links (single hop)
    * Assume full-duplix links, for now
    * Only protocol is framed packet transmission
- * Ad Hoc Networking (packet routing)
-   * Develop protocol based on  [AODV](https://en.wikipedia.org/wiki/Ad_hoc_On-Demand_Distance_Vector_Routing) for multihop mesh networking
-   * Encapsulate protocol handler into local mesh gateway
- * Transmission Control (end-to-end or 'socket' reliability)
+ * Ad Hoc Networking (mesh routing)
+   * [AODV](https://en.wikipedia.org/wiki/Ad_hoc_On-Demand_Distance_Vector_Routing) type protocol for route discovery
+   * Encapsulate protocol handler into 'local gateway' interface
+ * Transmission Control (end-to-end sockets)
    * Synchronize sequence numbers
    * Retransmit lost packets from rotating buffer
    * Ought to work both with a single-hop link or multi-hop socket
