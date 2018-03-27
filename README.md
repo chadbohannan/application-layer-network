@@ -59,7 +59,7 @@ To be valid an ELP fram must contain a frame delimiter and 2 control flag bytes,
 
 
 # Goals
-This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-organizing software applications across a broad range of application domians.
+This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-healing multi-network software across a broad range of application domians.
 
 # Planning
 Here's the current state of intention:
@@ -93,13 +93,14 @@ Here's how far the intent has manifested:
 
 ## [C#](./csharp/README.md)
  * Packet done.
- * Parser done.
+ * Parser CRC32 evaluation is incomplete.
 
 ## [Go](./go/README.md)
  * Not started
 
 ## [Java](./java/README.md)
- * Started
+ * Packet implemented but depends on java.util.zip for CRC32 computation.
+ * Parser done.
 
  ## [Python 2.7](./python/README.md)
  * Packet done.

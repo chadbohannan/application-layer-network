@@ -148,10 +148,6 @@ public class Parser {
         }
     }
 
-    /// <summary>
-    /// This gets the CRC, checks the body then sends the package before reseting the parser.
-    /// </summary>
-    /// <param name="b">The current byte being worked on.</param>
     private void GetCRC(byte b) {
         int crcStart = headerIndex + dataIndex;
         buffer[crcStart + crcIndex] = b;
