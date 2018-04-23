@@ -12,14 +12,6 @@
 
 #include "packet.h"
 
-/**********************************************************************************************************************
- *                  RETURN CODES
- **********************************************************************************************************************/
-#define  ERROR_NONE          0 // no errors
-
-/**********************************************************************************************************************
- *                  PROTOCOL DEFINITIONS
- **********************************************************************************************************************/
 
 // Packet parsing state enumeration
 #define STATE_FINDSTART  0
@@ -28,7 +20,7 @@
 #define STATE_GETDATA    3
 #define STATE_GETCRC     4
 
-// LinkState value enumerations (TODO support source routing)
+// LinkState value enumerations (TODO support mesh routing)
 #define  LINK_CONNECT   0x01
 #define  LINK_CONNECTED 0x03
 #define  LINK_PING      0x05
