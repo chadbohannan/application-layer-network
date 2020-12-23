@@ -6,6 +6,6 @@ import (
 	"github.com/chadbohannan/expanding-link-protocol/go/elp"
 )
 
-func maine() {
+func main() {
 	fmt.Println(elp.Value)
 }

@@ -105,15 +105,15 @@ class Packet:
     FRAME_ESCAPE        = 0xC3
 
     # Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
-    CF_UNUSED4   = 0x0400
-    CF_UNUSED3   = 0x0200
-    CF_UNUSED2   = 0x0100
-    CF_UNUSED1   = 0x0080
-    CF_LINKSTATE = 0x0040
-    CF_SRCADDR   = 0x0020
-    CF_DESTADDR  = 0x0010
-    CF_SEQNUM    = 0x0008
-    CF_ACKBLOCK  = 0x0004
+    CF_UNUSED2   = 0x0400
+    CF_UNUSED1   = 0x0200
+    CF_LINKSTATE = 0x0100
+    CF_SRCADDR   = 0x0080
+    CF_DESTADDR  = 0x0040
+    CF_SEQNUM    = 0x0020
+    CF_ACKBLOCK  = 0x0010
+    CF_CONTEXTID = 0X0008
+    CF_DATATYPE  = 0X0004
     CF_DATA      = 0x0002
     CF_CRC       = 0x0001
 
@@ -124,6 +124,8 @@ class Packet:
     DESTADDR_FIELD_SIZE   = 2 # INT16U
     SEQNUM_FIELD_SIZE     = 2 # INT16U
     ACKBLOCK_FIELD_SIZE   = 4 # INT32U
+    CONTEXTID_FIELD_SIZE  = 2 # INT16U
+    DATATYPE_FIELD_SIZE   = 1 # INT08U
     DATALENGTH_FIELD_SIZE = 2 # INT16U
     CRC_FIELD_SIZE        = 4 # INT32U
 
@@ -133,6 +135,8 @@ class Packet:
       DESTADDR_FIELD_SIZE + \
       SEQNUM_FIELD_SIZE + \
       ACKBLOCK_FIELD_SIZE + \
+      CONTEXTID_FIELD_SIZE + \
+      DATATYPE_FIELD_SIZE + \
       DATALENGTH_FIELD_SIZE
 
     MAX_DATA_SIZE = 1024 # small number to prevent constrained device stack overflow
@@ -158,6 +162,10 @@ class Packet:
             len += Packet.SEQNUM_FIELD_SIZE
         if(controlFlags & Packet.CF_ACKBLOCK):
             len += Packet.ACKBLOCK_FIELD_SIZE
+        if(controlFlags & Packet.CF_CONTEXTID):
+            len += Packet.CONTEXTID_FIELD_SIZE
+        if(controlFlags & Packet.CF_DATATYPE):
+            len += Packet.DATATYPE_FIELD_SIZE
         if(controlFlags & Packet.CF_DATA):
             len += Packet.DATALENGTH_FIELD_SIZE
         return len
@@ -191,6 +199,16 @@ class Packet:
       if (controlFlags & Packet.CF_ACKBLOCK):
           offset += Packet.ACKBLOCK_FIELD_SIZE
 
+      if (field == Packet.CF_CONTEXTID):
+          return offset
+      if (controlFlags & Packet.CF_CONTEXTID):
+          offset += Packet.CONTEXTID_FIELD_SIZE
+
+      if (field == Packet.CF_DATATYPE):
+          return offset
+      if (controlFlags & Packet.CF_DATATYPE):
+          offset += Packet.DATATYPE_FIELD_SIZE
+
       if (field == Packet.CF_DATA):
           return offset
       return None # TODO enumerate errors
@@ -223,6 +241,9 @@ class Packet:
         if (self.destAddr):    self.controlFlags |= Packet.CF_DESTADDR
         if (self.seqNum):      self.controlFlags |= Packet.CF_SEQNUM
         if (self.ackBlock):    self.controlFlags |= Packet.CF_ACKBLOCK
+        if (self.ackBlock):    self.controlFlags |= Packet.CF_ACKBLOCK
+        if (self.context_id):  self.controlFlags |= Packet.CF_CONTEXTID
+        if (self.data_type):   self.controlFlags |= Packet.CF_DATATYPE
         if (self.dataSize):    self.controlFlags |= Packet.CF_DATA
 
         # set EDAC bits
@@ -244,6 +265,12 @@ class Packet:
         if (self.controlFlags & Packet.CF_SEQNUM):
             packetBuffer.extend(writeINT16U(self.seqNum))
 
+        if (self.controlFlags & Packet.CF_CONTEXTID):
+            packetBuffer.extend(writeINT16U(self.contet_id))
+
+        if (self.controlFlags & Packet.CF_DATATYPE`):
+            packetBuffer.extend(writeINT16U(self.data_type))
+
         if (self.controlFlags & Packet.CF_DATA):
             packetBuffer.extend(writeINT16U(self.dataSize))
             packetBuffer.extend(self.data)
@@ -260,14 +287,16 @@ class Packet:
     def parsePacketBytes(self, packetBuffer):
         # initialize fields
         self.controlFlags = 0x0000
-        self.linkState = 0x00
-        self.srcAddr   = 0x0000
-        self.destAddr  = 0x0000
-        self.seqNum    = 0x0000
-        self.ackBlock  = 0x00000000
-        self.dataSize  = 0
-        self.data      = []
-        self.crcSum    = 0x00000000
+        self.linkState    = 0x00
+        self.srcAddr      = 0x0000
+        self.destAddr     = 0x0000
+        self.seqNum       = 0x0000
+        self.ackBlock     = 0x00000000
+        self.context_id   = 0x0000
+        self.data_type    = 0x00
+        self.dataSize     = 0
+        self.data         = []
+        self.crcSum       = 0x00000000
 
         if (len(packetBuffer) < 2):
             self.error = "packet < 2 bytes long"
@@ -300,6 +329,16 @@ class Packet:
             ackBytes = packetBuffer[offset:offset+Packet.ACKBLOCK_FIELD_SIZE]
             self.ackBlock = readINT16U(ackBytes)
             offset += Packet.ACKBLOCK_FIELD_SIZE
+
+        if(self.controlFlags & Packet.CF_CONTEXTID):
+            contextBytes = packetBuffer[offset:offset+Packet.CONTEXTID_FIELD_SIZE]
+            self.context_id = readINT16U(contextBytes)
+            offset += Packet.CONTEXTID_FIELD_SIZE
+
+        if(self.controlFlags & Packet.CF_DATATYPE):
+            typeBytes = packetBuffer[offset:offset+Packet.DATATYPE_FIELD_SIZE]
+            self.data_type = readINT16U(typeBytes)
+            offset += Packet.DATATYPE_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_DATA):
             lengthBytes = packetBuffer[offset:offset+Packet.DATALENGTH_FIELD_SIZE]

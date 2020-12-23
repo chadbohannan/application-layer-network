@@ -2,6 +2,12 @@ package elp
 
 import "io"
 
+// AddressType of all ELP packets
+type AddressType uint16
+
+// AddressTypeSize must be the size of AddressType in bytes
+const AddressTypeSize = 2
+
 // Packet framing
 const (
 	FRAME_LEADER_LENGTH = 4
@@ -12,15 +18,15 @@ const (
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
 const (
-	CF_UNUSED4   = 0x0400
-	CF_UNUSED3   = 0x0200
-	CF_UNUSED2   = 0x0100
-	CF_UNUSED1   = 0x0080
-	CF_LINKSTATE = 0x0040
-	CF_SRCADDR   = 0x0020
-	CF_DESTADDR  = 0x0010
-	CF_SEQNUM    = 0x0008
-	CF_ACKBLOCK  = 0x0004
+	CF_UNUSED2   = 0x0400
+	CF_UNUSED1   = 0x0200
+	CF_LINKSTATE = 0x0100
+	CF_SRCADDR   = 0x0080
+	CF_DESTADDR  = 0x0040
+	CF_SEQNUM    = 0x0020
+	CF_ACKBLOCK  = 0x0010
+	CF_CONTEXTID = 0x0008
+	CF_DATATYPE  = 0x0004
 	CF_DATA      = 0x0002
 	CF_CRC       = 0x0001
 )
@@ -53,8 +59,8 @@ const (
 type Packet struct {
 	ControlFlags uint16
 	LinkState    byte
-	SrcAddr      uint16
-	DestAddr     uint16
+	SrcAddr      AddressType
+	DestAddr     AddressType
 	SeqNum       uint16
 	AckBlock     uint32
 	DataSize     uint16
@@ -78,19 +84,22 @@ func headerFieldOffset(controlFlags, fieldBit uint16) int {
 	return 0
 }
 
-func writePacketToFrameBuffer(packet *Packet, outBuffer []byte) error {
-	return nil
-}
-
 func (p *Packet) HeaderLength() int {
 	return headerLength(p.ControlFlags)
 }
 
+// returns an unframed packet buffer
 func (p *Packet) ToBytes() (output []byte) {
 	return output
 }
 
-func WriteTo(w io.Writer) (n int64, err error) {
+// returns a byte array with starting delimiter and may contain escape chars
+func (p *Packet) ToFrameBytes() (output []byte) {
+	return output
+}
+
+// writes a framed packet to the writer
+func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	return n, err
 }
 
