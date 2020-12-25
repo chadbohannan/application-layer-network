@@ -4,10 +4,11 @@ import "fmt"
 
 /*
 An ELP network is a set of routers connected by channels.
-Nodes are addresses that packets can be sent to either locally
-or via a connected channel.
+Nodes may be local or remote addresses on the network.
 */
 
+// ChannelCostMap describes the link cost of available
+//   channels to a Node.
 type ChannelCostMap map[Channel]uint16
 
 // RouteMap holds all the RouteRecord elements with the same Dest.
@@ -48,11 +49,18 @@ func (r *Router) Send(p *Packet) error {
 	if onPacket, ok := r.localNodeMap[p.DestAddr]; ok {
 		onPacket(p)
 	} else if routes, ok := r.routeMap[p.DestAddr]; ok {
-		if len(routes) > 0 {
-			routes[0].Link.Send(p)
-		} else {
+		if len(routes) == 0 {
 			return fmt.Errorf("empty route list for %d [%X]", p.DestAddr, p.DestAddr)
 		}
+		var c Channel
+		minCost := uint16(9999)
+		for _c, cost := range routes {
+			if cost < minCost {
+				c = _c
+				cost = minCost
+			}
+		}
+		c.Send(p)
 	} else {
 		return fmt.Errorf("no route for %d [%X]", p.DestAddr, p.DestAddr)
 	}
@@ -75,7 +83,7 @@ func (r *Router) AddChannel(channel Channel) {
 				case 1:
 					if packet.DataSize == 4 {
 						address := AddressType(packet.Data[0])
-						cost := readINT16U(packet.Data[1:3])
+						cost := bytesToINT16U(packet.Data[1:3])
 						r.channelMap[channel][address] = cost
 						r.routeMap[address][channel] = cost
 					} else {
@@ -83,8 +91,8 @@ func (r *Router) AddChannel(channel Channel) {
 					}
 				case 2:
 					if packet.DataSize == 4 {
-						address := AddressType(readINT16U(packet.Data[:2]))
-						cost := readINT16U(packet.Data[2:4])
+						address := AddressType(bytesToINT16U(packet.Data[:2]))
+						cost := bytesToINT16U(packet.Data[2:4])
 						r.channelMap[channel][address] = cost
 						r.routeMap[address][channel] = cost
 					} else {
@@ -92,8 +100,8 @@ func (r *Router) AddChannel(channel Channel) {
 					}
 				case 4:
 					if packet.DataSize == 4 {
-						address := AddressType(readINT32U(packet.Data[:4]))
-						cost := readINT16U(packet.Data[4:6])
+						address := AddressType(bytesToINT32U(packet.Data[:4]))
+						cost := bytesToINT16U(packet.Data[4:6])
 						r.channelMap[channel][address] = cost
 						r.routeMap[address][channel] = cost
 					} else {

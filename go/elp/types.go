@@ -8,21 +8,29 @@ const ( // Link State enumeration
 	LinkStateNodeRouteCost = 2
 )
 
-func readINT16U(buff []byte) uint16 {
+func bytesToINT16U(buff []byte) uint16 {
 	if len(buff) == 2 {
 		return (uint16(buff[0]) << 8) | uint16(buff[1])
 	}
 	return 0xFFFF
 }
 
-func writeINT16U(value uint16) []byte {
+func bytesOfINT16U(value uint16) []byte {
 	return []byte{
 		byte(value >> 8),
 		byte(value & 0xFF),
 	}
 }
 
-func readINT32U(buff []byte) uint32 {
+func bytesOfAddressType(value AddressType) []byte {
+	return bytesOfINT16U(uint16(value))
+}
+
+func bytesToAddressType(buff []byte) AddressType {
+	return AddressType(bytesToINT16U(buff))
+}
+
+func bytesToINT32U(buff []byte) uint32 {
 	if len(buff) == 4 {
 		return uint32(buff[0])<<24 |
 			uint32(buff[1])<<16 |
@@ -32,7 +40,7 @@ func readINT32U(buff []byte) uint32 {
 	return 0xFFFFFFFF
 }
 
-func writeINT32U(value uint32) []byte {
+func bytesOfINT32U(value uint32) []byte {
 	return []byte{
 		byte((value >> 24) & 0xFF),
 		byte((value >> 16) & 0xFF),

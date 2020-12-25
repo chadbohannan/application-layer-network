@@ -1,6 +1,10 @@
 package elp
 
-import "io"
+import (
+	"bytes"
+	"fmt"
+	"io"
+)
 
 // AddressType of all ELP packets
 type AddressType uint16
@@ -39,6 +43,8 @@ const (
 	DESTADDR_FIELD_SIZE   = 2 // INT16U
 	SEQNUM_FIELD_SIZE     = 2 // INT16U
 	ACKBLOCK_FIELD_SIZE   = 4 // INT32U
+	CONTEXTID_FIELD_SIZE  = 2 // INT16U
+	DATATYPE_FIELD_SIZE   = 1 // INT08U
 	DATALENGTH_FIELD_SIZE = 2 // INT16U
 	CRC_FIELD_SIZE        = 4 // INT32U
 )
@@ -63,6 +69,8 @@ type Packet struct {
 	DestAddr     AddressType
 	SeqNum       uint16
 	AckBlock     uint32
+	ContextID    uint16
+	DataType     uint8
 	DataSize     uint16
 	Data         []byte
 	CrcSum       uint32
@@ -72,83 +80,209 @@ func NewPacket() *Packet {
 	return &Packet{}
 }
 
-func ParsePacket(buf []byte) (*Packet, error) {
-	return nil, nil
+// ParsePacket makes a structured packet from an unframed buffer
+func ParsePacket(packetBuffer []byte) (*Packet, error) {
+	if len(packetBuffer) < 2 {
+		return nil, fmt.Errorf("packet < 2 bytes long")
+	}
+
+	pkt := NewPacket()
+
+	cfBytes := packetBuffer[0:CF_FIELD_SIZE]
+	pkt.ControlFlags = CFHamDecode(bytesToINT16U(cfBytes))
+	offset := CF_FIELD_SIZE // length of controlFlags
+
+	if pkt.ControlFlags&CF_LINKSTATE != 0 {
+		pkt.LinkState = packetBuffer[offset]
+		offset += LINKSTATE_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_SRCADDR != 0 {
+		srcBytes := packetBuffer[offset : offset+SRCADDR_FIELD_SIZE]
+		pkt.SrcAddr = bytesToAddressType(srcBytes)
+		offset += SRCADDR_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_DESTADDR != 0 {
+		destBytes := packetBuffer[offset : offset+DESTADDR_FIELD_SIZE]
+		pkt.DestAddr = bytesToAddressType(destBytes)
+		offset += DESTADDR_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_SEQNUM != 0 {
+		seqBytes := packetBuffer[offset : offset+SEQNUM_FIELD_SIZE]
+		pkt.SeqNum = bytesToINT16U(seqBytes)
+		offset += SEQNUM_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_ACKBLOCK != 0 {
+		ackBytes := packetBuffer[offset : offset+ACKBLOCK_FIELD_SIZE]
+		pkt.AckBlock = bytesToINT32U(ackBytes)
+		offset += ACKBLOCK_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_CONTEXTID != 0 {
+		contextBytes := packetBuffer[offset : offset+CONTEXTID_FIELD_SIZE]
+		pkt.ContextID = bytesToINT16U(contextBytes)
+		offset += CONTEXTID_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_DATATYPE != 0 {
+		pkt.DataType = packetBuffer[offset]
+		offset += DATATYPE_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_DATA != 0 {
+		lengthBytes := packetBuffer[offset : offset+DATALENGTH_FIELD_SIZE]
+		pkt.DataSize = bytesToINT16U(lengthBytes)
+		offset += DATALENGTH_FIELD_SIZE
+		pkt.Data = packetBuffer[offset : offset+int(pkt.DataSize)]
+	}
+	return pkt, nil
 }
 
-func headerLength(controlFlags uint16) int {
-	return 0
+func HeaderLength(controlFlags uint16) uint8 {
+	return HeaderFieldOffset(controlFlags, 0)
 }
 
-func headerFieldOffset(controlFlags, fieldBit uint16) int {
-	return 0
+func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
+	offset := uint8(2)
+	if field == CF_LINKSTATE {
+		return offset
+	}
+	if controlFlags&CF_LINKSTATE != 0 {
+		offset += LINKSTATE_FIELD_SIZE
+	}
+	if field == CF_SRCADDR {
+		return offset
+	}
+	if controlFlags&CF_SRCADDR != 0 {
+		offset += SRCADDR_FIELD_SIZE
+	}
+	if field == CF_DESTADDR {
+		return offset
+	}
+	if controlFlags&CF_DESTADDR != 0 {
+		offset += DESTADDR_FIELD_SIZE
+	}
+	if field == CF_SEQNUM {
+		return offset
+	}
+	if controlFlags&CF_SEQNUM != 0 {
+		offset += SEQNUM_FIELD_SIZE
+	}
+	if field == CF_ACKBLOCK {
+		return offset
+	}
+	if controlFlags&CF_ACKBLOCK != 0 {
+		offset += ACKBLOCK_FIELD_SIZE
+	}
+	if field == CF_CONTEXTID {
+		return offset
+	}
+	if controlFlags&CF_CONTEXTID != 0 {
+		offset += CONTEXTID_FIELD_SIZE
+	}
+	if field == CF_DATATYPE {
+		return offset
+	}
+	if controlFlags&CF_DATATYPE != 0 {
+		offset += DATATYPE_FIELD_SIZE
+	}
+	return offset
 }
 
-func (p *Packet) HeaderLength() int {
-	return headerLength(p.ControlFlags)
+// ToBytes returns an unframed packet buffer
+func (p *Packet) ToBytes() ([]byte, error) {
+	if len(p.Data) > 65535 {
+		return nil, fmt.Errorf("len p.Data > 65535")
+	}
+	p.DataSize = uint16(len(p.Data))
+
+	controlFlags := uint16(CF_CRC)
+	if p.LinkState != 0 {
+		controlFlags |= CF_LINKSTATE
+	}
+	if p.SrcAddr != 0 {
+		controlFlags |= CF_SRCADDR
+	}
+	if p.DestAddr != 0 {
+		controlFlags |= CF_DESTADDR
+	}
+	if p.SeqNum != 0 {
+		controlFlags |= CF_SEQNUM
+	}
+	if p.AckBlock != 0 {
+		controlFlags |= CF_ACKBLOCK
+	}
+	if p.ContextID != 0 {
+		controlFlags |= CF_CONTEXTID
+	}
+	if p.DataType != 0 {
+		controlFlags |= CF_DATATYPE
+	}
+	if p.DataSize != 0 {
+		controlFlags |= CF_DATA
+	}
+
+	p.ControlFlags = CFHamEncode(controlFlags)
+
+	buff := bytes.NewBuffer([]byte{})
+	buff.Write(bytesOfINT16U(p.ControlFlags))
+
+	if controlFlags&CF_LINKSTATE != 0 {
+		buff.Write([]byte{p.LinkState})
+	}
+	if controlFlags&CF_SRCADDR != 0 {
+		buff.Write(bytesOfAddressType(p.SrcAddr))
+	}
+	if controlFlags&CF_DESTADDR != 0 {
+		buff.Write(bytesOfAddressType(p.DestAddr))
+	}
+	if controlFlags&CF_SEQNUM != 0 {
+		buff.Write(bytesOfINT16U(p.SeqNum))
+	}
+	if controlFlags&CF_ACKBLOCK != 0 {
+		buff.Write(bytesOfINT32U(p.AckBlock))
+	}
+	if controlFlags&CF_CONTEXTID != 0 {
+		buff.Write(bytesOfINT16U(p.ContextID))
+	}
+	if controlFlags&CF_DATATYPE != 0 {
+		buff.Write([]byte{p.DataType})
+	}
+	if controlFlags&CF_DATA != 0 {
+		buff.Write(bytesOfINT16U(p.DataSize))
+		buff.Write(p.Data)
+	}
+	if controlFlags&CF_CRC != 0 {
+		p.CrcSum = CRC32(buff.Bytes())
+		buff.Write(bytesOfINT32U(p.CrcSum))
+	}
+	return buff.Bytes(), nil
 }
 
-// returns an unframed packet buffer
-func (p *Packet) ToBytes() (output []byte) {
-	return output
+// ToFrameBytes returns a byte array with starting delimiter and may contain escape chars
+func (p *Packet) ToFrameBytes() ([]byte, error) {
+	buff := bytes.NewBuffer([]byte{})
+	for i := 0; i < FRAME_LEADER_LENGTH; i++ {
+		buff.WriteByte(FRAME_LEADER)
+	}
+	packetBytes, err := p.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+	delimCount := 0
+	for _, byt := range packetBytes {
+		buff.WriteByte(byt)
+		if byt == FRAME_LEADER {
+			delimCount++
+		} else {
+			delimCount = 0
+		}
+		if delimCount == (FRAME_LEADER_LENGTH - 1) {
+			buff.WriteByte(FRAME_ESCAPE)
+			delimCount = 0
+		}
+	}
+
+	return buff.Bytes(), nil
 }
 
-// returns a byte array with starting delimiter and may contain escape chars
-func (p *Packet) ToFrameBytes() (output []byte) {
-	return output
-}
-
-// writes a framed packet to the writer
+// WriteTo writes a framed packet to the writer
 func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
 	return n, err
-}
-
-func CRC32(pdata []byte) uint32 {
-	return 0
-}
-
-/*
- * This encodes the CF using a modified Hamming (15,11).
- * Returns the encoded 11 bit CF as a 15 bit codeword.
- * Only the 0x07FF bits are  aloud to be on for the input all others will be ignored.
- * Based off of the following Hamming (15,11) matrix...
- * G[16,11] = [[1000,0000,0000,1111],  0x800F
- *             [0100,0000,0000,0111],  0x4007
- *             [0010,0000,0000,1011],  0x200B
- *             [0001,0000,0000,1101],  0x100D
- *             [0000,1000,0000,1110],  0x080E
- *             [0000,0100,0000,0011],  0x0403
- *             [0000,0010,0000,0101],  0x0205
- *             [0000,0001,0000,0110],  0x0106
- *             [0000,0000,1000,1010],  0x008A
- *             [0000,0000,0100,1001],  0x0049
- *             [0000,0000,0010,1100]]; 0x002C
- */
-func CFHamEncode(value uint16) uint16 {
-	return 0
-}
-
-/*
- * This decodes the CF using a modified Hamming (15,11).
- * It will fix one error, if only one error occures, not very good for burst errors.
- * This is a SEC (single error correction) which means it has no BED (bit error detection) to save on size.
- * The returned value will be, if fixed properly, the same 11 bits that were sent into the encoder.
- * Bits 0xF800 will be zero.
- * Based off of the following Hamming (15,11) matrix...
- * H[16,4]  = [[1011,1000,1110,1000],  0x171D
- *             [1101,1011,0010,0100],  0x24DB
- *             [1110,1101,1000,0010],  0x41B7
- *             [1111,0110,0100,0001]]; 0x826F
- */
-func CFHamDecode(value uint16) uint16 {
-	return 0
-}
-
-/* DESCRIPTION : This is a modified "Sparse Ones Bit Count".
- *               Instead of counting the ones it just determines
- *               if there was an odd or even count of bits by XORing the int.
- * ARGUMENTS   : This is a 32 bit number to count the ones of.
- * RETURNS     : Return 0x0 or 0x1. */
-func IntXOR(n uint32) byte {
-	return 0
 }

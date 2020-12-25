@@ -35,17 +35,16 @@ def writeINT32U(value):
 def crc(pdata):
     c = 0
     i = 0
-    j = 0
     bit = 0
     crc = 0xFFFFFFFF;
     for c in pdata:
-        j = 0x0001
-        while (j <= 0x0080):
+        i = 0x0001
+        while (i <= 0x0080):
             bit = crc & 0x80000000;
             crc <<= 1
-            if((c&j)>0): bit ^= 0x80000000
+            if((c&i)>0): bit ^= 0x80000000
             if(bit>0): crc ^= 0x4C11DB7
-            j <<= 1
+            i <<= 1
 
     # reverse
     crc=(((crc& 0x55555555)<< 1)|((crc& 0xAAAAAAAA)>> 1))
@@ -241,9 +240,8 @@ class Packet:
         if (self.destAddr):    self.controlFlags |= Packet.CF_DESTADDR
         if (self.seqNum):      self.controlFlags |= Packet.CF_SEQNUM
         if (self.ackBlock):    self.controlFlags |= Packet.CF_ACKBLOCK
-        if (self.ackBlock):    self.controlFlags |= Packet.CF_ACKBLOCK
-        if (self.context_id):  self.controlFlags |= Packet.CF_CONTEXTID
-        if (self.data_type):   self.controlFlags |= Packet.CF_DATATYPE
+        if (self.contextID):  self.controlFlags |= Packet.CF_CONTEXTID
+        if (self.dataType):   self.controlFlags |= Packet.CF_DATATYPE
         if (self.dataSize):    self.controlFlags |= Packet.CF_DATA
 
         # set EDAC bits
@@ -265,11 +263,14 @@ class Packet:
         if (self.controlFlags & Packet.CF_SEQNUM):
             packetBuffer.extend(writeINT16U(self.seqNum))
 
+        if (self.controlFlags & Packet.CF_ACKBLOCK):
+            packetBuffer.extend(writeINT32U(self.ackBlock))
+
         if (self.controlFlags & Packet.CF_CONTEXTID):
             packetBuffer.extend(writeINT16U(self.contet_id))
 
-        if (self.controlFlags & Packet.CF_DATATYPE`):
-            packetBuffer.extend(writeINT16U(self.data_type))
+        if (self.controlFlags & Packet.CF_DATATYPE):
+            packetBuffer.extend(writeINT16U(self.dataType))
 
         if (self.controlFlags & Packet.CF_DATA):
             packetBuffer.extend(writeINT16U(self.dataSize))
@@ -292,8 +293,8 @@ class Packet:
         self.destAddr     = 0x0000
         self.seqNum       = 0x0000
         self.ackBlock     = 0x00000000
-        self.context_id   = 0x0000
-        self.data_type    = 0x00
+        self.contextID   = 0x0000
+        self.dataType    = 0x00
         self.dataSize     = 0
         self.data         = []
         self.crcSum       = 0x00000000
@@ -332,12 +333,12 @@ class Packet:
 
         if(self.controlFlags & Packet.CF_CONTEXTID):
             contextBytes = packetBuffer[offset:offset+Packet.CONTEXTID_FIELD_SIZE]
-            self.context_id = readINT16U(contextBytes)
+            self.contextID = readINT16U(contextBytes)
             offset += Packet.CONTEXTID_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_DATATYPE):
             typeBytes = packetBuffer[offset:offset+Packet.DATATYPE_FIELD_SIZE]
-            self.data_type = readINT16U(typeBytes)
+            self.dataType = readINT16U(typeBytes)
             offset += Packet.DATATYPE_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_DATA):
