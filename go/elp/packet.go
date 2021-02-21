@@ -2,6 +2,7 @@ package elp
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 )
@@ -22,11 +23,16 @@ const (
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
 const (
-	CF_UNUSED2   = 0x0400
-	CF_UNUSED1   = 0x0200
-	CF_LINKSTATE = 0x0100
-	CF_SRCADDR   = 0x0080
-	CF_DESTADDR  = 0x0040
+	CF_HAMMING1  = 0x8000
+	CF_HAMMING2  = 0x4000
+	CF_HAMMING3  = 0x2000
+	CF_HAMMING4  = 0x1000
+	CF_HAMMING5  = 0x0800
+	CF_NETSTATE  = 0x0400
+	CF_SERVICEID = 0x0200
+	CF_SRCADDR   = 0x0100
+	CF_DESTADDR  = 0x0080
+	CF_NEXTADDR  = 0x0040
 	CF_SEQNUM    = 0x0020
 	CF_ACKBLOCK  = 0x0010
 	CF_CONTEXTID = 0x0008
@@ -38,9 +44,11 @@ const (
 // Packet header field sizes
 const (
 	CF_FIELD_SIZE         = 2 // INT16U
-	LINKSTATE_FIELD_SIZE  = 1 // INT08U enumerated
+	NETSTATE_FIELD_SIZE   = 1 // INT08U enumerated
+	SERVICEID_FIELD_SIZE  = 2 // INT16U enumerated
 	SRCADDR_FIELD_SIZE    = 2 // INT16U
 	DESTADDR_FIELD_SIZE   = 2 // INT16U
+	NEXTADDR_FIELD_SIZE   = 2 // INT16U
 	SEQNUM_FIELD_SIZE     = 2 // INT16U
 	ACKBLOCK_FIELD_SIZE   = 4 // INT32U
 	CONTEXTID_FIELD_SIZE  = 2 // INT16U
@@ -52,28 +60,34 @@ const (
 // limits
 const (
 	MAX_HEADER_SIZE = CF_FIELD_SIZE +
-		LINKSTATE_FIELD_SIZE +
+		NETSTATE_FIELD_SIZE +
+		SERVICEID_FIELD_SIZE +
 		SRCADDR_FIELD_SIZE +
 		DESTADDR_FIELD_SIZE +
+		NEXTADDR_FIELD_SIZE +
 		SEQNUM_FIELD_SIZE +
 		ACKBLOCK_FIELD_SIZE +
+		CONTEXTID_FIELD_SIZE +
+		DATATYPE_FIELD_SIZE +
 		DATALENGTH_FIELD_SIZE
 	MAX_DATA_SIZE   = 1024 // small number to prevent stack overflow
 	MAX_PACKET_SIZE = MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 )
 
 type Packet struct {
-	ControlFlags uint16
-	LinkState    byte
-	SrcAddr      AddressType
-	DestAddr     AddressType
-	SeqNum       uint16
-	AckBlock     uint32
-	ContextID    uint16
-	DataType     uint8
-	DataSize     uint16
-	Data         []byte
-	CrcSum       uint32
+	ControlFlags uint16      `bson:"cf" json:"cf"`
+	NetState     byte        `bson:"net" json:"net"`
+	ServiceID    uint16      `bson:"srv" json:"srv"`
+	SrcAddr      AddressType `bson:"src" json:"src"`
+	DestAddr     AddressType `bson:"dst" json:"dst"`
+	NextAddr     AddressType `bson:"nxt" json:"nxt"`
+	SeqNum       uint16      `bson:"seq" json:"seq"`
+	AckBlock     uint32      `bson:"ack" json:"ack"`
+	ContextID    uint16      `bson:"ctx" json:"ctx"`
+	DataType     uint8       `bson:"typ" json:"typ"`
+	DataSize     uint16      `bson:"sz" json:"sz"`
+	Data         []byte      `bson:"data" json:"data"`
+	CrcSum       uint32      `bson:"crc" json:"crc"`
 }
 
 func NewPacket() *Packet {
@@ -91,10 +105,14 @@ func ParsePacket(packetBuffer []byte) (*Packet, error) {
 	cfBytes := packetBuffer[0:CF_FIELD_SIZE]
 	pkt.ControlFlags = CFHamDecode(bytesToINT16U(cfBytes))
 	offset := CF_FIELD_SIZE // length of controlFlags
-
-	if pkt.ControlFlags&CF_LINKSTATE != 0 {
-		pkt.LinkState = packetBuffer[offset]
-		offset += LINKSTATE_FIELD_SIZE
+	if pkt.ControlFlags&CF_NETSTATE != 0 {
+		pkt.NetState = packetBuffer[offset]
+		offset += NETSTATE_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_SERVICEID != 0 {
+		seqBytes := packetBuffer[offset : offset+SERVICEID_FIELD_SIZE]
+		pkt.ServiceID = bytesToINT16U(seqBytes)
+		offset += SERVICEID_FIELD_SIZE
 	}
 	if pkt.ControlFlags&CF_SRCADDR != 0 {
 		srcBytes := packetBuffer[offset : offset+SRCADDR_FIELD_SIZE]
@@ -105,6 +123,11 @@ func ParsePacket(packetBuffer []byte) (*Packet, error) {
 		destBytes := packetBuffer[offset : offset+DESTADDR_FIELD_SIZE]
 		pkt.DestAddr = bytesToAddressType(destBytes)
 		offset += DESTADDR_FIELD_SIZE
+	}
+	if pkt.ControlFlags&CF_NEXTADDR != 0 {
+		destBytes := packetBuffer[offset : offset+NEXTADDR_FIELD_SIZE]
+		pkt.NextAddr = bytesToAddressType(destBytes)
+		offset += NEXTADDR_FIELD_SIZE
 	}
 	if pkt.ControlFlags&CF_SEQNUM != 0 {
 		seqBytes := packetBuffer[offset : offset+SEQNUM_FIELD_SIZE]
@@ -139,12 +162,18 @@ func HeaderLength(controlFlags uint16) uint8 {
 }
 
 func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
-	offset := uint8(2)
-	if field == CF_LINKSTATE {
+	offset := uint8(CF_FIELD_SIZE)
+	if field == CF_NETSTATE {
 		return offset
 	}
-	if controlFlags&CF_LINKSTATE != 0 {
-		offset += LINKSTATE_FIELD_SIZE
+	if controlFlags&CF_NETSTATE != 0 {
+		offset += NETSTATE_FIELD_SIZE
+	}
+	if field == CF_SERVICEID {
+		return offset
+	}
+	if controlFlags&CF_SERVICEID != 0 {
+		offset += SERVICEID_FIELD_SIZE
 	}
 	if field == CF_SRCADDR {
 		return offset
@@ -157,6 +186,12 @@ func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
 	}
 	if controlFlags&CF_DESTADDR != 0 {
 		offset += DESTADDR_FIELD_SIZE
+	}
+	if field == CF_NEXTADDR {
+		return offset
+	}
+	if controlFlags&CF_NEXTADDR != 0 {
+		offset += NEXTADDR_FIELD_SIZE
 	}
 	if field == CF_SEQNUM {
 		return offset
@@ -182,25 +217,31 @@ func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
 	if controlFlags&CF_DATATYPE != 0 {
 		offset += DATATYPE_FIELD_SIZE
 	}
+	if field == CF_DATA {
+		return offset
+	}
+	if controlFlags&CF_DATA != 0 {
+		offset += DATALENGTH_FIELD_SIZE
+	}
 	return offset
 }
 
-// ToBytes returns an unframed packet buffer
-func (p *Packet) ToBytes() ([]byte, error) {
-	if len(p.Data) > 65535 {
-		return nil, fmt.Errorf("len p.Data > 65535")
+func (p *Packet) SetControlFlags() {
+	controlFlags := uint16(0)
+	if p.NetState != 0 {
+		controlFlags |= CF_NETSTATE
 	}
-	p.DataSize = uint16(len(p.Data))
-
-	controlFlags := uint16(CF_CRC)
-	if p.LinkState != 0 {
-		controlFlags |= CF_LINKSTATE
+	if p.ServiceID != 0 {
+		controlFlags |= CF_SERVICEID
 	}
 	if p.SrcAddr != 0 {
 		controlFlags |= CF_SRCADDR
 	}
 	if p.DestAddr != 0 {
 		controlFlags |= CF_DESTADDR
+	}
+	if p.NextAddr != 0 {
+		controlFlags |= CF_NEXTADDR
 	}
 	if p.SeqNum != 0 {
 		controlFlags |= CF_SEQNUM
@@ -219,36 +260,51 @@ func (p *Packet) ToBytes() ([]byte, error) {
 	}
 
 	p.ControlFlags = CFHamEncode(controlFlags)
+}
+
+// ToBytes returns an unframed packet buffer
+func (p *Packet) ToBytes() ([]byte, error) {
+	if len(p.Data) > 65535 {
+		return nil, fmt.Errorf("len p.Data > 65535")
+	}
+	p.DataSize = uint16(len(p.Data))
+	p.SetControlFlags()
 
 	buff := bytes.NewBuffer([]byte{})
 	buff.Write(bytesOfINT16U(p.ControlFlags))
 
-	if controlFlags&CF_LINKSTATE != 0 {
-		buff.Write([]byte{p.LinkState})
+	if p.ControlFlags&CF_NETSTATE != 0 {
+		buff.Write([]byte{p.NetState})
 	}
-	if controlFlags&CF_SRCADDR != 0 {
+	if p.ControlFlags&CF_SERVICEID != 0 {
+		buff.Write(bytesOfINT16U(p.ServiceID))
+	}
+	if p.ControlFlags&CF_SRCADDR != 0 {
 		buff.Write(bytesOfAddressType(p.SrcAddr))
 	}
-	if controlFlags&CF_DESTADDR != 0 {
+	if p.ControlFlags&CF_DESTADDR != 0 {
 		buff.Write(bytesOfAddressType(p.DestAddr))
 	}
-	if controlFlags&CF_SEQNUM != 0 {
+	if p.ControlFlags&CF_NEXTADDR != 0 {
+		buff.Write(bytesOfAddressType(p.NextAddr))
+	}
+	if p.ControlFlags&CF_SEQNUM != 0 {
 		buff.Write(bytesOfINT16U(p.SeqNum))
 	}
-	if controlFlags&CF_ACKBLOCK != 0 {
+	if p.ControlFlags&CF_ACKBLOCK != 0 {
 		buff.Write(bytesOfINT32U(p.AckBlock))
 	}
-	if controlFlags&CF_CONTEXTID != 0 {
+	if p.ControlFlags&CF_CONTEXTID != 0 {
 		buff.Write(bytesOfINT16U(p.ContextID))
 	}
-	if controlFlags&CF_DATATYPE != 0 {
+	if p.ControlFlags&CF_DATATYPE != 0 {
 		buff.Write([]byte{p.DataType})
 	}
-	if controlFlags&CF_DATA != 0 {
+	if p.ControlFlags&CF_DATA != 0 {
 		buff.Write(bytesOfINT16U(p.DataSize))
 		buff.Write(p.Data)
 	}
-	if controlFlags&CF_CRC != 0 {
+	if p.ControlFlags&CF_CRC != 0 {
 		p.CrcSum = CRC32(buff.Bytes())
 		buff.Write(bytesOfINT32U(p.CrcSum))
 	}
@@ -283,6 +339,15 @@ func (p *Packet) ToFrameBytes() ([]byte, error) {
 }
 
 // WriteTo writes a framed packet to the writer
-func (p *Packet) WriteTo(w io.Writer) (n int64, err error) {
-	return n, err
+func (p *Packet) WriteTo(w io.Writer) (n int, err error) {
+	if byts, err := p.ToFrameBytes(); err == nil {
+		return w.Write(byts)
+	} else {
+		return 0, err
+	}
+}
+
+func (p *Packet) ToJsonString() string {
+	byts, _ := json.MarshalIndent(p, "", " ")
+	return string(byts)
 }

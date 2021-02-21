@@ -48,3 +48,28 @@ func TestParser(t *testing.T) {
 		t.Fatalf("expected Data = 'test, got %s", string(pkt1.Data))
 	}
 }
+
+func TestParseFrame(t *testing.T) {
+	pkt := NewPacket()
+	pkt.NetState = 1
+	pkt.Data = []byte("ABCD")
+	pktFrame, err := pkt.ToFrameBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// parse the packet fram into a new packet body
+	var p *Packet
+	parser := NewParser(func(q *Packet) {
+		p = q
+	})
+	parser.IngestStream(pktFrame)
+
+	// assert the packet was received
+	if p == nil {
+		t.Fatalf("failed to parse packet")
+	}
+	if p.DataSize != 4 {
+		t.Fatalf("pkt: %s", p.ToJsonString())
+	}
+}

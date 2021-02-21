@@ -1,112 +1,158 @@
 package elp
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+	"time"
+)
 
 /*
 An ELP network is a set of routers connected by channels.
 Nodes may be local or remote addresses on the network.
 */
 
-// ChannelCostMap describes the link cost of available
-//   channels to a Node.
-type ChannelCostMap map[Channel]uint16
+// serviceHandlerMap maps local endpoint nodes to packet handlers
+type serviceHandlerMap map[uint16]func(*Packet)
 
-// RouteMap holds all the RouteRecord elements with the same Dest.
-//   Is used to select a channel to send a packet from Router.
-type RouteMap map[AddressType]ChannelCostMap
+type RemoteNode struct {
+	Address  AddressType // target addres to communicate with
+	NextHop  AddressType // next routing service node for address
+	Channel  Channel     // specific channel that is hosting next hop
+	Cost     uint16      // cost of using this route, generally a hop count
+	LastSeen time.Time   // routes should decay with a few missed updates
+}
 
-// AddressCostMap is the value for the Router ChannelMap
-type AddressCostMap map[AddressType]uint16
+type RemoteNodeList []RemoteNode
 
-// ChannelMap caches addresses accessible through a channel
-//   It should match the routeMap of the a remote channel (on point-to-point links)
-type ChannelMap map[Channel]AddressCostMap
+func (r RemoteNodeList) Len() int      { return len(r) }
+func (r RemoteNodeList) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
+func (r RemoteNodeList) Less(i, j int) bool {
+	if r[i].Cost != r[j].Cost {
+		return r[i].Cost < r[j].Cost
+	}
+	return r[i].LastSeen.Before(r[j].LastSeen)
+}
 
-// NodeCallbackMap maps local endpoint nodes to packet handlers
-type NodeCallbackMap map[AddressType]func(*Packet)
+type RemoteNodeMap map[AddressType]RemoteNodeList
+
+type NodeLoad struct {
+	Load     uint16
+	LastSeen time.Time
+}
+
+type NodeLoadMap map[AddressType]NodeLoad  // map[adress]NodeLoad
+type ServiceLoadMap map[uint16]NodeLoadMap // map[serviceID][address]NodeLoad
 
 // Router manages a set of channels and packet handlers
 type Router struct {
-	localNodeMap NodeCallbackMap // registered local node packet handlers
-	routeMap     RouteMap
-	channelMap   ChannelMap
-	onError      func(string)
+	mutex           sync.Mutex
+	address         AddressType
+	channels        []Channel
+	localServiceMap serviceHandlerMap // map[address]callback registered local node packet handlers
+	remoteNodeMap   RemoteNodeMap     // map[address][]RemoteNodes
+	serviceLoadMap  ServiceLoadMap
+	onError         func(string)
 }
 
 // NewRouter instantiates an applications ELP Router
-func NewRouter(onError func(string)) *Router {
+func NewRouter(address AddressType, onError func(string)) *Router {
 	return &Router{
-		localNodeMap: make(NodeCallbackMap),
-		routeMap:     make(RouteMap),
-		channelMap:   make(ChannelMap),
-		onError:      onError,
+		address:         address,
+		channels:        []Channel{},
+		localServiceMap: make(serviceHandlerMap),
+		remoteNodeMap:   make(RemoteNodeMap),
+		serviceLoadMap:  make(ServiceLoadMap),
+		onError:         onError,
 	}
 }
 
 // Send is the core routing function of Router. A packet is either expected
 //  locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
-	if onPacket, ok := r.localNodeMap[p.DestAddr]; ok {
-		onPacket(p)
-	} else if routes, ok := r.routeMap[p.DestAddr]; ok {
-		if len(routes) == 0 {
-			return fmt.Errorf("empty route list for %d [%X]", p.DestAddr, p.DestAddr)
+	p.SrcAddr = r.address
+	if p.DestAddr == r.address {
+		if onPacket, ok := r.localServiceMap[p.ServiceID]; ok {
+			onPacket(p)
+		} else {
+			r.onError(fmt.Sprintf("service %d not registered", p.ServiceID))
 		}
-		var c Channel
-		minCost := uint16(9999)
-		for _c, cost := range routes {
-			if cost < minCost {
-				c = _c
-				cost = minCost
+	} else if p.NextAddr == r.address || p.NextAddr == 0 {
+		if routes, ok := r.remoteNodeMap[p.DestAddr]; ok {
+			if len(routes) == 0 {
+				return fmt.Errorf("empty route list for %d [%X]", p.DestAddr, p.DestAddr)
 			}
+			var c Channel
+			var cost uint16
+			var nextHop AddressType
+			for _, route := range routes {
+				if cost == 0 || route.Cost < cost {
+					c = route.Channel
+					cost = route.Cost
+					nextHop = route.NextHop
+				}
+			}
+			if c != nil {
+				p.NextAddr = nextHop
+				c.Send(p)
+			} else {
+				return fmt.Errorf("empty route list for for %d [%X]", p.DestAddr, p.DestAddr)
+			}
+		} else {
+			return fmt.Errorf("no routes for %d [%X]", p.DestAddr, p.DestAddr)
 		}
-		c.Send(p)
-	} else {
-		return fmt.Errorf("no route for %d [%X]", p.DestAddr, p.DestAddr)
 	}
 	return nil
 }
 
 // AddChannel initializes
 func (r *Router) AddChannel(channel Channel) {
-	// add channel to channel index
-	r.channelMap[channel] = AddressCostMap{}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// cache channel for routing and service table syncronization
+	r.channels = append(r.channels, channel)
 
 	// define onPacket() to either handle link-state updates or route data
-	channel.Receive(func(packet *Packet) {
-		if (packet.ControlFlags & CF_LINKSTATE) == CF_LINKSTATE {
-			switch packet.LinkState {
-			case LinkStateRouteQuery:
-				// TODO response by generating LinkStateNodeRouteCost from the routing data
-			case LinkStateNodeRouteCost:
-				switch AddressTypeSize {
-				case 1:
-					if packet.DataSize == 4 {
-						address := AddressType(packet.Data[0])
-						cost := bytesToINT16U(packet.Data[1:3])
-						r.channelMap[channel][address] = cost
-						r.routeMap[address][channel] = cost
-					} else {
-						// TODO log error condition
+	go channel.Receive(func(packet *Packet) {
+
+		if (packet.ControlFlags & CF_NETSTATE) == CF_NETSTATE {
+			switch packet.NetState {
+			case NET_ROUTE:
+				// neighbor is sharing it's routing table
+				if remoteAddress, nextHop, cost, err := parseNetworkRouteSharePacket(packet); err == nil {
+					fmt.Printf("NET_ROUTE remoteAddress:%d, nextHop:%d, cost:%d\n", remoteAddress, nextHop, cost)
+					r.mutex.Lock()
+					defer r.mutex.Unlock()
+					var ok bool
+					var remoteNodes RemoteNodeList
+					if remoteNodes, ok = r.remoteNodeMap[remoteAddress]; !ok {
+						remoteNodes = RemoteNodeList{}
 					}
-				case 2:
-					if packet.DataSize == 4 {
-						address := AddressType(bytesToINT16U(packet.Data[:2]))
-						cost := bytesToINT16U(packet.Data[2:4])
-						r.channelMap[channel][address] = cost
-						r.routeMap[address][channel] = cost
-					} else {
-						// TODO log error condition
+					r.remoteNodeMap[remoteAddress] = append(remoteNodes, RemoteNode{
+						Address:  remoteAddress,
+						NextHop:  nextHop,
+						Channel:  channel,
+						Cost:     cost,
+						LastSeen: time.Now().UTC(),
+					})
+				} else {
+					fmt.Printf("error parsing NET_ROUTE: %s", err.Error())
+				}
+
+			case NET_SERVICE:
+				if address, serviceID, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
+					fmt.Printf("NET_SERVICE node:%d, service:%d, load:%d\n", address, serviceID, serviceLoad)
+					r.mutex.Lock()
+					defer r.mutex.Unlock()
+					if _, ok := r.serviceLoadMap[serviceID]; !ok {
+						r.serviceLoadMap[serviceID] = NodeLoadMap{}
 					}
-				case 4:
-					if packet.DataSize == 4 {
-						address := AddressType(bytesToINT32U(packet.Data[:4]))
-						cost := bytesToINT16U(packet.Data[4:6])
-						r.channelMap[channel][address] = cost
-						r.routeMap[address][channel] = cost
-					} else {
-						// TODO log error condition
+					r.serviceLoadMap[serviceID][address] = NodeLoad{
+						Load:     serviceLoad,
+						LastSeen: time.Now().UTC(),
 					}
+				} else {
+					fmt.Printf("error parsing NET_SERVICE: %s", err.Error())
 				}
 			}
 		} else {
@@ -115,18 +161,55 @@ func (r *Router) AddChannel(channel Channel) {
 	})
 }
 
-// RegisterNode adds a node to the network accessible in zero hops from this
+// RegisterService adds a node to the network accessible in zero hops from this
 //  router. Badd stuff happens if the address is not unique on the network.
-func (r *Router) RegisterNode(address AddressType, onPacket func(*Packet)) {
-	r.localNodeMap[address] = onPacket
+func (r *Router) RegisterService(serviceID uint16, onPacket func(*Packet)) {
+	r.mutex.Lock()
+	r.localServiceMap[serviceID] = onPacket
+	r.mutex.Unlock()
+	r.ShareRoutes()
 }
 
-// ListenTCP blocks forever and should be run as a go routine
-func (r *Router) ListenTCP(address string, port int) {
-	// TODO listen and wrap incomming connections in new channels
+// UnregisterService is a cleanup mechanism for elegant application teardown
+func (r *Router) UnregisterService(serviceID uint16) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	delete(r.localServiceMap, serviceID)
 }
 
-// ListenWebsocket blocks forever
-func (r *Router) ListenWebsocket(address string, port int) {
-	// TODO listen and wrap incomming connections in new channels
+// ExportRouteTable generates a set of packets that another router can read
+func (r *Router) ExportRouteTable() []*Packet {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	// compose routing table as an array of packets
+	// one local route, with a cost of 1
+	// for each remote route, select cheapest and add 1
+	routes := []*Packet{makeNetworkRouteSharePacket(r.address, r.address, 1)}
+	for address, remoteNodes := range r.remoteNodeMap {
+		var cost uint16
+		for _, remoteNode := range remoteNodes {
+			if cost == 0 || remoteNode.Cost < cost {
+				cost = remoteNode.Cost
+			}
+		}
+		if cost > 0 {
+			routes = append(routes, makeNetworkRouteSharePacket(r.address, address, cost+1))
+		} else {
+			// TODO clean up empty target list
+		}
+	}
+	return routes
+}
+
+// ShareRoutes broadcasts the local routing table
+func (r *Router) ShareRoutes() {
+	routes := r.ExportRouteTable()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	for _, channel := range r.channels {
+		for _, routePacket := range routes {
+			channel.Send(routePacket)
+		}
+	}
 }

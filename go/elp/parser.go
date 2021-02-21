@@ -16,13 +16,8 @@ const (
 
 // LinkState value enumerations (TODO support mesh routing)
 const (
-	LINK_CONNECT   = 0x01
-	LINK_CONNECTED = 0x03
-	LINK_PING      = 0x05
-	LINK_PONG      = 0x07
-	LINK_ACKRESEND = 0x09
-	LINK_NOACK     = 0x0B
-	LINK_CLOSE     = 0x0D
+	NET_ROUTE   = 0x01
+	NET_SERVICE = 0x03
 )
 
 type PacketCallback func(*Packet)
@@ -77,14 +72,15 @@ func (p *Parser) acceptPacket() {
 // byte of a packet without further input
 func (p *Parser) IngestStream(buffer []byte) {
 	for _, msg := range buffer {
-
 		// check for escape char (occurs mid-frame)
 		if msg == FRAME_ESCAPE {
+			// fmt.Println("IngestStream FRAME_ESCAPE")
 			if p.delimCount >= (FRAME_LEADER_LENGTH - 1) {
 				p.delimCount = 0 // reset FRAME_LEADER detection
 				continue         // drop the char from the stream
 			}
 		} else if msg == FRAME_LEADER {
+			// fmt.Println("IngestStream FRAME_LEADER")
 			p.delimCount++
 			if p.delimCount >= FRAME_LEADER_LENGTH {
 				p.delimCount = 0
@@ -99,10 +95,12 @@ func (p *Parser) IngestStream(buffer []byte) {
 
 		// use current char in following state
 		if p.state == STATE_FINDSTART {
+			// fmt.Println("IngestStream p.state == STATE_FINDSTART")
 			// Do Nothing, dump char
 			continue // end STATE_FINDSTART
 		}
 		if p.state == STATE_GET_CF {
+			// fmt.Println("IngestStream p.state == STATE_GET_CF")
 			if p.headerIndex > MAX_HEADER_SIZE {
 				p.state = STATE_FINDSTART
 			} else {
@@ -112,12 +110,14 @@ func (p *Parser) IngestStream(buffer []byte) {
 					cf := bytesToINT16U(p.frameBuffer)
 					p.controlFlags = CFHamDecode(cf)
 					p.headerLength = HeaderLength(p.controlFlags)
+					// fmt.Printf("Expected header length:%d\n", p.headerLength)
 					p.state = STATE_GETHEADER
 				}
-				continue // end STATE_GET_CF
 			}
+			continue // end STATE_GET_CF
 		}
 		if p.state == STATE_GETHEADER {
+			// fmt.Println("IngestStream p.state == STATE_GETHEADER")
 			if p.headerIndex >= MAX_HEADER_SIZE {
 				p.state = STATE_FINDSTART
 			} else {
@@ -134,12 +134,13 @@ func (p *Parser) IngestStream(buffer []byte) {
 						p.state = STATE_GETCRC
 					} else {
 						p.acceptPacket()
-						continue // end STATE_GETHEADER
 					}
 				}
 			}
+			continue // end STATE_GETHEADER
 		}
 		if p.state == STATE_GETDATA {
+			// fmt.Println("IngestStream p.state == STATE_GETDATA")
 			p.frameBuffer = append(p.frameBuffer, msg)
 			p.dataIndex++
 			if p.dataIndex >= p.dataLength {
@@ -147,12 +148,13 @@ func (p *Parser) IngestStream(buffer []byte) {
 					p.state = STATE_GETCRC
 				} else {
 					p.acceptPacket()
-					continue // end STATE_GETDATA
 				}
 			}
+			continue
 		}
 
 		if p.state == STATE_GETCRC {
+			// fmt.Println("IngestStream p.state == STATE_GETCRC")
 			p.frameBuffer = append(p.frameBuffer, msg)
 			p.crcIndex++
 			if p.crcIndex >= CRC_FIELD_SIZE {
@@ -166,7 +168,6 @@ func (p *Parser) IngestStream(buffer []byte) {
 					p.Clear()
 				} else {
 					p.acceptPacket()
-					continue // end STATE_GETCRC}
 				}
 			}
 		}

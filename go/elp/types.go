@@ -1,13 +1,5 @@
 package elp
 
-const ( // Link State enumeration
-	// LinkStateRouteQuery is a channel broadcast requesting LinkStateNodeRouteCost responses
-	LinkStateRouteQuery = 1
-
-	// LinkStateNodeRouteCost data is AddressType length + 2 bytes for int cost value
-	LinkStateNodeRouteCost = 2
-)
-
 func bytesToINT16U(buff []byte) uint16 {
 	if len(buff) == 2 {
 		return (uint16(buff[0]) << 8) | uint16(buff[1])

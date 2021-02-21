@@ -3,23 +3,17 @@ package elp
 // Channel sends one packet at a time by some mechanism
 type Channel interface {
 	Send(*Packet) error
-	Receive(func(*Packet))
+	Receive(PacketCallback)
 	Close()
 }
 
-// TCPChannel is a serialized, non-shared channel, but multiple nodes
-//  may be accessible through it.
-// type TCPChannel struct {
-// 	onPacket     func(*Packet)
-// 	onDisconnect func(Channel)
-// }
+type ChannelHost interface {
+	OnAccept(func(Channel))
+}
 
-// func NewTCPChannel() {
-//   TODO
-// }
-
-// LocalChannel wraps a pair of chan primatives; intended for development and test
+// LocalChannel wraps a pair of chan primatives; intended for development and testing
 type LocalChannel struct {
+	reciever PacketCallback
 	outbound chan *Packet
 	inbound  chan *Packet
 	close    chan bool
@@ -44,13 +38,15 @@ func (lc *LocalChannel) FlippedChannel() *LocalChannel {
 
 // Send transmits immediately
 func (lc *LocalChannel) Send(packet *Packet) error {
+	packet.SetControlFlags()
 	lc.outbound <- packet
 	return nil
 }
 
 // Receive starts a go routine to call onPacket
-func (lc *LocalChannel) Receive(onPacket func(*Packet)) {
+func (lc *LocalChannel) Receive(onPacket PacketCallback) {
 	go func() {
+		// TODO recieve more than one packet
 		select {
 		case packet := <-lc.inbound:
 			onPacket(packet)
