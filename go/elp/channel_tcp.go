@@ -54,23 +54,18 @@ func NewTCPChannel(conn net.Conn) *TCPChannel {
 }
 
 func (ch *TCPChannel) Send(p *Packet) error {
-	fmt.Println("TCPChannel:Send A")
+	p.SetControlFlags()
 	pktBytes, err := p.ToFrameBytes()
 	if err != nil {
 		return err
 	}
-	fmt.Println("TCPChannel:Send B: ", pktBytes)
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	fmt.Println("TCPChannel:Send C")
 	if n, err := ch.conn.Write(pktBytes); err != nil {
-		fmt.Println("TCPChannel:Send D")
 		return err
 	} else if n != len(pktBytes) {
-		fmt.Println("TCPChannel:Send E")
-		return fmt.Errorf("TCPChannel conn.Write send %d/%d bytes", n, len(pktBytes))
+		return fmt.Errorf("TCPChannel conn.Write sent %d/%d bytes", n, len(pktBytes))
 	}
-	fmt.Println("TCPChannel:Send F")
 	return nil
 }
 
@@ -79,15 +74,9 @@ func (ch *TCPChannel) Receive(onPacket PacketCallback) {
 	byteBuff := []byte{0}
 	for {
 		n, err := ch.conn.Read(byteBuff)
-		if err != nil {
-			fmt.Println("TCPChannel:Receive err:", err.Error())
+		if n < 1 || err != nil {
 			break
 		}
-		if n < 1 {
-			fmt.Println("TCPChannel:Receive n==0")
-			break
-		}
-		fmt.Println("TCPChannel:Recieve:", byteBuff)
 		parser.IngestStream(byteBuff)
 	}
 	ch.Close()
@@ -100,7 +89,7 @@ func (ch *TCPChannel) Close() {
 
 // OpenTCPChannel attempts to create an ELP wrapped socket connection to a remote host
 func OpenTCPChannel(hostname string, port int) (Channel, error) {
-	conn, err := net.Dial("tcp", "localhost:8000")
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", hostname, port))
 	if err != nil {
 		return nil, err
 	}

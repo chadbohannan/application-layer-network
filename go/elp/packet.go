@@ -228,6 +228,7 @@ func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
 
 func (p *Packet) SetControlFlags() {
 	controlFlags := uint16(0)
+	p.DataSize = uint16(len(p.Data))
 	if p.NetState != 0 {
 		controlFlags |= CF_NETSTATE
 	}

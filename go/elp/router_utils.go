@@ -2,14 +2,10 @@ package elp
 
 import "fmt"
 
-func parseNetworkAddressAllocationPacket(contextID uint16, packet *Packet) (AddressType, error) {
-	if packet.ContextID != contextID {
-		return 0, fmt.Errorf("packet.ContextID != %d", contextID)
+func makeNetQueryPacket() *Packet {
+	return &Packet{
+		NetState: NET_QUERY,
 	}
-	if len(packet.Data) != AddressTypeSize {
-		return 0, fmt.Errorf("len(packet.Data) != %d", AddressTypeSize)
-	}
-	return bytesToAddressType(packet.Data), nil
 }
 
 func makeNetworkRouteSharePacket(srcAddr, destAddr AddressType, cost uint16) *Packet {

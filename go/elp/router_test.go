@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-func TestRoute1Hop(t *testing.T) {
-
+func TestRoute0Hop(t *testing.T) {
 	packetRecieved := false
 	rtr := NewRouter(1, func(err string) {
 		fmt.Println(err)
@@ -24,7 +23,34 @@ func TestRoute1Hop(t *testing.T) {
 		t.Fatal("packet not recieved")
 	}
 }
+
+func TestRoute1Hop(t *testing.T) {
+	packetRecieved := false
+	rtr1 := NewRouter(1, func(err string) { fmt.Println("router 1 err:" + err) })
+	rtr2 := NewRouter(2, func(err string) { fmt.Println("router 2 err:" + err) })
+
+	rtr1.RegisterService(0x0001, func(*Packet) { packetRecieved = true })
+
+	localChannel := NewLocalChannel()
+	rtr1.AddChannel(localChannel)
+	rtr2.AddChannel(localChannel.FlippedChannel())
+
+	time.Sleep(time.Millisecond)
+
+	pkt := NewPacket()
+	pkt.DestAddr = 0x0001
+	pkt.ServiceID = 0x0001
+	if err := rtr2.Send(pkt); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond) // let async operation settle
+	if !packetRecieved {
+		t.Fatal("packet not recieved")
+	}
+}
+
 func TestRoute2Hop(t *testing.T) {
+
 	packetRecieved := false
 	rtr1 := NewRouter(1, func(err string) {
 		fmt.Println("router 1 err:" + err)
@@ -35,22 +61,28 @@ func TestRoute2Hop(t *testing.T) {
 	rtr2 := NewRouter(2, func(err string) {
 		fmt.Println("router 2 err:" + err)
 	})
+	rtr3 := NewRouter(3, func(err string) {
+		fmt.Println("router 2 err:" + err)
+	})
 
-	localChannel := NewLocalChannel()
-	rtr1.AddChannel(localChannel)
-	rtr2.AddChannel(localChannel.FlippedChannel())
+	channelA := NewLocalChannel()
+	rtr1.AddChannel(channelA)
+	rtr2.AddChannel(channelA.FlippedChannel())
 
-	rtr1.ShareRoutes()
+	channelB := NewLocalChannel()
+	rtr2.AddChannel(channelB)
+	rtr3.AddChannel(channelB.FlippedChannel())
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(time.Millisecond)
 
 	pkt := NewPacket()
 	pkt.DestAddr = 0x0001
 	pkt.ServiceID = 0x0001
-	if err := rtr2.Send(pkt); err != nil {
+	if err := rtr3.Send(pkt); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(10 * time.Millisecond) // let async operation settle
+
+	time.Sleep(time.Millisecond) // let async operation settle
 	if !packetRecieved {
 		t.Fatal("packet not recieved")
 	}

@@ -22,8 +22,8 @@ type LocalChannel struct {
 // NewLocalChannel allocates the chans of a new LocalChannel
 func NewLocalChannel() *LocalChannel {
 	return &LocalChannel{
-		outbound: make(chan *Packet),
-		inbound:  make(chan *Packet),
+		outbound: make(chan *Packet, 2),
+		inbound:  make(chan *Packet, 2),
 		close:    make(chan bool),
 	}
 }
@@ -46,12 +46,13 @@ func (lc *LocalChannel) Send(packet *Packet) error {
 // Receive starts a go routine to call onPacket
 func (lc *LocalChannel) Receive(onPacket PacketCallback) {
 	go func() {
-		// TODO recieve more than one packet
-		select {
-		case packet := <-lc.inbound:
-			onPacket(packet)
-		case <-lc.close:
-			return
+		for {
+			select {
+			case packet := <-lc.inbound:
+				onPacket(packet)
+			case <-lc.close:
+				return
+			}
 		}
 	}()
 }
