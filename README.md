@@ -1,91 +1,14 @@
-# expanding-link-protocol
-Source, documentation and examples of ELP packet handlers in multiple programming languages.
+# application-layer-network
+Source, documentation and examples of ALN packet handlers in multiple programming languages.
 
-# Why?
-Packet frames are a useful means of moving data through a network. This library attempts to offer a packet composer/parser compatable with itself across several languages without the development overhead of related solutions such as [Protocol Buffers](https://developers.google.com/protocol-buffers/).
+An Application Layer Network applies mesh routing to a packetized messaging system as a means to build networked applications without dedicated messaging infrastructure like MQTT. Setup and integration is designed to be trivial with multi-language support and no library or build-system dependencies.
 
-This library offers a working packetizer & parser 'off the shelf' useful for applications build across heterogenous runtimes such as occur when linking sensor networks to cloud technologies.
+Drawbacks include that the routing table requires memory on each routing node of an ALN.
 
-# Packet Structure
+## Use Cases
+An ALN provides message routing to anywhere in a connected network. A connected network is one where enough links exists that a message can be routed from a node to any other node. An ALN provides messaging connectivity within an application without any concern to network topology or even underlying protocols. One technique is to use an ALN as a protocol bridge to make bluetooth peripherals accessible as services in your network application by using a generic ALN Router instance in an Android app.
 
-<table>
-  <tr>
-    <td>Frame Leader*</td>
-    <td>Control Flags*</td>
-    <td>Source</td>
-    <td>Destination</td>
-    <td>Seq Num</td>
-    <td>Ack Block</td>
-    <td>Data Length</td>
-    <td>Data</td>
-    <td>CRC</td>
-  </tr>
-  <tr>
-    <td>4</td>
-    <td>2</td>
-    <td>2</td>
-    <td>2</td>
-    <td>2</td>
-    <td>4</td>
-    <td>2</td>
-    <td>Variable</td>
-    <td>4</td>
-  </tr>
-
-  <tr>
-    <td>"<<<<"</td>
-    <td colspan="7">CRC Content</td>
-    <td>CRC</td>
-  </tr>
-  <tr>
-    <td></td>
-    <td colspan="8" align="center">ELP Packet</td>
-  </tr>
-  <tr>
-    <td colspan="9" align="center">ELP Frame</td>
-  </tr>
-</table>
-
-
-Frames are delimited by four 0x3C ('<') characters. If contain data that would appear to indicate a frame delimiter then there will be a 0xC3 byte inserted ('byte stuffed') into the byte sequence after three '<' occur in sequence a packet.
-
-A Frame contains a single Packet which starts with a two byte sequence of Control Flag bits. Of these 16 bits, 4 are used for forward error correction, 1 is static to prevent the frame delimeter byte ever being the first control byte, and the remaining 11 flag bits used to indicate which fields are present in the packet header.
-
-If the Data flag is set the Data Length field will be followed by the number of bytes indicated.
-
-If the CRC flag is set the last for bytes of the packet will be a CRC32 result of the prior bytes (unframed packet).
-
-To be valid an ELP fram must contain a frame delimiter and 2 control flag bytes, it need not contain content, thus the minimum length of an ELP packet is 6 bytes; 4 delimeter bytes and 2 control bytes that contain only zeros. The largest packet supported by this implementation is composed by setting all 7 packet fields and maximizing data capacity is 65556 bytes. Such packets are expected when reliable mesh-networking protocols utilize all fields support content fragmentation and resequencing.
-
-
-# Goals
-This repository is young and ambitious. It is useful with only Packets and Parsers defined, but the ultimate goal is to provide a cross-language set of tools useful in developing self-healing multi-network software across a broad range of application domians.
-
-# Planning
-Here's the current state of intention:
- * Define Packet
-   * 4 byte frame leader
-   * 2 control bytes with 11 usable bits
-   * 7 packet fields (4 unused control bits)
-   * CRC32
- * Parse Packets
-   * Buffers streaming input
-   * Validated packets are accepted
- * Encapuslate Serial Links (single hop)
-   * Assume full-duplix links, for now
-   * Only protocol is framed packet transmission
- * Ad Hoc Networking (mesh routing)
-   * [AODV](https://en.wikipedia.org/wiki/Ad_hoc_On-Demand_Distance_Vector_Routing) type protocol for route discovery
-   * Encapsulate protocol handler into 'local gateway' interface
- * Transmission Control (end-to-end sockets)
-   * Synchronize sequence numbers
-   * Retransmit lost packets from rotating buffer
-   * Ought to work both with a single-hop link or multi-hop socket
-
-
-# Repository Status
-
-Here's how far the intent has manifested:
+# Development Status
 
 ## [C99](./c99/README.md)
  * Packet implemented but could be more efficient
@@ -96,7 +19,8 @@ Here's how far the intent has manifested:
  * Parser CRC32 evaluation is incomplete.
 
 ## [Go](./go/README.md)
- * Not started
+ * Mesh routing working with automated tests and a TCP example.
+ * Route failure handling not started.
 
 ## [Java](./java/README.md)
  * Packet implemented but depends on java.util.zip for CRC32 computation.

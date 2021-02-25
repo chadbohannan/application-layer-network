@@ -4,66 +4,64 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/chadbohannan/expanding-link-protocol/go/elp"
+	"github.com/chadbohannan/expanding-link-protocol/go/aln"
 )
-
-func onError(errMsg string) {
-	fmt.Println(errMsg)
-}
 
 func main() {
 	// create first router
-	r1Address := elp.AddressType(1)
-	r2Address := elp.AddressType(2)
+	r1Address := aln.AddressType(1)
+	r2Address := aln.AddressType(2)
 	pingServiceID := uint16(3)
 
-	// setup the first node to be a passive host
-	r1 := elp.NewRouter(r1Address, onError)
-	tcpHost := elp.NewTcpChannelHost("localhost", 8000)
-	go tcpHost.Listen(func(newChannel elp.Channel) {
-		fmt.Println("on new channel")
+	// setup the first node to host a ping service
+	r1 := aln.NewRouter(r1Address)
+	tcpHost := aln.NewTcpChannelHost("localhost", 8000)
+	go tcpHost.Listen(func(newChannel aln.Channel) {
 		r1.AddChannel(newChannel)
 	})
 
-	// create the ping service
-	r1.RegisterService(pingServiceID, func(packet *elp.Packet) {
+	// create the ping service to send packets back where they came from
+	r1.RegisterService(pingServiceID, func(packet *aln.Packet) {
 		fmt.Printf("...")
-		r1.Send(&elp.Packet{
+		r1.Send(&aln.Packet{
 			DestAddr:  packet.SrcAddr,
 			ContextID: packet.ContextID,
-			Data:      []byte("pong"),
+			Data:      []byte("pong!"),
 		})
 	})
-	time.Sleep(time.Second)
+
+	time.Sleep(10 * time.Millisecond) // let the new server open port 8000
 
 	// setup the second node to connect to the first using TCP
-	r2 := elp.NewRouter(r2Address, onError)
+	r2 := aln.NewRouter(r2Address)
 	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Println("dial failed:" + err.Error())
 		os.Exit(-1)
 	}
 
-	r2.AddChannel(elp.NewTCPChannel(conn))
+	r2.AddChannel(aln.NewTCPChannel(conn))
 
-	// give the router time to receive the routing table
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond) // let the routing tables synchronize
 
 	// Setup our ping reply handler
-	ctx := r2.RegisterContextHandler(func(response *elp.Packet) {
-		fmt.Printf("%s", string(response.Data))
+	var wg sync.WaitGroup
+	wg.Add(1)
+	ctx := r2.RegisterContextHandler(func(response *aln.Packet) {
+		fmt.Println(string(response.Data))
+		wg.Done()
 	})
 	defer r2.ReleaseContext(ctx)
 
-	fmt.Printf("Ping:")
-	r2.Send(&elp.Packet{
-		DestAddr:  1,
+	fmt.Printf("ping")
+	r2.Send(&aln.Packet{
+		DestAddr:  r1Address,
 		ServiceID: pingServiceID,
 		ContextID: ctx,
 	})
 
-	time.Sleep(1 * time.Second)
-
+	wg.Wait()
 }
