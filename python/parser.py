@@ -34,7 +34,6 @@ class Parser:
         self.dataIndex = 0
         self.dataLength = 0
         self.crcIndex = 0
-        self.crcLength = 0
 
     def acceptPacket(self):
         packet = Packet(self.frameBuffer)
@@ -77,9 +76,8 @@ class Parser:
                 continue # end STATE_FINDSTART
 
             if (self.state == Parser.STATE_GET_CF):
-                # TODO isoloate into readControlByte(msg)
                 if(self.headerIndex > Packet.MAX_HEADER_SIZE):
-                    this.state = Parser.STATE_FINDSTART
+                    self.state = Parser.STATE_FINDSTART
                 else:
                     self.frameBuffer.append(msg)
                     self.headerIndex += 1
@@ -92,7 +90,6 @@ class Parser:
                 continue # end STATE_GET_CF
 
             if (self.state == Parser.STATE_GETHEADER):
-                # TODO isoloate into readHeaderByte(msg)
                 if(self.headerIndex >= Packet.MAX_HEADER_SIZE):
                     self.state = Parser.STATE_FINDSTART
                 else:
@@ -108,31 +105,27 @@ class Parser:
                         elif (self.controlFlags & Packet.CF_CRC):
                             self.crcIndex = 0
                             self.dataLength = 0
-                            self.crcLength = Packet.CRC_FIELD_SIZE
                             self.state = Parser.STATE_GETCRC
                         else:
                             self.acceptPacket()
                 continue # end STATE_GETHEADER
 
             if (self.state == Parser.STATE_GETDATA):
-                # TODO isoloate into readDataByte(msg)
                 self.frameBuffer.append(msg)
                 self.dataIndex += 1
                 if(self.dataIndex >= self.dataLength):
 
                     if (self.controlFlags & Packet.CF_CRC):
                         self.crcIndex = 0
-                        self.crcLength = Packet.CRC_FIELD_SIZE
                         self.state = Parser.STATE_GETCRC
                     else:
                         self.acceptPacket()
                 continue # end STATE_GETDATA
 
             if (self.state == Parser.STATE_GETCRC):
-                # TODO isoloate into readCRCByte(msg)
                 self.frameBuffer.append(msg)
                 self.crcIndex += 1
-                if(self.crcIndex >= self.crcLength):
+                if(self.crcIndex >= Packet.CRC_FIELD_SIZE):
                     sz = len(self.frameBuffer)
                     subframeBytes = self.frameBuffer[0:sz-Packet.CRC_FIELD_SIZE]
                     computedCRC = crc(subframeBytes)
@@ -140,7 +133,7 @@ class Parser:
                     expectedCRC = readINT32U(crcBytes)
                     if (computedCRC != expectedCRC):
                         # TODO error reporting
-                        self.state = Parser.STATE_FINDSTART
+                        self.clear()
                     else:
                       self.acceptPacket()
                 continue # end STATE_GETCRC
