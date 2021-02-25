@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chadbohannan/expanding-link-protocol/go/aln"
+	"github.com/chadbohannan/application-layer-network/go/aln"
 )
 
 func main() {

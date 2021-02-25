@@ -1,1 +1,3 @@
-module github.com/chadbohannan/expanding-link-protocol/go
+module github.com/chadbohannan/application-layer-network/go
+
+go 1.16
