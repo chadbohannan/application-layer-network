@@ -45,11 +45,10 @@ type Router struct {
 	contextMap     serviceHandlerMap
 	remoteNodeMap  RemoteNodeMap // map[address][]RemoteNodes
 	serviceLoadMap ServiceLoadMap
-	onError        func(string)
 }
 
 // NewRouter instantiates an applications ELP Router
-func NewRouter(address AddressType, onError func(string)) *Router {
+func NewRouter(address AddressType) *Router {
 	return &Router{
 		address:        address,
 		channels:       []Channel{},
@@ -57,7 +56,6 @@ func NewRouter(address AddressType, onError func(string)) *Router {
 		contextMap:     make(serviceHandlerMap),
 		remoteNodeMap:  make(RemoteNodeMap),
 		serviceLoadMap: make(ServiceLoadMap),
-		onError:        onError,
 	}
 }
 
@@ -70,7 +68,7 @@ func (r *Router) Send(p *Packet) error {
 		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
 			onPacket(p)
 		} else {
-			r.onError(fmt.Sprintf("service %d not registered", p.ServiceID))
+			return fmt.Errorf("service %d not registered", p.ServiceID)
 		}
 	} else if p.NextAddr == r.address || p.NextAddr == 0 {
 		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
