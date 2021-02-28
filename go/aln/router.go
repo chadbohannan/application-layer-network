@@ -59,9 +59,30 @@ func NewRouter(address AddressType) *Router {
 	}
 }
 
+// SelectService returns the address of the service with the lowest load, or zero
+func (r *Router) SelectService(serviceID uint16) AddressType {
+	if _, ok := r.serviceMap[serviceID]; ok {
+		return r.address
+	}
+	var minLoad uint16
+	var remoteAddress AddressType
+	if loadMap, ok := r.serviceLoadMap[serviceID]; ok {
+		for address, load := range loadMap {
+			if minLoad == 0 || minLoad > load.Load {
+				remoteAddress = address
+				minLoad = load.Load
+			}
+		}
+	}
+	return remoteAddress
+}
+
 // Send is the core routing function of Router. A packet is either expected
 //  locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
+	if p.DestAddr == 0 && p.ServiceID != 0 {
+		p.DestAddr = r.SelectService(p.ServiceID)
+	}
 	if p.DestAddr == r.address {
 		if onPacket, ok := r.serviceMap[p.ServiceID]; ok {
 			onPacket(p)
@@ -78,6 +99,8 @@ func (r *Router) Send(p *Packet) error {
 		} else {
 			return fmt.Errorf("no route for %d [%X]", p.DestAddr, p.DestAddr)
 		}
+	} else {
+		return fmt.Errorf("packet is unroutable; no action taken")
 	}
 	return nil
 }
@@ -153,6 +176,11 @@ func (r *Router) AddChannel(channel Channel) {
 						Load:     serviceLoad,
 						LastSeen: time.Now().UTC(),
 					}
+					for _, c := range r.channels {
+						if c != channel {
+							c.Send(packet)
+						}
+					}
 				} else {
 					fmt.Printf("error parsing NET_SERVICE: %s", err.Error())
 				}
@@ -160,6 +188,9 @@ func (r *Router) AddChannel(channel Channel) {
 			case NET_QUERY:
 				for _, routePacket := range r.ExportRouteTable() {
 					channel.Send(routePacket)
+				}
+				for _, servicePacket := range r.ExportServiceTable() {
+					channel.Send(servicePacket)
 				}
 			}
 		} else {
@@ -175,7 +206,7 @@ func (r *Router) RegisterService(serviceID uint16, onPacket func(*Packet)) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.serviceMap[serviceID] = onPacket
-	go r.ShareRoutes()
+	go r.ShareNetState()
 }
 
 // UnregisterService is a cleanup mechanism for elegant application teardown
@@ -189,7 +220,6 @@ func (r *Router) UnregisterService(serviceID uint16) {
 func (r *Router) ExportRouteTable() []*Packet {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-
 	// compose routing table as an array of packets
 	// one local route, with a cost of 1
 	// for each remote route, our cost and add 1
@@ -201,14 +231,36 @@ func (r *Router) ExportRouteTable() []*Packet {
 	return routes
 }
 
-// ShareRoutes broadcasts the local routing table
-func (r *Router) ShareRoutes() {
+// ExportServiceTable composes a list of packets encoding the service table of this node
+func (r *Router) ExportServiceTable() []*Packet {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	services := []*Packet{}
+	for serviceID, _ := range r.serviceMap {
+		var load uint16 // TODO measure load
+		services = append(services, makeNetworkServiceSharePacket(r.address, serviceID, load))
+	}
+	for serviceID, loadMap := range r.serviceLoadMap {
+		for address, load := range loadMap { // TODO sort by increasing load (first tx'd is lowest load)
+			// TODO filter expired or unroutable entries
+			services = append(services, makeNetworkServiceSharePacket(address, serviceID, load.Load))
+		}
+	}
+	return services
+}
+
+// ShareNetState broadcasts the local routing table
+func (r *Router) ShareNetState() {
 	routes := r.ExportRouteTable()
+	services := r.ExportServiceTable()
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	for _, channel := range r.channels {
 		for _, routePacket := range routes {
 			channel.Send(routePacket)
+		}
+		for _, servicePacket := range services {
+			channel.Send(servicePacket)
 		}
 	}
 }

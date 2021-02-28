@@ -25,7 +25,7 @@ func main() {
 
 	// create the ping service to send packets back where they came from
 	r1.RegisterService(pingServiceID, func(packet *aln.Packet) {
-		fmt.Printf("...")
+		fmt.Printf("...") // this is the mid-point of the round-trip
 		r1.Send(&aln.Packet{
 			DestAddr:  packet.SrcAddr,
 			ContextID: packet.ContextID,
@@ -51,14 +51,13 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	ctx := r2.RegisterContextHandler(func(response *aln.Packet) {
-		fmt.Println(string(response.Data))
+		fmt.Println(string(response.Data)) // pong!
 		wg.Done()
 	})
 	defer r2.ReleaseContext(ctx)
 
-	fmt.Printf("ping")
+	fmt.Printf("ping") // the journey begins
 	r2.Send(&aln.Packet{
-		DestAddr:  r1Address,
 		ServiceID: pingServiceID,
 		ContextID: ctx,
 	})
