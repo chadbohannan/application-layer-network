@@ -1,3 +1,5 @@
+import json
+
 # Packet class can compose and decompose packets for frame-link transit
 
 
@@ -104,11 +106,11 @@ class Packet:
     FRAME_ESCAPE        = 0xC3
 
     # Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
-    CF_UNUSED2   = 0x0400
-    CF_UNUSED1   = 0x0200
-    CF_LINKSTATE = 0x0100
-    CF_SRCADDR   = 0x0080
-    CF_DESTADDR  = 0x0040
+    CF_NETSTATE  = 0x0400
+    CF_SERVICEID = 0x0200
+    CF_SRCADDR   = 0x0100
+    CF_DESTADDR  = 0x0080
+    CF_NEXTADDR  = 0x0040
     CF_SEQNUM    = 0x0020
     CF_ACKBLOCK  = 0x0010
     CF_CONTEXTID = 0X0008
@@ -118,9 +120,11 @@ class Packet:
 
     # Packet header field sizes
     CF_FIELD_SIZE         = 2 # INT16U
-    LINKSTATE_FIELD_SIZE  = 1 # INT08U enumerated
+    NETSTATE_FIELD_SIZE   = 1 # INT08U enumerated
+    SERVICEID_FIELD_SIZE  = 2 # INT16U
     SRCADDR_FIELD_SIZE    = 2 # INT16U
     DESTADDR_FIELD_SIZE   = 2 # INT16U
+    NEXTADDR_FIELD_SIZE   = 2 # INT16U
     SEQNUM_FIELD_SIZE     = 2 # INT16U
     ACKBLOCK_FIELD_SIZE   = 4 # INT32U
     CONTEXTID_FIELD_SIZE  = 2 # INT16U
@@ -129,21 +133,37 @@ class Packet:
     CRC_FIELD_SIZE        = 4 # INT32U
 
     MAX_HEADER_SIZE = CF_FIELD_SIZE + \
-      LINKSTATE_FIELD_SIZE + \
-      SRCADDR_FIELD_SIZE + \
-      DESTADDR_FIELD_SIZE + \
-      SEQNUM_FIELD_SIZE + \
-      ACKBLOCK_FIELD_SIZE + \
-      CONTEXTID_FIELD_SIZE + \
-      DATATYPE_FIELD_SIZE + \
-      DATALENGTH_FIELD_SIZE
+        NETSTATE_FIELD_SIZE + \
+        SERVICEID_FIELD_SIZE + \
+        SRCADDR_FIELD_SIZE + \
+        DESTADDR_FIELD_SIZE + \
+        NEXTADDR_FIELD_SIZE + \
+        SEQNUM_FIELD_SIZE + \
+        ACKBLOCK_FIELD_SIZE + \
+        CONTEXTID_FIELD_SIZE + \
+        DATATYPE_FIELD_SIZE + \
+        DATALENGTH_FIELD_SIZE
 
-    MAX_DATA_SIZE = 1024 # small number to prevent constrained device stack overflow
+    MAX_DATA_SIZE = 0xFFFF
     MAX_PACKET_SIZE = MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 
 
     # parse packet from incoming data, if available
     def __init__(self, body):
+        # initialize fields
+        self.controlFlags = 0x0000
+        self.netState     = 0x00
+        self.serviceID    = 0x0000
+        self.srcAddr      = 0x0000
+        self.destAddr     = 0x0000
+        self.nextAddr     = 0x0000
+        self.seqNum       = 0x0000
+        self.ackBlock     = 0x00000000
+        self.contextID   = 0x0000
+        self.dataType    = 0x00
+        self.dataSize     = 0
+        self.data         = []
+        self.crcSum       = 0x00000000
 
         if (body != None):
             self.parsePacketBytes(body)
@@ -151,12 +171,16 @@ class Packet:
     @staticmethod
     def headerLength(controlFlags):
         len = 2 # length of controlFlags
-        if(controlFlags & Packet.CF_LINKSTATE):
-            len += Packet.LINKSTATE_FIELD_SIZE
+        if(controlFlags & Packet.CF_NETSTATE):
+            len += Packet.NETSTATE_FIELD_SIZE
+        if(controlFlags & Packet.CF_SERVICEID):
+            len += Packet.SERVICEID_FIELD_SIZE
         if(controlFlags & Packet.CF_SRCADDR):
             len += Packet.SRCADDR_FIELD_SIZE
         if(controlFlags & Packet.CF_DESTADDR):
             len += Packet.DESTADDR_FIELD_SIZE
+        if(controlFlags & Packet.CF_NEXTADDR):
+            len += Packet.NEXTADDR_FIELD_SIZE
         if(controlFlags & Packet.CF_SEQNUM):
             len += Packet.SEQNUM_FIELD_SIZE
         if(controlFlags & Packet.CF_ACKBLOCK):
@@ -173,10 +197,15 @@ class Packet:
     def headerFieldOffset(controlFlags, field):
       offset = 2
 
-      if (field == Packet.CF_LINKSTATE):
+      if (field == Packet.CF_NETSTATE):
           return offset
-      if (controlFlags & Packet.CF_LINKSTATE):
-          offset += Packet.LINKSTATE_FIELD_SIZE
+      if (controlFlags & Packet.CF_NETSTATE):
+          offset += Packet.NETSTATE_FIELD_SIZE
+
+      if (field == Packet.CF_SERVICEID):
+          return offset
+      if (controlFlags & Packet.CF_SERVICEID):
+          offset += Packet.SERVICEID_FIELD_SIZE
 
       if (field == Packet.CF_SRCADDR):
           return offset
@@ -188,8 +217,13 @@ class Packet:
       if (controlFlags & Packet.CF_DESTADDR):
           offset += Packet.DESTADDR_FIELD_SIZE
 
+      if (field == Packet.CF_NEXTADDR):
+          return offset
+      if (controlFlags & Packet.CF_NEXTADDR):
+          offset += Packet.NEXTADDR_FIELD_SIZE
+
       if (field == Packet.CF_SEQNUM):
-          return offset;
+          return offset
       if (controlFlags & Packet.CF_SEQNUM):
           offset += Packet.SEQNUM_FIELD_SIZE
 
@@ -218,8 +252,8 @@ class Packet:
         frameBuffer = []
 
         # write frame leader
-        for i in range(0, 4):
-            frameBuffer.append(Packet.FRAME_LEADER_LENGTH)
+        for i in range(0, Packet.FRAME_LEADER_LENGTH):
+            frameBuffer.append(Packet.FRAME_LEADER)
 
         # write byte-stuffed packet body
         delimCount = 0
@@ -234,10 +268,13 @@ class Packet:
 
     def toPacketBuffer(self): # returns a un-framed array
         # establish packet structure
-        self.controlFlags = Packet.CF_CRC
-        if (self.linkState):   self.controlFlags |= Packet.CF_LINKSTATE
+        self.dataSize = len(self.data)
+        self.controlFlags = 0 # Packet.CF_CRC
+        if (self.netState):   self.controlFlags |= Packet.CF_NETSTATE
+        if (self.serviceID):   self.controlFlags |= Packet.CF_SERVICEID
         if (self.srcAddr):     self.controlFlags |= Packet.CF_SRCADDR
         if (self.destAddr):    self.controlFlags |= Packet.CF_DESTADDR
+        if (self.nextAddr):    self.controlFlags |= Packet.CF_NEXTADDR
         if (self.seqNum):      self.controlFlags |= Packet.CF_SEQNUM
         if (self.ackBlock):    self.controlFlags |= Packet.CF_ACKBLOCK
         if (self.contextID):  self.controlFlags |= Packet.CF_CONTEXTID
@@ -251,14 +288,20 @@ class Packet:
         packetBuffer.extend(writeINT16U(self.controlFlags))
 
 
-        if (self.controlFlags & Packet.CF_LINKSTATE):
-            packetBuffer.append(self.linkState);
+        if (self.controlFlags & Packet.CF_NETSTATE):
+            packetBuffer.append(self.netState);
+
+        if (self.controlFlags & Packet.CF_SERVICEID):
+            packetBuffer.extend(writeINT16U(self.serviceID))
 
         if (self.controlFlags & Packet.CF_SRCADDR):
             packetBuffer.extend(writeINT16U(self.srcAddr))
 
         if (self.controlFlags & Packet.CF_DESTADDR):
             packetBuffer.extend(writeINT16U(self.destAddr))
+
+        if (self.controlFlags & Packet.CF_NEXTADDR):
+            packetBuffer.extend(writeINT16U(self.nextAddr))
 
         if (self.controlFlags & Packet.CF_SEQNUM):
             packetBuffer.extend(writeINT16U(self.seqNum))
@@ -270,7 +313,7 @@ class Packet:
             packetBuffer.extend(writeINT16U(self.contet_id))
 
         if (self.controlFlags & Packet.CF_DATATYPE):
-            packetBuffer.extend(writeINT16U(self.dataType))
+            packetBuffer.append(self.netState);
 
         if (self.controlFlags & Packet.CF_DATA):
             packetBuffer.extend(writeINT16U(self.dataSize))
@@ -286,19 +329,6 @@ class Packet:
 
     # unpacks a recieved packet into local variables
     def parsePacketBytes(self, packetBuffer):
-        # initialize fields
-        self.controlFlags = 0x0000
-        self.linkState    = 0x00
-        self.srcAddr      = 0x0000
-        self.destAddr     = 0x0000
-        self.seqNum       = 0x0000
-        self.ackBlock     = 0x00000000
-        self.contextID   = 0x0000
-        self.dataType    = 0x00
-        self.dataSize     = 0
-        self.data         = []
-        self.crcSum       = 0x00000000
-
         if (len(packetBuffer) < 2):
             self.error = "packet < 2 bytes long"
             return None
@@ -307,9 +337,14 @@ class Packet:
         self.controlFlags = CFHamDecode(readINT16U(cfBytes))
         offset = Packet.CF_FIELD_SIZE # length of controlFlags
 
-        if(self.controlFlags & Packet.CF_LINKSTATE):
-            self.linkState = packetBuffer[offset]
-            offset += Packet.LINKSTATE_FIELD_SIZE # 1
+        if(self.controlFlags & Packet.CF_NETSTATE):
+            self.netState = packetBuffer[offset]
+            offset += Packet.NETSTATE_FIELD_SIZE # 1
+
+        if(self.controlFlags & Packet.CF_SERVICEID):
+            srvBytes = packetBuffer[offset:offset+Packet.SERVICEID_FIELD_SIZE]
+            self.serviceID = readINT16U(srvBytes)
+            offset += Packet.SERVICEID_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_SRCADDR):
             srcBytes = packetBuffer[offset:offset+Packet.SRCADDR_FIELD_SIZE]
@@ -320,6 +355,11 @@ class Packet:
             destBytes = packetBuffer[offset:offset+Packet.DESTADDR_FIELD_SIZE]
             self.destAddr = readINT16U(destBytes)
             offset += Packet.DESTADDR_FIELD_SIZE
+
+        if(self.controlFlags & Packet.CF_NEXTADDR):
+            nxtBytes = packetBuffer[offset:offset+Packet.NEXTADDR_FIELD_SIZE]
+            self.destAddr = readINT16U(nxtBytes)
+            offset += Packet.NEXTADDR_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_SEQNUM):
             seqBytes = packetBuffer[offset:offset+Packet.SEQNUM_FIELD_SIZE]
@@ -352,3 +392,41 @@ class Packet:
         # print 'parsePacketBytes, cf: %x body size:%d' % (self.controlFlags, len(packetBuffer))
 
         return None
+
+    @staticmethod
+    def fromJsonString(str):
+        obj = json.loads(str)
+        p = Packet(None)
+        p.controlFlags = obj["cf"]
+        if "net" in obj: p.netState = obj["net"]
+        if "srv" in obj: p.netState = obj["srv"]
+        if "src" in obj: p.srcAddr = obj["src"]
+        if "dst" in obj: p.destAddr = obj["dst"]
+        if "nxt" in obj: p.destAddr = obj["nxt"]
+        if "seq" in obj: p.seqNum = obj["seq"]
+        if "ack" in obj: p.ackBlock = obj["ack"]
+        if "ctx" in obj: p.controlFlags = obj["ctx"]
+        if "typ" in obj: p.dataType = obj["typ"]
+        if "data" in obj:
+            p.data = obj["data"]
+            p.dataSize = len(p.data)        
+        return p
+    
+    def toJsonStruct(self):
+        self.dataSize = len(self.data)
+        return {
+            "cf": self.controlFlags,
+            "net": self.netState,
+            "srv": self.serviceID,
+            "src": self.srcAddr,
+            "dst": self.destAddr,
+            "nxt": self.nextAddr,
+            "seq": self.seqNum,
+            "ack": self.ackBlock,
+            "ctx": self.contextID,
+            "typ": self.dataType,
+            "data": self.data,
+        }
+
+    def toJsonString(self):
+        return json.dumps(self.toJsonStruct())
