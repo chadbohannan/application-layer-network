@@ -80,6 +80,9 @@ func (r *Router) SelectService(serviceID uint16) AddressType {
 // Send is the core routing function of Router. A packet is either expected
 //  locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	if p.DestAddr == 0 && p.ServiceID != 0 {
 		p.DestAddr = r.SelectService(p.ServiceID)
 	}
@@ -105,6 +108,8 @@ func (r *Router) Send(p *Packet) error {
 	return nil
 }
 
+// RegisterContextHandler returns a contextID. Services must respond with the same
+// contextID to reach the correct handler.
 func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -116,6 +121,7 @@ func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	return ctxID
 }
 
+// ReleaseContext frees memory associated with a context
 func (r *Router) ReleaseContext(ctxID uint16) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

@@ -10,10 +10,6 @@ class Parser:
     STATE_GETDATA   = 3
     STATE_GETCRC    = 4
 
-    # LinkState value enumerations (TODO support routing)
-    NET_ROUTE   = 0x01
-    NET_SERVICE = 0x03
-
     # requires a callback function that will be called when a packet is parsed
     # from incremental data
     def __init__(self, packet_callback):
@@ -47,23 +43,18 @@ class Parser:
     # consumes data incrementally and emits calls to packet_callback when full
     # packets are parsed from the incoming stream
     def readBytes(self, buffer):
-        # import pdb; pdb.set_trace()
         for msg in buffer:
-            print(msg,", state:", self.state, "delimCount:", self.delimCount)
             # check for escape char (occurs mid-frame)
             if (msg == Packet.FRAME_ESCAPE):
-                print(msg, " is FRAME_ESCAPE")
                 if (self.delimCount >= (Packet.FRAME_LEADER_LENGTH-1)):
                     self.delimCount = 0 # reset FRAME_LEADER detection
                     continue # drop the char from the stream
             elif(msg == Packet.FRAME_LEADER):
-                print(msg, " is FRAME_LEADER")
                 self.delimCount += 1
                 if (self.delimCount >= Packet.FRAME_LEADER_LENGTH):
                     self.state = Parser.STATE_GET_CF
                     continue
             else: # not a framing byte; reset delim count
-                print(msg, " is packet body, reseting delimCount")
                 self.delimCount = 0
 
 
