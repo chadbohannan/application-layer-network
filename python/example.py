@@ -1,27 +1,39 @@
-import sys, time
-sys.path.insert(0, "../../src/py")
-from aln.packet import Packet, readINT32U, writeINT32U
-from aln.parser import Parser
+import selectors, signal, socket, sys, time
+from aln.tcpchannel import TcpChannel
+from aln.router import Router
 
-# import pdb; pdb.set_trace()
+def packet_handler(p):
+    print(p.toJsonString())
 
-def packet_callback(packet):
-    # import pdb; pdb.set_trace()
-    print("".join(packet.data))
 
 def main():
-    packet = Packet(None)
-    packet.serviceID = 1
-    packet.data = "ping"
+    print('connecting')
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(('localhost', 8000))
+    print('connected')
 
-    buff = packet.toFramedBuffer()
-    print("ping...")
+    tcpChannel = TcpChannel(sock)
     
-    # TODO use routers to connect a client to a ping service
-    parser = Parser(packet_callback)
-    parser.readBytes(packet.toFramedBuffer())
-    
-    time.sleep(.01)
+    # TODO router.add_channel(tcpChannel)
+    sel = selectors.DefaultSelector()
+    router = Router(sel, 2) # TODO address-request protocol
+    router.add_channel(tcpChannel)
 
+    #tcpChannel.listen(sel, packet_handler)
+
+
+    def signal_handler(signal, frame): # listen for ^C
+            tcpChannel.close()
+            sel.close()
+    signal.signal(signal.SIGINT, signal_handler)
+
+    while True: # enter event loop
+        events = sel.select()
+        for key, mask in events:
+            callback = key.data
+            callback(key.fileobj, mask)
+
+print("B")
 if __name__ == "__main__":
+    print("starting")
     main()

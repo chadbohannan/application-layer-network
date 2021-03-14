@@ -1,5 +1,5 @@
 # Parser class can compose and decompose packets for frame-link transit
-from packet import Packet, crc, CFHamDecode, readINT16U, writeINT16U, readINT32U, writeINT32U
+from .packet import *
 
 class Parser:
 
@@ -32,6 +32,7 @@ class Parser:
 
         # deliver to application code
         if (self.packet_callback):
+            # import pdb; pdb.set_trace()
             self.packet_callback(packet)
         else:
             return -3 # TODO enumerate errors

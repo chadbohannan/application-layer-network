@@ -2,7 +2,6 @@ import json
 
 # Packet class can compose and decompose packets for frame-link transit
 
-
 def readINT16U(buffer):
     if (len(buffer) != 2):
         raise ValueError(
