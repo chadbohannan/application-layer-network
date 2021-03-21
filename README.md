@@ -15,4 +15,8 @@ An ALN provides message routing to anywhere in a connected network. A connected 
 | C#       | Broken |        |        |       |      |           |
 | Go       | Done   | Done   | Proto  | Done  | Done |           |
 | Java     | Broken | Broken |        |       |      |           |
-| Python   | Done   | Done   | Proto  |       |      |           |
+| Python   | Done   | Done   | Proto  |       | Done |           |
+
+Broken - design changed, code is obselete
+Proto - some functionality working but module is not incomplete
+Done - functional; implements design

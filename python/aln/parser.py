@@ -32,7 +32,6 @@ class Parser:
 
         # deliver to application code
         if (self.packet_callback):
-            # import pdb; pdb.set_trace()
             self.packet_callback(packet)
         else:
             return -3 # TODO enumerate errors
@@ -44,6 +43,7 @@ class Parser:
     # consumes data incrementally and emits calls to packet_callback when full
     # packets are parsed from the incoming stream
     def readBytes(self, buffer):
+        print(buffer)
         for msg in buffer:
             # check for escape char (occurs mid-frame)
             if (msg == Packet.FRAME_ESCAPE):

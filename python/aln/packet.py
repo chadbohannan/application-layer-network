@@ -184,7 +184,7 @@ class Packet:
         self.ackBlock = ackBlock
         self.contextID = contextID
         self.dataType = dataType
-        self.data = data if data else []
+        self.data = data if data else bytes()
         self.dataSize = len(self.data)
         self.crcSum = crcSum
 
@@ -286,10 +286,16 @@ class Packet:
                 frameBuffer.append(Packet.FRAME_ESCAPE)
                 delimCount = 0
 
-        return frameBuffer
+        return bytes(frameBuffer)
 
     def toPacketBuffer(self):  # returns a un-framed array
         # establish packet structure
+        if isinstance(self.data, str):
+            self.data = self.data.encode('utf-8')
+        if isinstance(self.data, list):
+            self.data = bytes(self.data)        
+        if not isinstance(self.data, (bytes, bytearray)):
+            raise Exception('data type error')
         self.dataSize = len(self.data)
         self.controlFlags = 0  # Packet.CF_CRC
         if (self.netState):
@@ -341,7 +347,7 @@ class Packet:
             packetBuffer.extend(writeINT32U(self.ackBlock))
 
         if (self.controlFlags & Packet.CF_CONTEXTID):
-            packetBuffer.extend(writeINT16U(self.contet_id))
+            packetBuffer.extend(writeINT16U(self.contextID))
 
         if (self.controlFlags & Packet.CF_DATATYPE):
             packetBuffer.append(self.netState)

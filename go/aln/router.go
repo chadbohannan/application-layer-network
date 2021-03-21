@@ -80,23 +80,30 @@ func (r *Router) SelectService(serviceID uint16) AddressType {
 // Send is the core routing function of Router. A packet is either expected
 //  locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
+
+	handler := func(p *Packet) {}
+	packetCallback := func(p *Packet) { handler(p) }
+	defer packetCallback(p)
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	if p.SrcAddr == 0 {
+		p.SrcAddr = r.address
+	}
 	if p.DestAddr == 0 && p.ServiceID != 0 {
 		p.DestAddr = r.SelectService(p.ServiceID)
 	}
 	if p.DestAddr == r.address {
 		if onPacket, ok := r.serviceMap[p.ServiceID]; ok {
-			onPacket(p)
+			handler = onPacket
 		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
-			onPacket(p)
+			handler = onPacket
 		} else {
 			return fmt.Errorf("service %d not registered", p.ServiceID)
 		}
 	} else if p.NextAddr == r.address || p.NextAddr == 0 {
 		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
-			p.SrcAddr = r.address
 			p.NextAddr = route.NextHop
 			route.Channel.Send(p)
 		} else {
@@ -109,7 +116,7 @@ func (r *Router) Send(p *Packet) error {
 }
 
 // RegisterContextHandler returns a contextID. Services must respond with the same
-// contextID to reach the correct handler.
+// contextID to reach the correct response handler.
 func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -134,8 +141,13 @@ func (r *Router) AddChannel(channel Channel) {
 	r.channels = append(r.channels, channel)
 	r.mutex.Unlock()
 
+	// TODO add OnClose callback to TcpChannel
+
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) {
+		fmt.Printf("received packet to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
+			packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
+
 		if (packet.ControlFlags & CF_NETSTATE) == CF_NETSTATE {
 			switch packet.NetState {
 			case NET_ROUTE:

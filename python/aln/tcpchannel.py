@@ -4,6 +4,7 @@ from .parser import Parser
 class TcpChannel():
     def __init__(self, sock):
         self.sock = sock
+        self.on_close = None
         self.sock.setblocking(False)
 
     def packet_handler(self, packet):
@@ -19,15 +20,20 @@ class TcpChannel():
         self.selector.unregister(self.sock)
         self.sock.close()
 
-    def send(packet):
-        self.sock.send(packet.toFrameBytes())
+    def send(self, packet):
+        frame = packet.toFrameBytes()
+        try:
+            self.sock.send(frame)
+        except:
+            return False
+        return True
 
     def recv(self, sock, mask):
         data = sock.recv(1024)
         if data:
-            print('received', repr(data), 'from ', sock.getsockname())
             self.parser.readBytes(data)
         else:
-            print('closing', sock)
             self.selector.unregister(sock)
             sock.close()
+            if self.on_close:
+                self.on_close(self)

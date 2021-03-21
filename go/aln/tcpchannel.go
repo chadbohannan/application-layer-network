@@ -70,7 +70,8 @@ func (ch *TCPChannel) Send(p *Packet) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("sending " + p.ToJsonString())
+	fmt.Printf("send to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
+		p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data)
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()

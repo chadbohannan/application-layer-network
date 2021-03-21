@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -19,7 +18,6 @@ func main() {
 
 	// create the ping service to send packets back where they came from
 	router.RegisterService(pingServiceID, func(packet *aln.Packet) {
-		fmt.Printf("...") // this is the mid-point of the round-trip
 		router.Send(&aln.Packet{
 			DestAddr:  packet.SrcAddr,
 			ContextID: packet.ContextID,
