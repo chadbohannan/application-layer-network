@@ -24,9 +24,7 @@ def main():
         lock.release() # release the main thread
     signal.signal(signal.SIGINT, signal_handler)
 
-    time.sleep(0.1) # let the service table sync up
     PING_SERVICE_ID = 1
-    pingAddr = router.select_service(PING_SERVICE_ID)
 
     def on_pong(packet):
         print('received:', str(bytes(packet.data)))
@@ -34,7 +32,8 @@ def main():
         router.release_context(packet.contextID)         
 
     ctxID = router.register_context_handler(on_pong)
-    router.send(Packet(destAddr=pingAddr, serviceID=PING_SERVICE_ID, contextID=ctxID))
+    msg = router.send(Packet(serviceID=PING_SERVICE_ID, contextID=ctxID))
+    if msg: print("on send:", msg)
 
     # hang until ^C
     lock.acquire()

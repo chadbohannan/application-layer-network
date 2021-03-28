@@ -26,7 +26,7 @@ func (host *TcpChannelHost) Listen(onConnect func(Channel)) {
 	l, err := net.Listen("tcp", bindAddress)
 	if err != nil {
 		fmt.Println("TCPHost:Listen err:", err.Error())
-		os.Exit(1)
+		os.Exit(-1)
 	}
 	defer l.Close()
 
@@ -36,7 +36,7 @@ func (host *TcpChannelHost) Listen(onConnect func(Channel)) {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("TCPHost:Accept err: ", err.Error())
-			os.Exit(1)
+			os.Exit(-1)
 		}
 		go onConnect(NewTCPChannel(conn))
 	}
@@ -84,7 +84,7 @@ func (ch *TCPChannel) Send(p *Packet) error {
 }
 
 // Receive deserializes packets from it's socket
-func (ch *TCPChannel) Receive(onPacket PacketCallback) {
+func (ch *TCPChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
 	parser := NewParser(onPacket)
 	byteBuff := []byte{0}
 	for {
@@ -95,6 +95,9 @@ func (ch *TCPChannel) Receive(onPacket PacketCallback) {
 		parser.IngestStream(byteBuff)
 	}
 	ch.Close()
+	if onClose != nil {
+		onClose(ch)
+	}
 }
 
 // Close .

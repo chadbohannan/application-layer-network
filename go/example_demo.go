@@ -45,7 +45,7 @@ func main() {
 
 	r2.AddChannel(aln.NewTCPChannel(conn))
 
-	time.Sleep(time.Millisecond) // let the routing tables synchronize
+	time.Sleep(10 * time.Millisecond) // let the routing tables synchronize
 
 	// Setup our ping reply handler
 	var wg sync.WaitGroup
@@ -56,7 +56,7 @@ func main() {
 	})
 	defer r2.ReleaseContext(ctx)
 
-	fmt.Printf("ping") // the journey begins
+	fmt.Println("ping") // the journey begins
 	r2.Send(&aln.Packet{
 		ServiceID: pingServiceID,
 		ContextID: ctx,

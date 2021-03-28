@@ -22,6 +22,7 @@ const (
 )
 
 type PacketCallback func(*Packet)
+type OnCloseCallback func(Channel)
 
 type Parser struct {
 	frameBuffer []byte // clears on frame delimiter; contains no esc chars
