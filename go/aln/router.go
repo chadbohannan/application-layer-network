@@ -167,8 +167,8 @@ func (r *Router) AddChannel(channel Channel) {
 
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) {
-		fmt.Printf("received packet to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
-			packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
+		// fmt.Printf("received packet to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
+		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
 
 		if (packet.ControlFlags & CF_NETSTATE) == CF_NETSTATE {
 			switch packet.NetState {

@@ -60,11 +60,13 @@ func TestRoute2Hop(t *testing.T) {
 	rtr1.AddChannel(channelA)
 	rtr2.AddChannel(channelA.FlippedChannel())
 
+	time.Sleep(10 * time.Millisecond) // allow route and service table to sync
+
 	channelB := NewLocalChannel()
 	rtr2.AddChannel(channelB)
 	rtr3.AddChannel(channelB.FlippedChannel())
 
-	time.Sleep(time.Millisecond) // allow route and service table to sync
+	time.Sleep(10 * time.Millisecond) // allow route and service table to sync
 
 	pkt := NewPacket()
 	pkt.ServiceID = 0x0001
@@ -72,7 +74,7 @@ func TestRoute2Hop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(2 * time.Millisecond) // let async operation settle
+	time.Sleep(200 * time.Millisecond) // let async operation settle
 	if !packetRecieved {
 		t.Fatal("packet not recieved")
 	}
