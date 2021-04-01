@@ -45,17 +45,19 @@ type Router struct {
 	contextMap     serviceHandlerMap
 	remoteNodeMap  RemoteNodeMap // map[address][]RemoteNodes
 	serviceLoadMap ServiceLoadMap
+	serviceQueue   map[uint16][]*Packet // packets waiting for services during warmup
 }
 
 // NewRouter instantiates an applications ELP Router
 func NewRouter(address AddressType) *Router {
 	return &Router{
 		address:        address,
-		channels:       []Channel{},
+		channels:       make([]Channel, 0),
 		serviceMap:     make(serviceHandlerMap),
 		contextMap:     make(serviceHandlerMap),
 		remoteNodeMap:  make(RemoteNodeMap),
 		serviceLoadMap: make(ServiceLoadMap),
+		serviceQueue:   make(map[uint16][]*Packet),
 	}
 }
 
@@ -80,24 +82,42 @@ func (r *Router) SelectService(serviceID uint16) AddressType {
 // Send is the core routing function of Router. A packet is either expected
 //  locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
+
+	handler := func(p *Packet) {}
+	packetCallback := func(p *Packet) { handler(p) }
+	defer packetCallback(p)
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if p.SrcAddr == 0 {
+		p.SrcAddr = r.address
+	}
 	if p.DestAddr == 0 && p.ServiceID != 0 {
 		p.DestAddr = r.SelectService(p.ServiceID)
+		if p.DestAddr == 0 {
+			if _, ok := r.serviceQueue[p.ServiceID]; !ok {
+				r.serviceQueue[p.ServiceID] = []*Packet{p}
+			} else {
+				r.serviceQueue[p.ServiceID] = append(r.serviceQueue[p.ServiceID], p)
+			}
+			return fmt.Errorf("serviceID %d unavailable, packet queued", p.ServiceID)
+		}
 	}
 	if p.DestAddr == r.address {
 		if onPacket, ok := r.serviceMap[p.ServiceID]; ok {
-			onPacket(p)
+			handler = onPacket
 		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
-			onPacket(p)
+			handler = onPacket
 		} else {
 			return fmt.Errorf("service %d not registered", p.ServiceID)
 		}
 	} else if p.NextAddr == r.address || p.NextAddr == 0 {
 		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
-			p.SrcAddr = r.address
 			p.NextAddr = route.NextHop
 			route.Channel.Send(p)
 		} else {
-			return fmt.Errorf("no route for %d [%X]", p.DestAddr, p.DestAddr)
+			return fmt.Errorf("packet queued for delayed send t %d [%X]", p.DestAddr, p.DestAddr)
 		}
 	} else {
 		return fmt.Errorf("packet is unroutable; no action taken")
@@ -105,6 +125,8 @@ func (r *Router) Send(p *Packet) error {
 	return nil
 }
 
+// RegisterContextHandler returns a contextID. Services must respond with the same
+// contextID to reach the correct response handler.
 func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -116,10 +138,23 @@ func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	return ctxID
 }
 
+// ReleaseContext frees memory associated with a context
 func (r *Router) ReleaseContext(ctxID uint16) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	delete(r.contextMap, ctxID)
+}
+
+func (r *Router) RemoveChannel(channel Channel) {
+	for i, ch := range r.channels {
+		if ch == channel {
+			a := r.channels
+			a[i] = a[len(a)-1]
+			a[len(a)-1] = nil
+			r.channels = a[:len(a)-1]
+			break
+		}
+	}
 }
 
 // AddChannel initializes
@@ -128,8 +163,13 @@ func (r *Router) AddChannel(channel Channel) {
 	r.channels = append(r.channels, channel)
 	r.mutex.Unlock()
 
+	// TODO add OnClose callback to TcpChannel
+
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) {
+		// fmt.Printf("received packet to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
+		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
+
 		if (packet.ControlFlags & CF_NETSTATE) == CF_NETSTATE {
 			switch packet.NetState {
 			case NET_ROUTE:
@@ -181,6 +221,16 @@ func (r *Router) AddChannel(channel Channel) {
 							c.Send(packet)
 						}
 					}
+					if packetList, ok := r.serviceQueue[serviceID]; ok {
+						if route, ok := r.remoteNodeMap[address]; ok {
+							for _, p := range packetList {
+								p.DestAddr = address
+								p.NextAddr = route.NextHop
+								channel.Send(p)
+							}
+						}
+						delete(r.serviceQueue, serviceID)
+					}
 				} else {
 					fmt.Printf("error parsing NET_SERVICE: %s", err.Error())
 				}
@@ -196,12 +246,11 @@ func (r *Router) AddChannel(channel Channel) {
 		} else {
 			r.Send(packet)
 		}
-	})
+	}, r.RemoveChannel)
 	channel.Send(makeNetQueryPacket())
 }
 
-// RegisterService adds a node to the network accessible in zero hops from this
-//  router. Badd stuff happens if the address is not unique on the network.
+// RegisterService binds a handler to a serviceID and shares the info with neighbors
 func (r *Router) RegisterService(serviceID uint16, onPacket func(*Packet)) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -209,7 +258,7 @@ func (r *Router) RegisterService(serviceID uint16, onPacket func(*Packet)) {
 	go r.ShareNetState()
 }
 
-// UnregisterService is a cleanup mechanism for elegant application teardown
+// UnregisterService releases the handler for a service
 func (r *Router) UnregisterService(serviceID uint16) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()

@@ -1,7 +1,6 @@
 package aln
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -24,7 +23,6 @@ func TestINT32U(t *testing.T) {
 }
 
 func TestParser(t *testing.T) {
-	// TODO create Packet
 	pkt0 := NewPacket()
 	pkt0.DestAddr = 0x0101
 	pkt0.Data = []byte("test")
@@ -32,7 +30,6 @@ func TestParser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pkt.ToBytes err: %s", err.Error())
 	}
-	fmt.Printf("toString: %s", string(buff))
 
 	pkt1, err := ParsePacket(buff)
 	if err != nil {
