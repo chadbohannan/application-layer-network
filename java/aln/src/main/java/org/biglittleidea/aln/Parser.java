@@ -2,10 +2,6 @@ package org.biglittleidea.aln;
 
 public class Parser {
 
-    public interface IPacketHandler {
-        void onPacket(Packet p);
-    }
-
     private class State {
         public static final int FindStart = 0;
         public static final int GetCF = 1;

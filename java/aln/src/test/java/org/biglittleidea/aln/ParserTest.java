@@ -2,6 +2,8 @@ package org.biglittleidea.aln;
 
 import org.biglittleidea.aln.Packet;
 import org.biglittleidea.aln.Parser;
+import org.biglittleidea.aln.IPacketHandler;
+
 import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
@@ -28,7 +30,7 @@ class ParserTest {
         byte[] buffer = packet.toFrameBuffer();
         
         final ArrayList<Packet> parsedPackets = new ArrayList();
-        Parser parser = new Parser(new Parser.IPacketHandler(){
+        Parser parser = new Parser(new IPacketHandler(){
             @Override public void onPacket(Packet p) {
                 parsedPackets.add(p);
             }
