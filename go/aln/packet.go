@@ -74,6 +74,13 @@ const (
 	MAX_PACKET_SIZE = MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 )
 
+// LinkState value enumerations (TODO support mesh routing)
+const (
+	NET_ROUTE   = 0x01 // packet contains route entry
+	NET_SERVICE = 0x02 // packet contains service entry
+	NET_QUERY   = 0x03 // packet is a request for content
+)
+
 type Packet struct {
 	ControlFlags uint16      `bson:"cf" json:"cf"`
 	NetState     byte        `bson:"net" json:"net"`

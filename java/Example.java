@@ -1,11 +1,16 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.ArrayList;
+import java.io.PrintWriter;
+import java.io.ServerSocket;
+import java.io.Socket;
 
 
 public class Example {
-
+    private ServerSocket serverSocket;
+    private Socket clientSocket;
+    private PrintWriter out;
+    private BufferedReader in;
     public static void main(String[] args) {
         Parser.IPacketHandler handler = new Parser.IPacketHandler(){
             public void onPacket(Packet p) {

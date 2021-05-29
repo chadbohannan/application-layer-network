@@ -1,3 +1,5 @@
+package org.biglittleidea.aln;
+
 import java.util.ArrayList;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
@@ -20,12 +22,9 @@ public class Packet {
      *   then this will return an error of -1, only 0x07FF are
      *   aloud to be on.
      **/
-    static public short Encode(short value) {
-        /* check the validity of input */
-        //if ((value & 0xF800) != 0x0000) 
-        //    throw new System.InvalidOperationException("Invalid input");
+    static public short HammingEncode(short value) {
         /* perform G matrix */
-        int temp = (value & 0x07FF) | 
+        int temp = (value & 0x07FF) |
             (IntXOR(value & 0x071D) << 12) |
             (IntXOR(value & 0x04DB) << 13) |
             (IntXOR(value & 0x01B7) << 14) |
@@ -43,7 +42,7 @@ public class Packet {
      *   11 bits that were sent into the encoder.
      * - Bits 0xF800 will be zero.
      **/
-    static public short Decode(short value) {
+    static public short HammingDecode(short value) {
         int err = IntXOR(value & 0x826F) /* perform H matrix */
                 | (IntXOR(value & 0x41B7) << 1) | (IntXOR(value & 0x24DB) << 2) | (IntXOR(value & 0x171D) << 3);
         switch (err) /* decode error feild */
@@ -64,61 +63,58 @@ public class Packet {
     }
 
     public class ControlFlag {
-        public static final int unused4=0x0400;
-        public static final int unused3=0x0200;
-        public static final int unused2=0x0100;
-        public static final int unused1=0x0080;
-        public static final int linkState=0x0040;
-        public static final int scrAddr=0x0020;
-        public static final int destAddr=0x0010;
-        public static final int seqNum=0x0008;
-        public static final int ackBlock=0x0004;
-        public static final int data=0x0002;
-        public static final int crc=0x0001;
+        public static final int netState  = 0x0400;
+        public static final int serviceID = 0x0200;
+        public static final int scrAddr   = 0x0100;
+        public static final int destAddr  = 0x0080;
+        public static final int nextAddr  = 0x0040;
+        public static final int seqNum    = 0x0020;
+        public static final int ackBlock  = 0x0010;
+        public static final int contextID = 0x0008;
+        public static final int dataType  = 0x0004;
+        public static final int data      = 0x0002;
+        public static final int crc       = 0x0001;
     }
 
-    public class LinkState {
-        public static final byte CONNECT = 0x01;
-        public static final byte CONNECTED = 0x03;
-        public static final byte PING = 0x05;
-        public static final byte PONG = 0x07;
-        public static final byte ACKRESEND = 0x09;
-        public static final byte NOACK = 0x0B;
-        public static final byte CLOSE = 0x0D;
+    public class NetState {
+        public static final byte ROUTE   = 0x01; // packet contains route entry
+        public static final byte SERVICE = 0x02; // packet contains service entry
+        public static final byte QUERY   = 0x03; // packet is a request for content
     }
 
     public static final byte FrameLeader = (byte) 0x3C;
     public static final byte FrameEscape = (byte) 0xC3;
     public static final int FrameLeaderLength = 4;
 
-    public byte LinkState;
+    public byte NetState;
+    public short SerivceID;
     public short SourceAddress;
-    public short DestinationAddress;
+    public short DestAddress;
+    public short NextAddress;
     public short SequenceNum;
     public int AcknowledgeBlock;
+    public short ContextID;
+    public byte DataType;
     public byte[] Data;
     public int CRC;
-    
+
     public Packet() { }
 
     public Packet(Packet p) {
-        LinkState = p.LinkState;
+        NetState = p.NetState;
+        SerivceID = p.SerivceID;
         SourceAddress = p.SourceAddress;
-        DestinationAddress = p.DestinationAddress;
+        DestAddress = p.DestAddress;
+        NextAddress = p.NextAddress;
         SequenceNum = p.SequenceNum;
         AcknowledgeBlock = p.AcknowledgeBlock;
+        ContextID = p.ContextID;
+        DataType = p.DataType;
         Data = p.Data;
     }
 
     public Packet(byte[] pData) {
         init(pData);
-    }
-
-    public Packet(ArrayList<Byte> byteList) {
-        byte[] buf = new byte[byteList.size()];
-        for (int i = 0; i < byteList.size(); i++)
-            buf[i] = byteList.get(i);
-        init(buf);
     }
 
     public static short readUINT16(byte[] pData, int offset) {
@@ -161,7 +157,10 @@ public class Packet {
 
     public static int fieldOffset(short controlFlags, int field) {
         int offset = 2; // ControlFlag bytes
-        if (field == ControlFlag.linkState)
+        if (field == ControlFlag.netState)
+            return offset;
+        offset += 1;
+        if (field == ControlFlag.serviceID)
             return offset;
         offset += 1;
         if (field == ControlFlag.scrAddr)
@@ -170,38 +169,60 @@ public class Packet {
         if (field == ControlFlag.destAddr)
             return offset;
         offset += 2;
+        if (field == ControlFlag.nextAddr)
+            return offset;
+        offset += 2;
         if (field == ControlFlag.seqNum)
             return offset;
         offset += 2;
         if (field == ControlFlag.ackBlock)
             return offset;
-        return offset + 4;
+        offset += 4;
+        if (field == ControlFlag.contextID)
+            return offset;
+        offset += 2;
+        if (field == ControlFlag.dataType)
+            return offset;
+        offset += 1;
+        return offset;
     }
 
     public static int headerLength(short controlFlags) {
         int len = 2; // control flag bytes
-        if ((controlFlags & ControlFlag.linkState) != 0x00) len += 1;
-        if ((controlFlags & ControlFlag.scrAddr) != 0x00) len += 2;
-        if ((controlFlags & ControlFlag.destAddr) != 0x00) len += 2;
-        if ((controlFlags & ControlFlag.seqNum) != 0x00) len += 2;
-        if ((controlFlags & ControlFlag.ackBlock) != 0x00) len += 4;
-        if ((controlFlags & ControlFlag.data) != 0x00) len += 2;
+        if ((controlFlags & ControlFlag.netState) != 0) len += 1;
+        if ((controlFlags & ControlFlag.serviceID) != 0) len += 2;
+        if ((controlFlags & ControlFlag.scrAddr) != 0) len += 2;
+        if ((controlFlags & ControlFlag.destAddr) != 0) len += 2;
+        if ((controlFlags & ControlFlag.nextAddr) != 0) len += 2;
+        if ((controlFlags & ControlFlag.seqNum) != 0) len += 2;
+        if ((controlFlags & ControlFlag.ackBlock) != 0) len += 4;
+        if ((controlFlags & ControlFlag.contextID) != 0) len += 2;
+        if ((controlFlags & ControlFlag.dataType) != 0) len += 1;
+        if ((controlFlags & ControlFlag.data) != 0) len += 2;
         return len;
     }
 
     public void init(byte[] pData) {
         short controlFlags = readUINT16(pData, 0);
         int offset = 2;
-        if ((controlFlags & ControlFlag.linkState) != 0) {
-            LinkState = pData[offset];
+        if ((controlFlags & ControlFlag.netState) != 0) {
+            NetState = pData[offset];
             offset += 1;
+        }
+        if ((controlFlags & ControlFlag.serviceID) != 0) {
+            SerivceID = readUINT16(pData, offset);
+            offset += 2;
         }
         if ((controlFlags & ControlFlag.scrAddr) != 0) {
             SourceAddress = readUINT16(pData, offset);
             offset += 2;
         }
         if ((controlFlags & ControlFlag.destAddr) != 0) {
-            DestinationAddress = readUINT16(pData, offset);
+            DestAddress = readUINT16(pData, offset);
+            offset += 2;
+        }
+        if ((controlFlags & ControlFlag.nextAddr) != 0) {
+            NextAddress = readUINT16(pData, offset);
             offset += 2;
         }
         if ((controlFlags & ControlFlag.seqNum) != 0) {
@@ -211,6 +232,14 @@ public class Packet {
         if ((controlFlags & ControlFlag.ackBlock) != 0) {
             AcknowledgeBlock = readUINT32(pData, offset);
             offset += 4;
+        }
+        if ((controlFlags & ControlFlag.contextID) != 0) {
+            ContextID = readUINT16(pData, offset);
+            offset += 2;
+        }
+        if ((controlFlags & ControlFlag.dataType) != 0) {
+            DataType = pData[offset];
+            offset += 1;
         }
         if ((controlFlags & ControlFlag.data) != 0) {
             int dataLength = readUINT16(pData, offset);
@@ -234,25 +263,28 @@ public class Packet {
     }
 
     public void clear() {
-        LinkState = 0;
+        NetState = 0;
         SourceAddress = 0;
-        DestinationAddress = 0;
+        DestAddress = 0;
         SequenceNum = 0;
         AcknowledgeBlock = 0;
         Data = new byte[] {};
     }
 
-    // returns the hamming encoded Control Field 
+    // returns the hamming encoded Control Field
     public short ControlField() {
         short controlField = 0;
-        if (LinkState != 0) controlField |= ControlFlag.linkState;
+        if (NetState != 0) controlField |= ControlFlag.netState;
+        if (SerivceID != 0) controlField |= ControlFlag.serviceID;
         if (SourceAddress != 0) controlField |= ControlFlag.scrAddr;
-        if (DestinationAddress != 0) controlField |= ControlFlag.destAddr;
+        if (DestAddress != 0) controlField |= ControlFlag.destAddr;
+        if (NextAddress != 0) controlField |= ControlFlag.nextAddr;
         if (SequenceNum != 0) controlField |= ControlFlag.seqNum;
         if (AcknowledgeBlock != 0) controlField |= ControlFlag.ackBlock;
+        if (ContextID != 0) controlField |= ControlFlag.contextID;
+        if (DataType != 0) controlField |= ControlFlag.dataType;
         if (Data != null && Data.length != 0) controlField |= ControlFlag.data;
-        controlField |= ControlFlag.crc; // TODO enable control of CRC
-        controlField = Encode(controlField);
+        controlField = HammingEncode(controlField);
         return controlField;
     }
 
@@ -261,38 +293,10 @@ public class Packet {
         Checksum checksum = new CRC32();
         checksum.update(pdata, start, stop);
         return (int)checksum.getValue();
-
-        // int crc = 0xFFFFFFFF;
-        // for (int i = start; i < stop; i++) {
-        //     byte c = pdata[i];
-        //     System.out.printf("c:%x ", c);
-        //     for (int j = 0x01; j <= 0x80; j <<= 1) {
-        //         int bit = crc & 0x80000000;
-        //         System.out.printf("Debug A %d: bit:%x\n", i, bit);
-        //         crc <<= 1;
-        //         System.out.printf("Debug B %d: crc:%x\n", i, crc);
-        //         System.out.printf("c & j %x\n", c & j);
-        //         if ((c & j) != 0)
-        //             bit ^= 0x80000000;
-        //         System.out.printf("Debug C %d: bit:%x\n", i, bit);
-        //         if (bit > 0)
-        //             crc ^= 0x4C11DB7;
-        //         System.out.printf("Debug D %d: crc:%x\n", i, crc);
-        //     }
-        //     System.out.printf("Debug E %d: crc:%x\n", i, crc);
-        // }
-        // System.out.printf("Debug F: crc:%x\n", crc);
-        // /* Reverse */
-        // crc = (((crc & 0x55555555) << 1) | ((crc & 0xAAAAAAAA) >> 1));
-        // crc = (((crc & 0x33333333) << 2) | ((crc & 0xCCCCCCCC) >> 2));
-        // crc = (((crc & 0x0F0F0F0F) << 4) | ((crc & 0xF0F0F0F0) >> 4));
-        // crc = (((crc & 0x00FF00FF) << 8) | ((crc & 0xFF00FF00) >> 8));
-        // crc = (((crc & 0x0000FFFF) << 16) | ((crc & 0xFFFF0000) >> 16));
-        // return (crc ^ 0xFFFFFFFF) & 0xFFFFFFFF;
     }
 
     // Creates a byte array containing the serialized packet framed for transmission
-    private byte[] toFrameBuffer()
+    public byte[] toFrameBuffer()
     {
         ArrayList<Byte> byteBuffer = new ArrayList<>();
         for (int i = 0; i < FrameLeaderLength; i++)
@@ -328,8 +332,13 @@ public class Packet {
         for (int i = 0; i < cf.length; i++)
             list.add(cf[i]);
 
-        if ((controlField & ControlFlag.linkState) != 0) {
-            list.add(LinkState);
+        if ((controlField & ControlFlag.netState) != 0) {
+            list.add(NetState);
+        }
+        if ((controlField & ControlFlag.serviceID) != 0) {
+            byte[] buf = writeUINT16(SerivceID);
+            for (int i = 0; i < buf.length; i++)
+                list.add(buf[i]);
         }
         if ((controlField & ControlFlag.scrAddr) != 0) {
             byte[] buf = writeUINT16(SourceAddress);
@@ -337,7 +346,12 @@ public class Packet {
                 list.add(buf[i]);
         }
         if((controlField & ControlFlag.destAddr)!=0) {
-            byte[] buf = writeUINT16(DestinationAddress);
+            byte[] buf = writeUINT16(DestAddress);
+            for (int i = 0; i < buf.length; i++)
+                list.add(buf[i]);
+        }
+        if((controlField & ControlFlag.nextAddr)!=0) {
+            byte[] buf = writeUINT16(NextAddress);
             for (int i = 0; i < buf.length; i++)
                 list.add(buf[i]);
         }
@@ -350,6 +364,14 @@ public class Packet {
             byte[] buf = writeUINT32(AcknowledgeBlock);
             for (int i = 0; i < buf.length; i++)
                 list.add(buf[i]);
+        }
+        if((controlField & ControlFlag.contextID)!=0) {
+            byte[] buf = writeUINT16(ContextID);
+            for (int i = 0; i < buf.length; i++)
+                list.add(buf[i]);
+        }
+        if((controlField & ControlFlag.dataType)!=0) {
+            list.add(DataType);
         }
         if((controlField &  ControlFlag.data)!=0) {
             // first metadata
@@ -374,19 +396,27 @@ public class Packet {
     public String toString() {
         short controlField = ControlField();
         byte[] cf = writeUINT16(controlField);
-        String s = String.format("%x%x", cf[0], cf[1]);
-        if ((controlField & ControlFlag.linkState) != 0)
-            s += String.format("%x", LinkState);
+        String s = String.format("cf:0x%02x%02x,", cf[0], cf[1]);
+        if ((controlField & ControlFlag.netState) != 0)
+            s += String.format("net:%d,", NetState);
+        if ((controlField & ControlFlag.serviceID) != 0)
+            s += String.format("srv:%d,", SerivceID);
         if ((controlField & ControlFlag.scrAddr) != 0)
-            s += String.format("%x", SourceAddress);
+            s += String.format("src:0x%x,", SourceAddress);
         if ((controlField & ControlFlag.destAddr) != 0)
-            s += String.format("%x", DestinationAddress);
+            s += String.format("dst:0x%x,", DestAddress);
+        if ((controlField & ControlFlag.nextAddr) != 0)
+            s += String.format("nxt:0x%x,", NextAddress);
         if ((controlField & ControlFlag.seqNum) != 0)
-            s += String.format("%x", SequenceNum);
+            s += String.format("seq:%d,", SequenceNum);
         if ((controlField & ControlFlag.ackBlock) != 0)
-            s += String.format("%x", AcknowledgeBlock);
+            s += String.format("ack:0x%x,", AcknowledgeBlock);
+        if ((controlField & ControlFlag.contextID) != 0)
+            s += String.format("ctx:%d,", ContextID);
+        if ((controlField & ControlFlag.dataType) != 0)
+            s += String.format("typ:%d,", DataType);
         if ((controlField & ControlFlag.data) != 0)
-            s += String.format("%x", Data.length);
+            s += String.format("len:%d", Data.length);
         return s;
     }
 

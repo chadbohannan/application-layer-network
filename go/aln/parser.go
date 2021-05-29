@@ -14,13 +14,6 @@ const (
 	STATE_GETCRC    = 4
 )
 
-// LinkState value enumerations (TODO support mesh routing)
-const (
-	NET_ROUTE   = 0x01 // packet contains route entry
-	NET_SERVICE = 0x02 // packet contains service entry
-	NET_QUERY   = 0x03 // packet is a request for content
-)
-
 type PacketCallback func(*Packet)
 type OnCloseCallback func(Channel)
 
