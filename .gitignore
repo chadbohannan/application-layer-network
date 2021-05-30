@@ -3,7 +3,7 @@
 *.o
 *.pyc
 *.class
-elp-serialization
+__debug_bin
 packets.input
 packets.output
 

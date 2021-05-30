@@ -44,7 +44,10 @@ public class TcpChannel implements IChannel {
                             parser.readBytes(buffer[0].array(), (int)num);
                             buffer[0].flip();
                             socket.read(buffer, 0, 1, timeout, TimeUnit.SECONDS, 42, this);
-                        }
+                        }    
+                    }
+                    public void failed(Throwable exc, Integer a){
+                        //System.out.println(exc.getLocalizedMessage());
                     }
                 };
                 socket.read(buffer, 0, 1, timeout, TimeUnit.MILLISECONDS, 42, completionHandler);
