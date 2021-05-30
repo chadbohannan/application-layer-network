@@ -1,3 +1,5 @@
+// https://github.com/55pp/testTravis/blob/master/clientD/src/main/java/com/NioSocketClient.java
+// sets up an example asynchronous socket client
 package com.geekcap.javaworld.nio2;
 
 import java.io.IOException;
@@ -13,21 +15,19 @@ import java.util.concurrent.Future;
 
 public class NioSocketClient
 {
-
     public String sendMessage(AsynchronousSocketChannel client, String message) {
+        
+        // send message
         byte[] byteMsg = new String(message).getBytes();
         ByteBuffer buffer = ByteBuffer.wrap(byteMsg);
         Future<Integer> writeResult = client.write(buffer);
+        writeResult.get(); // number of bytes writen
 
-        // do some computation
-
-        writeResult.get();
+        // read response
         buffer.flip();
         Future<Integer> readResult = client.read(buffer);
-        
-        // do some computation
+        readResult.get(); // number of bytes read
 
-        readResult.get();
         String echo = new String(buffer.array()).trim();
         buffer.clear();
         return echo;
