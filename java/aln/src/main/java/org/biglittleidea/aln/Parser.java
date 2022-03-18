@@ -1,9 +1,6 @@
+package org.biglittleidea.aln;
 
 public class Parser {
-
-    public interface IPacketHandler {
-        void onPacket(Packet p);
-    }
 
     private class State {
         public static final int FindStart = 0;
@@ -44,9 +41,9 @@ public class Parser {
         crcIndex = 0;
     }
 
-    public int readBytes(byte[] data)
+    public int readBytes(byte[] data, int length)
         {
-            for (int i = 0; i < data.length; i++)
+            for (int i = 0; i < length; i++)
             {
                 byte b = data[i];
                 // a simple state machine to strip framming bytes from incoming data
