@@ -90,12 +90,12 @@ func (r *Router) Send(p *Packet) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if p.SrcAddr == 0 {
+	if len(p.SrcAddr) == 0 {
 		p.SrcAddr = r.address
 	}
-	if p.DestAddr == 0 && p.ServiceID != 0 {
+	if len(p.DestAddr) == 0 && p.ServiceID != 0 {
 		p.DestAddr = r.SelectService(p.ServiceID)
-		if p.DestAddr == 0 {
+		if len(p.DestAddr) == 0 {
 			if _, ok := r.serviceQueue[p.ServiceID]; !ok {
 				r.serviceQueue[p.ServiceID] = []*Packet{p}
 			} else {
@@ -112,12 +112,12 @@ func (r *Router) Send(p *Packet) error {
 		} else {
 			return fmt.Errorf("service %d not registered", p.ServiceID)
 		}
-	} else if p.NextAddr == r.address || p.NextAddr == 0 {
+	} else if p.NextAddr == r.address || len(p.NextAddr) == 0 {
 		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
 			p.NextAddr = route.NextHop
 			route.Channel.Send(p)
 		} else {
-			return fmt.Errorf("packet queued for delayed send t %d [%X]", p.DestAddr, p.DestAddr)
+			return fmt.Errorf("packet queued for delayed send t %s [%X]", p.DestAddr, p.DestAddr)
 		}
 	} else {
 		return fmt.Errorf("packet is unroutable; no action taken")
@@ -175,8 +175,8 @@ func (r *Router) AddChannel(channel Channel) {
 			case NET_ROUTE:
 				// neighbor is sharing it's routing table
 				if remoteAddress, nextHop, cost, err := parseNetworkRouteSharePacket(packet); err == nil {
-					// msg := "NET_ROUTE [%d] remoteAddress:%d, nextHop:%d, cost:%d\n"
-					// fmt.Printf(msg, r.address, remoteAddress, nextHop, cost)
+					msg := "NET_ROUTE [%s] remoteAddress:%s, nextHop:%s, cost:%d\n"
+					fmt.Printf(msg, r.address, remoteAddress, nextHop, cost)
 					r.mutex.Lock()
 					defer r.mutex.Unlock()
 					var ok bool
@@ -201,12 +201,12 @@ func (r *Router) AddChannel(channel Channel) {
 						}
 					}
 				} else {
-					fmt.Printf("error parsing NET_ROUTE: %s", err.Error())
+					fmt.Printf("error parsing NET_ROUTE: %s\n", err.Error())
 				}
 
 			case NET_SERVICE:
 				if address, serviceID, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
-					// fmt.Printf("NET_SERVICE node:%d, service:%d, load:%d\n", address, serviceID, serviceLoad)
+					fmt.Printf("NET_SERVICE node:%s, service:%d, load:%d\n", address, serviceID, serviceLoad)
 					r.mutex.Lock()
 					defer r.mutex.Unlock()
 					if _, ok := r.serviceLoadMap[serviceID]; !ok {
@@ -232,7 +232,7 @@ func (r *Router) AddChannel(channel Channel) {
 						delete(r.serviceQueue, serviceID)
 					}
 				} else {
-					fmt.Printf("error parsing NET_SERVICE: %s", err.Error())
+					fmt.Printf("error parsing NET_SERVICE: %s\n", err.Error())
 				}
 
 			case NET_QUERY:

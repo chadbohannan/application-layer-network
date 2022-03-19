@@ -24,8 +24,8 @@ type Parser struct {
 	delimCount   uint8  // counts '<' chars to detect new frames
 	controlFlags uint16 // hamming-decoded first 2 bytes of frameBuffer
 
-	headerIndex  uint8 // offset into header of next header byte
-	headerLength uint8
+	headerIndex  uint16 // offset into header of next header byte
+	headerLength uint16
 
 	dataIndex  uint16 // offset into data of next data byte
 	dataLength uint16 // local-hardware decoded datalength value
@@ -101,7 +101,7 @@ func (p *Parser) IngestStream(buffer []byte) {
 				if p.headerIndex == 2 {
 					cf := bytesToINT16U(p.frameBuffer)
 					p.controlFlags = CFHamDecode(cf)
-					p.headerLength = HeaderLength(p.controlFlags)
+					p.headerLength = HeaderLength(p.controlFlags, p.frameBuffer)
 					// fmt.Printf("Expected header length:%d\n", p.headerLength)
 					p.state = STATE_GETHEADER
 				}
@@ -116,7 +116,7 @@ func (p *Parser) IngestStream(buffer []byte) {
 				if p.headerIndex >= p.headerLength {
 					if p.controlFlags&CF_DATA != 0 {
 						p.dataIndex = 0
-						dataOffset := HeaderFieldOffset(p.controlFlags, CF_DATA)
+						dataOffset := HeaderFieldOffset(p.controlFlags, CF_DATA, p.frameBuffer)
 						dataBytes := p.frameBuffer[dataOffset : dataOffset+2]
 						p.dataLength = bytesToINT16U(dataBytes)
 						p.state = STATE_GETDATA
