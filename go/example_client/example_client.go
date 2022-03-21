@@ -12,8 +12,8 @@ import (
 
 func main() {
 	// create first router
-	localAddress := aln.AddressType(2) // TODO dynamic address allocation
-	pingServiceID := uint16(1)
+	localAddress := aln.AddressType("client")
+	pingServiceID := uint16(3)
 
 	// setup the second node to connect to the first using TCP
 	router := aln.NewRouter(localAddress)

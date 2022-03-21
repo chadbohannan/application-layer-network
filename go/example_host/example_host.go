@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	alnHostAddress := aln.AddressType(1)
-	pingServiceID := uint16(1)
+	alnHostAddress := aln.AddressType("host")
+	pingServiceID := uint16(3)
 	router := aln.NewRouter(alnHostAddress)
 	tcpHost := aln.NewTcpChannelHost("localhost", 8000)
 	go tcpHost.Listen(func(newChannel aln.Channel) {
