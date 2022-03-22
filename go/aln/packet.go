@@ -15,10 +15,16 @@ type AddressType string
 
 // Packet framing
 const (
-	FRAME_LEADER_LENGTH = 4
-	FRAME_CF_LENGTH     = 2
-	FRAME_LEADER        = 0x3C // '<' (ASCII)
-	FRAME_ESCAPE        = 0xC3 // 'Ã' (Extended ASCII)
+	FRAME_CF_LENGTH = 2
+	FRAME_START     = 0X00
+	FRAME_END       = 0XC0
+	FRAME_ESC       = 0xDB
+	FRAME_END_T     = 0xDC
+	FRAME_ESC_T     = 0xDD
+
+	// FRAME_LEADER_LENGTH = 4
+	// FRAME_LEADER        = 0x3C // '<' (ASCII)
+	// FRAME_ESCAPE        = 0xC3 // 'Ã' (Extended ASCII)
 )
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
@@ -334,32 +340,28 @@ func (p *Packet) ToBytes() ([]byte, error) {
 // ToFrameBytes returns a byte array with starting delimiter and may contain escape chars
 func (p *Packet) ToFrameBytes() ([]byte, error) {
 	buff := bytes.NewBuffer([]byte{})
-	for i := 0; i < FRAME_LEADER_LENGTH; i++ {
-		buff.WriteByte(FRAME_LEADER)
-	}
 	packetBytes, err := p.ToBytes()
 	if err != nil {
 		return nil, err
 	}
-	delimCount := 0
 	for _, byt := range packetBytes {
-		buff.WriteByte(byt)
-		if byt == FRAME_LEADER {
-			delimCount++
-		} else {
-			delimCount = 0
-		}
-		if delimCount == (FRAME_LEADER_LENGTH - 1) {
-			buff.WriteByte(FRAME_ESCAPE)
-			delimCount = 0
+		switch byt {
+		case FRAME_END:
+			buff.WriteByte(FRAME_ESC)
+			buff.WriteByte(FRAME_END_T)
+		case FRAME_ESC:
+			buff.WriteByte(FRAME_ESC)
+			buff.WriteByte(FRAME_ESC_T)
+		default:
+			buff.WriteByte(byt)
 		}
 	}
-
+	buff.WriteByte(FRAME_END)
 	return buff.Bytes(), nil
 }
 
-// WriteTo writes a framed packet to the writer
-func (p *Packet) WriteTo(w io.Writer) (n int, err error) {
+// Write a framed packet to the writer
+func (p *Packet) Write(w io.Writer) (n int, err error) {
 	if byts, err := p.ToFrameBytes(); err == nil {
 		return w.Write(byts)
 	} else {
