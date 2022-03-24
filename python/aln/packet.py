@@ -1,4 +1,5 @@
 import json
+from .frame import toAX25FrameBytes
 
 # Packet class can compose and decompose packets for frame-link transit
 
@@ -107,12 +108,6 @@ def IntXOR(n):
 
 class Packet:
 
-    # Packet framing
-    FRAME_LEADER_LENGTH = 4
-    FRAME_CF_LENGTH = 2
-    FRAME_LEADER = 0x3C
-    FRAME_ESCAPE = 0xC3
-
     # Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
     CF_NETSTATE = 0x0400
     CF_SERVICEID = 0x0200
@@ -130,9 +125,9 @@ class Packet:
     CF_FIELD_SIZE = 2  # INT16U
     NETSTATE_FIELD_SIZE = 1  # INT08U enumerated
     SERVICEID_FIELD_SIZE = 2  # INT16U
-    SRCADDR_FIELD_SIZE = 2  # INT16U
-    DESTADDR_FIELD_SIZE = 2  # INT16U
-    NEXTADDR_FIELD_SIZE = 2  # INT16U
+    SRCADDR_FIELD_SIZE_MAX = 256
+    DESTADDR_FIELD_SIZE_MAX = 256
+    NEXTADDR_FIELD_SIZE_MAX = 256
     SEQNUM_FIELD_SIZE = 2  # INT16U
     ACKBLOCK_FIELD_SIZE = 4  # INT32U
     CONTEXTID_FIELD_SIZE = 2  # INT16U
@@ -143,9 +138,9 @@ class Packet:
     MAX_HEADER_SIZE = CF_FIELD_SIZE + \
         NETSTATE_FIELD_SIZE + \
         SERVICEID_FIELD_SIZE + \
-        SRCADDR_FIELD_SIZE + \
-        DESTADDR_FIELD_SIZE + \
-        NEXTADDR_FIELD_SIZE + \
+        SRCADDR_FIELD_SIZE_MAX + \
+        DESTADDR_FIELD_SIZE_MAX + \
+        NEXTADDR_FIELD_SIZE_MAX + \
         SEQNUM_FIELD_SIZE + \
         ACKBLOCK_FIELD_SIZE + \
         CONTEXTID_FIELD_SIZE + \
@@ -191,18 +186,18 @@ class Packet:
         if body: self.parsePacketBytes(body)
 
     @staticmethod
-    def headerLength(controlFlags):
+    def headerLength(controlFlags, buffer):
         len = 2  # length of controlFlags
         if(controlFlags & Packet.CF_NETSTATE):
             len += Packet.NETSTATE_FIELD_SIZE
         if(controlFlags & Packet.CF_SERVICEID):
             len += Packet.SERVICEID_FIELD_SIZE
         if(controlFlags & Packet.CF_SRCADDR):
-            len += Packet.SRCADDR_FIELD_SIZE
+            len += buffer[len]
         if(controlFlags & Packet.CF_DESTADDR):
-            len += Packet.DESTADDR_FIELD_SIZE
+            len += buffer[len]
         if(controlFlags & Packet.CF_NEXTADDR):
-            len += Packet.NEXTADDR_FIELD_SIZE
+            len += buffer[len]
         if(controlFlags & Packet.CF_SEQNUM):
             len += Packet.SEQNUM_FIELD_SIZE
         if(controlFlags & Packet.CF_ACKBLOCK):
@@ -216,7 +211,7 @@ class Packet:
         return len
 
     @staticmethod
-    def headerFieldOffset(controlFlags, field):
+    def headerFieldOffset(controlFlags, field, buffer):
         offset = 2
 
         if (field == Packet.CF_NETSTATE):
@@ -232,17 +227,17 @@ class Packet:
         if (field == Packet.CF_SRCADDR):
             return offset
         if (controlFlags & Packet.CF_SRCADDR):
-            offset += Packet.SRCADDR_FIELD_SIZE
+            offset += buffer[offset]
 
         if (field == Packet.CF_DESTADDR):
             return offset
         if (controlFlags & Packet.CF_DESTADDR):
-            offset += Packet.DESTADDR_FIELD_SIZE
+            offset += buffer[offset]
 
         if (field == Packet.CF_NEXTADDR):
             return offset
         if (controlFlags & Packet.CF_NEXTADDR):
-            offset += Packet.NEXTADDR_FIELD_SIZE
+            offset += buffer[offset]
 
         if (field == Packet.CF_SEQNUM):
             return offset
@@ -266,27 +261,12 @@ class Packet:
 
         if (field == Packet.CF_DATA):
             return offset
+        if (controlFlags & Packet.CF_DATATYPE):
+            offset += buffer[offset]
+
         return None  # TODO enumerate errors
 
-    # returns a link-frame ready block of bytes to be transmitted
-    def toFrameBytes(self):  # returns a byte-stuffed array
-        packetBuffer = self.toPacketBuffer()
-        frameBuffer = []
-
-        # write frame leader
-        for i in range(0, Packet.FRAME_LEADER_LENGTH):
-            frameBuffer.append(Packet.FRAME_LEADER)
-
-        # write byte-stuffed packet body
-        delimCount = 0
-        for byt in packetBuffer:
-            frameBuffer.append(byt)
-            delimCount = (0, delimCount + 1)[byt == Packet.FRAME_LEADER]
-            if (delimCount == (Packet.FRAME_LEADER_LENGTH - 1)):
-                frameBuffer.append(Packet.FRAME_ESCAPE)
-                delimCount = 0
-
-        return bytes(frameBuffer)
+    
 
     def toPacketBuffer(self):  # returns a un-framed array
         # establish packet structure
@@ -332,13 +312,16 @@ class Packet:
             packetBuffer.extend(writeINT16U(self.serviceID))
 
         if (self.controlFlags & Packet.CF_SRCADDR):
-            packetBuffer.extend(writeINT16U(self.srcAddr))
+            packetBuffer.extend(len(self.srcAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(bytearray(self.srcAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_DESTADDR):
-            packetBuffer.extend(writeINT16U(self.destAddr))
+            packetBuffer.extend(len(self.destAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(bytearray(self.destAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_NEXTADDR):
-            packetBuffer.extend(writeINT16U(self.nextAddr))
+            packetBuffer.extend(len(self.nextAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(bytearray(self.nextAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_SEQNUM):
             packetBuffer.extend(writeINT16U(self.seqNum))
@@ -384,19 +367,25 @@ class Packet:
             offset += Packet.SERVICEID_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_SRCADDR):
-            srcBytes = packetBuffer[offset:offset+Packet.SRCADDR_FIELD_SIZE]
-            self.srcAddr = readINT16U(srcBytes)
-            offset += Packet.SRCADDR_FIELD_SIZE
+            addrSize = int(packetBuffer[offset])
+            offset += 1
+            value = packetBuffer[offset:offset+addrSize]
+            self.srcAddr = bytearray(value).decode("utf-8")
+            offset += addrSize
 
         if(self.controlFlags & Packet.CF_DESTADDR):
-            destBytes = packetBuffer[offset:offset+Packet.DESTADDR_FIELD_SIZE]
-            self.destAddr = readINT16U(destBytes)
-            offset += Packet.DESTADDR_FIELD_SIZE
+            addrSize = int(packetBuffer[offset])
+            offset += 1
+            value = packetBuffer[offset:offset+addrSize]
+            self.destAddr = bytearray(value).decode("utf-8")
+            offset += addrSize
 
         if(self.controlFlags & Packet.CF_NEXTADDR):
-            nxtBytes = packetBuffer[offset:offset+Packet.NEXTADDR_FIELD_SIZE]
-            self.destAddr = readINT16U(nxtBytes)
-            offset += Packet.NEXTADDR_FIELD_SIZE
+            addrSize = int(packetBuffer[offset])
+            offset += 1
+            value = packetBuffer[offset:offset+addrSize]
+            self.nextAddr = bytearray(value).decode("utf-8")
+            offset += addrSize
 
         if(self.controlFlags & Packet.CF_SEQNUM):
             seqBytes = packetBuffer[offset:offset+Packet.SEQNUM_FIELD_SIZE]
@@ -427,6 +416,9 @@ class Packet:
             self.data = packetBuffer[offset:offset+self.dataSize]
 
         return None
+
+    def toFrameBytes(self):
+        return toAX25FrameBytes(self.toPacketBuffer())
 
     @staticmethod
     def fromJsonString(str):

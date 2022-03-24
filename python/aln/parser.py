@@ -1,14 +1,10 @@
 # Parser class can compose and decompose packets for frame-link transit
 from .packet import *
+from .frame import FRAME_START, FRAME_END, FRAME_ESC, FRAME_END_T, FRAME_ESC_T
 
 class Parser:
-
-    # Packet parsing state enumeration
-    STATE_FINDSTART = 0
-    STATE_GET_CF    = 1
-    STATE_GETHEADER = 2
-    STATE_GETDATA   = 3
-    STATE_GETCRC    = 4
+    STATE_BUFFERING = 0
+    STATE_ESCAPED = 1
 
     # requires a callback function that will be called when a packet is parsed
     # from incremental data
@@ -17,107 +13,31 @@ class Parser:
         self.clear()
 
     def clear(self):
-        self.state = Parser.STATE_FINDSTART
-        self.delimCount = 0
+        self.state = Parser.STATE_BUFFERING
         self.controlFlags = 0x0000
         self.frameBuffer = []
-        self.headerIndex = 0
-        self.headerLength = 0
-        self.dataIndex = 0
-        self.dataLength = 0
-        self.crcIndex = 0
-
+        
     def acceptPacket(self):
         packet = Packet(self.frameBuffer)
-
-        # deliver to application code
+        err = None
         if (self.packet_callback):
-            self.packet_callback(packet)
-        else:
-            return -3 # TODO enumerate errors
-
+            err = self.packet_callback(packet) # deliver to application code
         self.clear()
-
-        return None
+        return err
 
     # consumes data incrementally and emits calls to packet_callback when full
     # packets are parsed from the incoming stream
     def readBytes(self, buffer):
         for msg in buffer:
-            # check for escape char (occurs mid-frame)
-            if (msg == Packet.FRAME_ESCAPE):
-                if (self.delimCount >= (Packet.FRAME_LEADER_LENGTH-1)):
-                    self.delimCount = 0 # reset FRAME_LEADER detection
-                    continue # drop the char from the stream
-            elif(msg == Packet.FRAME_LEADER):
-                self.delimCount += 1
-                if (self.delimCount >= Packet.FRAME_LEADER_LENGTH):
-                    self.state = Parser.STATE_GET_CF
-                    continue
-            else: # not a framing byte; reset delim count
-                self.delimCount = 0
-
-
-            # use current char in following state
-            if (self.state == Parser.STATE_FINDSTART):
-                # Do Nothing, dump char
-                continue # end STATE_FINDSTART
-
-            if (self.state == Parser.STATE_GET_CF):
-                if(self.headerIndex > Packet.MAX_HEADER_SIZE):
-                    self.state = Parser.STATE_FINDSTART
-                else:
-                    self.frameBuffer.append(msg)
-                    self.headerIndex += 1
-                    if (self.headerIndex == 2):
-                        cf = readINT16U(self.frameBuffer)
-                        self.controlFlags = CFHamDecode(cf)
-                        self.headerLength = Packet.headerLength(self.controlFlags)
-                        self.state = Parser.STATE_GETHEADER
-
-                continue # end STATE_GET_CF
-
-            if (self.state == Parser.STATE_GETHEADER):
-                if(self.headerIndex >= Packet.MAX_HEADER_SIZE):
-                    self.state = Parser.STATE_FINDSTART
-                else:
-                    self.frameBuffer.append(msg)
-                    self.headerIndex += 1
-                    if(self.headerIndex >= self.headerLength):
-                        if (self.controlFlags & Packet.CF_DATA):
-                            dataOffset = Packet.headerFieldOffset(self.controlFlags, Packet.CF_DATA)
-                            dataBytes = self.frameBuffer[dataOffset:dataOffset+2]
-                            self.dataLength = readINT16U(dataBytes)
-                            self.state = Parser.STATE_GETDATA
-                        elif (self.controlFlags & Packet.CF_CRC):
-                            self.state = Parser.STATE_GETCRC
-                        else:
-                            self.acceptPacket()
-                continue # end STATE_GETHEADER
-
-            if (self.state == Parser.STATE_GETDATA):
+            if msg == FRAME_END:
+                self.acceptPacket()
+            elif self.state == Parser.STATE_ESCAPED:
+                if msg == FRAME_END_T:
+                    self.frameBuffer.append(FRAME_END)
+                elif msg == FRAME_ESC_T:
+                    self.frameBuffer.append(FRAME_ESC)                    
+                self.state = Parser.STATE_BUFFERING
+            elif (msg == FRAME_ESC):
+                self.state = Parser.STATE_ESCAPED
+            else:
                 self.frameBuffer.append(msg)
-                self.dataIndex += 1
-                if(self.dataIndex >= self.dataLength):
-
-                    if (self.controlFlags & Packet.CF_CRC):
-                        self.state = Parser.STATE_GETCRC
-                    else:
-                        self.acceptPacket()
-                continue # end STATE_GETDATA
-
-            if (self.state == Parser.STATE_GETCRC):
-                self.frameBuffer.append(msg)
-                self.crcIndex += 1
-                if(self.crcIndex >= Packet.CRC_FIELD_SIZE):
-                    sz = len(self.frameBuffer)
-                    subframeBytes = self.frameBuffer[0:sz-Packet.CRC_FIELD_SIZE]
-                    computedCRC = crc(subframeBytes)
-                    crcBytes = self.frameBuffer[sz-Packet.CRC_FIELD_SIZE:sz]
-                    expectedCRC = readINT32U(crcBytes)
-                    if (computedCRC != expectedCRC):
-                        # TODO error reporting
-                        self.clear()
-                    else:
-                      self.acceptPacket()
-                continue # end STATE_GETCRC
