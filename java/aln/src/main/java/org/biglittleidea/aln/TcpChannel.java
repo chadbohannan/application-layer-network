@@ -41,7 +41,7 @@ public class TcpChannel implements IChannel {
                         if (num < 0) { // number of bytes read
                             closeHandler.onChannelClosed(TcpChannel.this);
                         } else if (num > 0) {
-                            parser.readBytes(buffer[0].array(), (int)num);
+                            parser.readAx25FrameBytes(buffer[0].array(), (int)num);
                             buffer[0].flip();
                             socket.read(buffer, 0, 1, timeout, TimeUnit.SECONDS, 42, this);
                         }    

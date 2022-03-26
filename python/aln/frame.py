@@ -1,5 +1,4 @@
 
-FRAME_START     = 0X00
 FRAME_END       = 0XC0
 FRAME_ESC       = 0xDB
 FRAME_END_T     = 0xDC

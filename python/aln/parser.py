@@ -1,6 +1,6 @@
 # Parser class can compose and decompose packets for frame-link transit
 from .packet import *
-from .frame import FRAME_START, FRAME_END, FRAME_ESC, FRAME_END_T, FRAME_ESC_T
+from .frame import FRAME_END, FRAME_ESC, FRAME_END_T, FRAME_ESC_T
 
 class Parser:
     STATE_BUFFERING = 0
