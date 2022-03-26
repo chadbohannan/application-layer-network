@@ -1,7 +1,6 @@
 package org.biglittleidea.aln;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
@@ -312,11 +311,14 @@ public class Packet {
             buffer.put(Data);
         }
         if((controlField &  ControlFlag.crc)!=0) {
-            buffer.put(writeUINT32(0)); // TODO
+            buffer.put(writeUINT32(0)); // TODO: not zero
             buffer.put(Data);
         }
 
-        return buffer.array();
+        byte[] data = new byte[buffer.position()];
+        buffer.rewind();
+        buffer.get(data);
+        return data;
     }
 
     // Summary description for Packet.

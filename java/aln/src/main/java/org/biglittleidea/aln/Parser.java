@@ -22,7 +22,7 @@ public class Parser {
 
     public void reset() {
         state = State.Buffering;
-        buffer.reset();
+        buffer.clear();
     }
 
     private void acceptPacket() {

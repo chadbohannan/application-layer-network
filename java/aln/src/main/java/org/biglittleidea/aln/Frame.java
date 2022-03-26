@@ -11,21 +11,25 @@ public class Frame {
 
         // Creates a byte array containing the serialized packet framed for transmission
         public static byte[] toAX25Buffer(byte[] content) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(BufferSize);
+            ByteBuffer buffer = ByteBuffer.allocate(BufferSize);
             for (int i = 0; i < content.length; i++) {
                 Byte b = content[i];
                 if (b == End){
-                    byteBuffer.put(Esc);
-                    byteBuffer.put(EndT);
+                    buffer.put(Esc);
+                    buffer.put(EndT);
                 } else if (b == Esc) {
-                    byteBuffer.put(Esc);
-                    byteBuffer.put(EscT);
+                    buffer.put(Esc);
+                    buffer.put(EscT);
                 } else {
-                    byteBuffer.put(b);
+                    buffer.put(b);
                 }
             }
-            byteBuffer.put(End);
-            return byteBuffer.array();
+            buffer.put(End);
+            byte[] data = new byte[buffer.position()];
+            buffer.rewind();
+            buffer.get(data);
+            return data;
+
         }
 
         public static byte[] fromAX25Buffer(byte[] content) {
