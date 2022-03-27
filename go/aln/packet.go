@@ -10,20 +10,13 @@ import (
 // AddressType of all ELP packets
 type AddressType string
 
-// AddressTypeSize must be the size of AddressType in bytes
-// const AddressTypeSize = 2
-
 // Packet framing
 const (
 	FRAME_CF_LENGTH = 2
-	FRAME_END       = 0XC0
+	FRAME_END       = 0xC0
 	FRAME_ESC       = 0xDB
 	FRAME_END_T     = 0xDC
 	FRAME_ESC_T     = 0xDD
-
-	// FRAME_LEADER_LENGTH = 4
-	// FRAME_LEADER        = 0x3C // '<' (ASCII)
-	// FRAME_ESCAPE        = 0xC3 // 'Ã' (Extended ASCII)
 )
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
@@ -88,18 +81,18 @@ const (
 
 type Packet struct {
 	ControlFlags uint16      `bson:"cf" json:"cf"`
-	NetState     byte        `bson:"net" json:"net"`
-	ServiceID    uint16      `bson:"srv" json:"srv"`
-	SrcAddr      AddressType `bson:"src" json:"src"`
-	DestAddr     AddressType `bson:"dst" json:"dst"`
-	NextAddr     AddressType `bson:"nxt" json:"nxt"`
-	SeqNum       uint16      `bson:"seq" json:"seq"`
-	AckBlock     uint32      `bson:"ack" json:"ack"`
-	ContextID    uint16      `bson:"ctx" json:"ctx"`
-	DataType     uint8       `bson:"typ" json:"typ"`
-	DataSize     uint16      `bson:"sz" json:"sz"`
-	Data         []byte      `bson:"data" json:"data"`
-	CrcSum       uint32      `bson:"crc" json:"crc"`
+	NetState     byte        `bson:"net" json:"net,omitempty"`
+	ServiceID    uint16      `bson:"srv" json:"srv,omitempty"`
+	SrcAddr      AddressType `bson:"src" json:"src,omitempty"`
+	DestAddr     AddressType `bson:"dst" json:"dst,omitempty"`
+	NextAddr     AddressType `bson:"nxt" json:"nxt,omitempty"`
+	SeqNum       uint16      `bson:"seq" json:"seq,omitempty"`
+	AckBlock     uint32      `bson:"ack" json:"ack,omitempty"`
+	ContextID    uint16      `bson:"ctx" json:"ctx,omitempty"`
+	DataType     uint8       `bson:"typ" json:"typ,omitempty"`
+	DataSize     uint16      `bson:"sz" json:"sz,omitempty"`
+	Data         []byte      `bson:"data" json:"data,omitempty"`
+	CrcSum       uint32      `bson:"-" json:"-"`
 }
 
 func NewPacket() *Packet {
