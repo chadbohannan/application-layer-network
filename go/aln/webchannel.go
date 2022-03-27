@@ -44,7 +44,7 @@ func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCall
 			break // jk; not forever
 		}
 	}
-	onClose()
+	onClose(ch)
 }
 
 // Close .
