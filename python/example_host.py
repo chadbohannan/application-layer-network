@@ -7,7 +7,7 @@ from threading import Lock
 
 def main():
     sel = selectors.DefaultSelector() # application event loop
-    router = Router(sel, 1) # TODO dynamic address allocation protocol
+    router = Router(sel, "python-host-1") # TODO dynamic address allocation protocol
     router.start()
 
     # TODO register ping service

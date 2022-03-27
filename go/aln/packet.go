@@ -8,17 +8,15 @@ import (
 )
 
 // AddressType of all ELP packets
-type AddressType uint16
-
-// AddressTypeSize must be the size of AddressType in bytes
-const AddressTypeSize = 2
+type AddressType string
 
 // Packet framing
 const (
-	FRAME_LEADER_LENGTH = 4
-	FRAME_CF_LENGTH     = 2
-	FRAME_LEADER        = 0x3C // '<' (ASCII)
-	FRAME_ESCAPE        = 0xC3 // 'Ã' (Extended ASCII)
+	FRAME_CF_LENGTH = 2
+	FRAME_END       = 0xC0
+	FRAME_ESC       = 0xDB
+	FRAME_END_T     = 0xDC
+	FRAME_ESC_T     = 0xDD
 )
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
@@ -43,18 +41,18 @@ const (
 
 // Packet header field sizes
 const (
-	CF_FIELD_SIZE         = 2 // INT16U
-	NETSTATE_FIELD_SIZE   = 1 // INT08U enumerated
-	SERVICEID_FIELD_SIZE  = 2 // INT16U enumerated
-	SRCADDR_FIELD_SIZE    = 2 // INT16U
-	DESTADDR_FIELD_SIZE   = 2 // INT16U
-	NEXTADDR_FIELD_SIZE   = 2 // INT16U
-	SEQNUM_FIELD_SIZE     = 2 // INT16U
-	ACKBLOCK_FIELD_SIZE   = 4 // INT32U
-	CONTEXTID_FIELD_SIZE  = 2 // INT16U
-	DATATYPE_FIELD_SIZE   = 1 // INT08U
-	DATALENGTH_FIELD_SIZE = 2 // INT16U
-	CRC_FIELD_SIZE        = 4 // INT32U
+	CF_FIELD_SIZE           = 2   // INT16U
+	NETSTATE_FIELD_SIZE     = 1   // INT08U enumerated
+	SERVICEID_FIELD_SIZE    = 2   // INT16U enumerated
+	SRCADDR_FIELD_SIZE_MAX  = 256 // string
+	DESTADDR_FIELD_SIZE_MAX = 256 // string
+	NEXTADDR_FIELD_SIZE_MAX = 256 // string
+	SEQNUM_FIELD_SIZE       = 2   // INT16U
+	ACKBLOCK_FIELD_SIZE     = 4   // INT32U
+	CONTEXTID_FIELD_SIZE    = 2   // INT16U
+	DATATYPE_FIELD_SIZE     = 1   // INT08U
+	DATALENGTH_FIELD_SIZE   = 2   // INT16U
+	CRC_FIELD_SIZE          = 4   // INT32U
 )
 
 // limits
@@ -62,15 +60,15 @@ const (
 	MAX_HEADER_SIZE = CF_FIELD_SIZE +
 		NETSTATE_FIELD_SIZE +
 		SERVICEID_FIELD_SIZE +
-		SRCADDR_FIELD_SIZE +
-		DESTADDR_FIELD_SIZE +
-		NEXTADDR_FIELD_SIZE +
+		SRCADDR_FIELD_SIZE_MAX +
+		DESTADDR_FIELD_SIZE_MAX +
+		NEXTADDR_FIELD_SIZE_MAX +
 		SEQNUM_FIELD_SIZE +
 		ACKBLOCK_FIELD_SIZE +
 		CONTEXTID_FIELD_SIZE +
 		DATATYPE_FIELD_SIZE +
 		DATALENGTH_FIELD_SIZE
-	MAX_DATA_SIZE   = 1024 // small number to prevent stack overflow
+	MAX_DATA_SIZE   = 4096
 	MAX_PACKET_SIZE = MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 )
 
@@ -83,18 +81,18 @@ const (
 
 type Packet struct {
 	ControlFlags uint16      `bson:"cf" json:"cf"`
-	NetState     byte        `bson:"net" json:"net"`
-	ServiceID    uint16      `bson:"srv" json:"srv"`
-	SrcAddr      AddressType `bson:"src" json:"src"`
-	DestAddr     AddressType `bson:"dst" json:"dst"`
-	NextAddr     AddressType `bson:"nxt" json:"nxt"`
-	SeqNum       uint16      `bson:"seq" json:"seq"`
-	AckBlock     uint32      `bson:"ack" json:"ack"`
-	ContextID    uint16      `bson:"ctx" json:"ctx"`
-	DataType     uint8       `bson:"typ" json:"typ"`
-	DataSize     uint16      `bson:"sz" json:"sz"`
-	Data         []byte      `bson:"data" json:"data"`
-	CrcSum       uint32      `bson:"crc" json:"crc"`
+	NetState     byte        `bson:"net" json:"net,omitempty"`
+	ServiceID    uint16      `bson:"srv" json:"srv,omitempty"`
+	SrcAddr      AddressType `bson:"src" json:"src,omitempty"`
+	DestAddr     AddressType `bson:"dst" json:"dst,omitempty"`
+	NextAddr     AddressType `bson:"nxt" json:"nxt,omitempty"`
+	SeqNum       uint16      `bson:"seq" json:"seq,omitempty"`
+	AckBlock     uint32      `bson:"ack" json:"ack,omitempty"`
+	ContextID    uint16      `bson:"ctx" json:"ctx,omitempty"`
+	DataType     uint8       `bson:"typ" json:"typ,omitempty"`
+	DataSize     uint16      `bson:"sz" json:"sz,omitempty"`
+	Data         []byte      `bson:"data" json:"data,omitempty"`
+	CrcSum       uint32      `bson:"-" json:"-"`
 }
 
 func NewPacket() *Packet {
@@ -122,19 +120,25 @@ func ParsePacket(packetBuffer []byte) (*Packet, error) {
 		offset += SERVICEID_FIELD_SIZE
 	}
 	if pkt.ControlFlags&CF_SRCADDR != 0 {
-		srcBytes := packetBuffer[offset : offset+SRCADDR_FIELD_SIZE]
+		addrSize := int(packetBuffer[offset])
+		offset += 1
+		srcBytes := packetBuffer[offset : offset+addrSize]
 		pkt.SrcAddr = bytesToAddressType(srcBytes)
-		offset += SRCADDR_FIELD_SIZE
+		offset += addrSize
 	}
 	if pkt.ControlFlags&CF_DESTADDR != 0 {
-		destBytes := packetBuffer[offset : offset+DESTADDR_FIELD_SIZE]
+		addrSize := int(packetBuffer[offset])
+		offset += 1
+		destBytes := packetBuffer[offset : offset+addrSize]
 		pkt.DestAddr = bytesToAddressType(destBytes)
-		offset += DESTADDR_FIELD_SIZE
+		offset += addrSize
 	}
 	if pkt.ControlFlags&CF_NEXTADDR != 0 {
-		destBytes := packetBuffer[offset : offset+NEXTADDR_FIELD_SIZE]
-		pkt.NextAddr = bytesToAddressType(destBytes)
-		offset += NEXTADDR_FIELD_SIZE
+		addrSize := int(packetBuffer[offset])
+		offset += 1
+		nextBytes := packetBuffer[offset : offset+addrSize]
+		pkt.NextAddr = bytesToAddressType(nextBytes)
+		offset += addrSize
 	}
 	if pkt.ControlFlags&CF_SEQNUM != 0 {
 		seqBytes := packetBuffer[offset : offset+SEQNUM_FIELD_SIZE]
@@ -164,12 +168,12 @@ func ParsePacket(packetBuffer []byte) (*Packet, error) {
 	return pkt, nil
 }
 
-func HeaderLength(controlFlags uint16) uint8 {
-	return HeaderFieldOffset(controlFlags, 0)
+func HeaderLength(controlFlags uint16, frame []byte) uint16 {
+	return HeaderFieldOffset(controlFlags, 0, frame)
 }
 
-func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
-	offset := uint8(CF_FIELD_SIZE)
+func HeaderFieldOffset(controlFlags uint16, field uint16, frame []byte) uint16 {
+	offset := uint16(CF_FIELD_SIZE)
 	if field == CF_NETSTATE {
 		return offset
 	}
@@ -186,19 +190,22 @@ func HeaderFieldOffset(controlFlags uint16, field uint16) uint8 {
 		return offset
 	}
 	if controlFlags&CF_SRCADDR != 0 {
-		offset += SRCADDR_FIELD_SIZE
+		addrSize := uint16(frame[offset])
+		offset += addrSize
 	}
 	if field == CF_DESTADDR {
 		return offset
 	}
 	if controlFlags&CF_DESTADDR != 0 {
-		offset += DESTADDR_FIELD_SIZE
+		addrSize := uint16(frame[offset])
+		offset += addrSize
 	}
 	if field == CF_NEXTADDR {
 		return offset
 	}
 	if controlFlags&CF_NEXTADDR != 0 {
-		offset += NEXTADDR_FIELD_SIZE
+		addrSize := uint16(frame[offset])
+		offset += addrSize
 	}
 	if field == CF_SEQNUM {
 		return offset
@@ -242,13 +249,13 @@ func (p *Packet) SetControlFlags() {
 	if p.ServiceID != 0 {
 		controlFlags |= CF_SERVICEID
 	}
-	if p.SrcAddr != 0 {
+	if len(p.SrcAddr) != 0 {
 		controlFlags |= CF_SRCADDR
 	}
-	if p.DestAddr != 0 {
+	if len(p.DestAddr) != 0 {
 		controlFlags |= CF_DESTADDR
 	}
-	if p.NextAddr != 0 {
+	if len(p.NextAddr) != 0 {
 		controlFlags |= CF_NEXTADDR
 	}
 	if p.SeqNum != 0 {
@@ -288,12 +295,15 @@ func (p *Packet) ToBytes() ([]byte, error) {
 		buff.Write(bytesOfINT16U(p.ServiceID))
 	}
 	if p.ControlFlags&CF_SRCADDR != 0 {
+		buff.WriteByte(byte(len(p.SrcAddr)))
 		buff.Write(bytesOfAddressType(p.SrcAddr))
 	}
 	if p.ControlFlags&CF_DESTADDR != 0 {
+		buff.WriteByte(byte(len(p.DestAddr)))
 		buff.Write(bytesOfAddressType(p.DestAddr))
 	}
 	if p.ControlFlags&CF_NEXTADDR != 0 {
+		buff.WriteByte(byte(len(p.NextAddr)))
 		buff.Write(bytesOfAddressType(p.NextAddr))
 	}
 	if p.ControlFlags&CF_SEQNUM != 0 {
@@ -322,32 +332,28 @@ func (p *Packet) ToBytes() ([]byte, error) {
 // ToFrameBytes returns a byte array with starting delimiter and may contain escape chars
 func (p *Packet) ToFrameBytes() ([]byte, error) {
 	buff := bytes.NewBuffer([]byte{})
-	for i := 0; i < FRAME_LEADER_LENGTH; i++ {
-		buff.WriteByte(FRAME_LEADER)
-	}
 	packetBytes, err := p.ToBytes()
 	if err != nil {
 		return nil, err
 	}
-	delimCount := 0
 	for _, byt := range packetBytes {
-		buff.WriteByte(byt)
-		if byt == FRAME_LEADER {
-			delimCount++
-		} else {
-			delimCount = 0
-		}
-		if delimCount == (FRAME_LEADER_LENGTH - 1) {
-			buff.WriteByte(FRAME_ESCAPE)
-			delimCount = 0
+		switch byt {
+		case FRAME_END:
+			buff.WriteByte(FRAME_ESC)
+			buff.WriteByte(FRAME_END_T)
+		case FRAME_ESC:
+			buff.WriteByte(FRAME_ESC)
+			buff.WriteByte(FRAME_ESC_T)
+		default:
+			buff.WriteByte(byt)
 		}
 	}
-
+	buff.WriteByte(FRAME_END)
 	return buff.Bytes(), nil
 }
 
-// WriteTo writes a framed packet to the writer
-func (p *Packet) WriteTo(w io.Writer) (n int, err error) {
+// Write a framed packet to the writer
+func (p *Packet) Write(w io.Writer) (n int, err error) {
 	if byts, err := p.ToFrameBytes(); err == nil {
 		return w.Write(byts)
 	} else {

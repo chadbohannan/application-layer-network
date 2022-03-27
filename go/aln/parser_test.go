@@ -24,7 +24,7 @@ func TestINT32U(t *testing.T) {
 
 func TestParser(t *testing.T) {
 	pkt0 := NewPacket()
-	pkt0.DestAddr = 0x0101
+	pkt0.DestAddr = "ten-ten"
 	pkt0.Data = []byte("test")
 	buff, err := pkt0.ToBytes()
 	if err != nil {
@@ -36,7 +36,7 @@ func TestParser(t *testing.T) {
 		t.Fatalf("ParsePacket err: %s", err.Error())
 	}
 	if pkt1.DestAddr != pkt0.DestAddr {
-		t.Fatalf("expected DestAddress = %d, got %d", pkt0.DestAddr, pkt1.DestAddr)
+		t.Fatalf("expected DestAddress = %s, got %s", pkt0.DestAddr, pkt1.DestAddr)
 	}
 	if len(pkt1.Data) != 4 {
 		t.Fatalf("expected DataLength = %d, got %d", 4, len(pkt1.Data))

@@ -9,7 +9,8 @@ func makeNetQueryPacket() *Packet {
 }
 
 func makeNetworkRouteSharePacket(srcAddr, destAddr AddressType, cost uint16) *Packet {
-	data := bytesOfAddressType(destAddr)
+	data := []byte{byte(len(destAddr))}
+	data = append(data, []byte(destAddr)...)
 	data = append(data, bytesOfINT16U(cost)...)
 	return &Packet{
 		NetState: NET_ROUTE,
@@ -21,18 +22,23 @@ func makeNetworkRouteSharePacket(srcAddr, destAddr AddressType, cost uint16) *Pa
 // returns dest, next-hop, cost, err
 func parseNetworkRouteSharePacket(packet *Packet) (AddressType, AddressType, uint16, error) {
 	if packet.NetState != NET_ROUTE {
-		return 0, 0, 0, fmt.Errorf("parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
+		return "", "", 0, fmt.Errorf("parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
 	}
-	if len(packet.Data) != AddressTypeSize+2 {
-		return 0, 0, 0, fmt.Errorf("parseNetworkRouteSharePacket: len(packet.Data != %d", AddressTypeSize+2)
+	if len(packet.Data) == 0 {
+		return "", "", 0, fmt.Errorf("parseNetworkRouteSharePacket: packet.Data is empty")
 	}
-	addr := bytesToAddressType(packet.Data[:AddressTypeSize])
-	cost := bytesToINT16U(packet.Data[AddressTypeSize:])
+	addrSize := int(packet.Data[0])
+	if len(packet.Data) != addrSize+3 {
+		return "", "", 0, fmt.Errorf("parseNetworkRouteSharePacket: len(packet.Data) is %d; expexted %d", len(packet.Data), addrSize+3)
+	}
+	addr := bytesToAddressType(packet.Data[1 : addrSize+1])
+	cost := bytesToINT16U(packet.Data[1+addrSize:])
 	return addr, packet.SrcAddr, cost, nil
 }
 
 func makeNetworkServiceSharePacket(hostAddr AddressType, serviceID, serviceLoad uint16) *Packet {
-	data := bytesOfAddressType(hostAddr)
+	data := []byte{byte(len(hostAddr))}
+	data = append(data, bytesOfAddressType(hostAddr)...)
 	data = append(data, bytesOfINT16U(serviceID)...)
 	data = append(data, bytesOfINT16U(serviceLoad)...)
 	return &Packet{
@@ -43,13 +49,14 @@ func makeNetworkServiceSharePacket(hostAddr AddressType, serviceID, serviceLoad 
 
 func parseNetworkServiceSharePacket(packet *Packet) (AddressType, uint16, uint16, error) {
 	if packet.NetState != NET_SERVICE {
-		return 0, 0, 0, fmt.Errorf("parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
+		return "", 0, 0, fmt.Errorf("parseNetworkServiceSharePacket: packet.NetState != NET_ROUTE")
 	}
-	if len(packet.Data) != AddressTypeSize+4 {
-		return 0, 0, 0, fmt.Errorf("parseNetworkRouteSharePacket: len(packet.Data != %d", AddressTypeSize+4)
+	addrSize := packet.Data[0]
+	if len(packet.Data) != int(addrSize)+5 {
+		return "", 0, 0, fmt.Errorf("parseNetworkServiceSharePacket: len(packet.Data) = %d; expected: %d", len(packet.Data), addrSize+5)
 	}
-	addr := bytesToAddressType(packet.Data[:AddressTypeSize])
-	serviceID := bytesToINT16U(packet.Data[AddressTypeSize : AddressTypeSize+2])
-	serviceLoad := bytesToINT16U(packet.Data[AddressTypeSize+2:])
+	addr := bytesToAddressType(packet.Data[1 : addrSize+1])
+	serviceID := bytesToINT16U(packet.Data[addrSize+1 : addrSize+3])
+	serviceLoad := bytesToINT16U(packet.Data[addrSize+3:])
 	return addr, serviceID, serviceLoad, nil
 }

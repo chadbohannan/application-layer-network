@@ -29,7 +29,7 @@ public class NioSocketServer
                     listener.accept( null, this );
 
                     // Greet the client
-                    ch.write( ByteBuffer.wrap( "Hello, I am Echo Server 2020, let's have an engaging conversation!\n".getBytes() ) );
+                    ch.write( ByteBuffer.wrap( "Hello, let's have a conversation!\n".getBytes() ) );
 
                     // Allocate a byte buffer (4K) to read from the client
                     ByteBuffer byteBuffer = ByteBuffer.allocate( 4096 );

@@ -22,14 +22,17 @@ class TcpChannel():
 
     def send(self, packet):
         frame = packet.toFrameBytes()
+        print("sending frame:"+str(frame))
         try:
             self.sock.send(frame)
-        except:
+        except Exception as e:
+            print(e)
             return False
         return True
 
     def recv(self, sock, mask):
         data = sock.recv(1024)
+        print("recv:"+str(data))
         if data:
             self.parser.readBytes(data)
         else:

@@ -15,11 +15,11 @@ func bytesOfINT16U(value uint16) []byte {
 }
 
 func bytesOfAddressType(value AddressType) []byte {
-	return bytesOfINT16U(uint16(value))
+	return []byte(value)
 }
 
 func bytesToAddressType(buff []byte) AddressType {
-	return AddressType(bytesToINT16U(buff))
+	return AddressType(buff)
 }
 
 func bytesToINT32U(buff []byte) uint32 {

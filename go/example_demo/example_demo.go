@@ -1,4 +1,4 @@
-package main
+package example_demo
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ func main() {
 
 	// setup the first node to host a ping service
 	r1 := aln.NewRouter(r1Address)
-	tcpHost := aln.NewTcpChannelHost("localhost", 8000)
+	tcpHost := aln.NewTcpChannelHost("localhost", 8181)
 	go tcpHost.Listen(func(newChannel aln.Channel) {
 		r1.AddChannel(newChannel)
 	})
@@ -37,7 +37,7 @@ func main() {
 
 	// setup the second node to connect to the first using TCP
 	r2 := aln.NewRouter(r2Address)
-	conn, err := net.Dial("tcp", "localhost:8000")
+	conn, err := net.Dial("tcp", "localhost:8181")
 	if err != nil {
 		fmt.Println("dial failed:" + err.Error())
 		os.Exit(-1)

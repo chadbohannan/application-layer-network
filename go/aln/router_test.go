@@ -7,13 +7,13 @@ import (
 
 func TestRoute0Hop(t *testing.T) {
 	packetRecieved := false
-	rtr := NewRouter(1)
+	rtr := NewRouter("1")
 	rtr.RegisterService(0x0001, func(*Packet) {
 		packetRecieved = true
 	})
 
 	pkt := NewPacket()
-	pkt.DestAddr = 0x0001
+	pkt.DestAddr = "1"
 	pkt.ServiceID = 0x0001
 	rtr.Send(pkt) // blocking call to local handler
 	if !packetRecieved {
@@ -23,8 +23,8 @@ func TestRoute0Hop(t *testing.T) {
 
 func TestRoute1Hop(t *testing.T) {
 	packetRecieved := false
-	rtr1 := NewRouter(1)
-	rtr2 := NewRouter(2)
+	rtr1 := NewRouter("1")
+	rtr2 := NewRouter("2")
 
 	rtr1.RegisterService(0x0001, func(*Packet) { packetRecieved = true })
 
@@ -35,7 +35,7 @@ func TestRoute1Hop(t *testing.T) {
 	time.Sleep(time.Millisecond)
 
 	pkt := NewPacket()
-	pkt.DestAddr = 0x0001
+	pkt.DestAddr = "1"
 	pkt.ServiceID = 0x0001
 	if err := rtr2.Send(pkt); err != nil {
 		t.Fatal(err)
@@ -49,12 +49,12 @@ func TestRoute1Hop(t *testing.T) {
 func TestRoute2Hop(t *testing.T) {
 
 	packetRecieved := false
-	rtr1 := NewRouter(1)
+	rtr1 := NewRouter("1")
 	rtr1.RegisterService(0x0001, func(*Packet) {
 		packetRecieved = true
 	})
-	rtr2 := NewRouter(2)
-	rtr3 := NewRouter(3)
+	rtr2 := NewRouter("2")
+	rtr3 := NewRouter("3")
 
 	channelA := NewLocalChannel()
 	rtr1.AddChannel(channelA)

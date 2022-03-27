@@ -3,30 +3,39 @@ from threading import Lock, Thread
 import random
 from .packet import Packet, readINT16U, writeINT16U
 
-AddressTypeSize = 2  # TODO make it easier to use longer addresses
-bytesToAddressType = readINT16U
+# AddressTypeSize = 2  # TODO make it easier to use longer addresses
+bytesToAddressType = str
 
 def makeNetQueryPacket():
     return Packet(netState=Packet.NET_QUERY)
 
+def byteLen(buff):
+    return len(buff).to_bytes(1, 'little')
+
 def makeNetworkRouteSharePacket(srcAddr, destAddr, cost):
-    data = writeINT16U(destAddr) + writeINT16U(cost)
+    data = []
+    data.extend(byteLen(destAddr))
+    data.extend(bytes(destAddr, "utf-8"))
+    data.extend(writeINT16U(cost))
+    # data = byteLen(destAddr) + bytes(destAddr, "utf-8") + writeINT16U(cost)
     return Packet(netState=Packet.NET_ROUTE, srcAddr=srcAddr,data=data)
 
 def parseNetworkRouteSharePacket(packet): # returns dest, next-hop, cost, err
     if packet.netState != Packet.NET_ROUTE:
         return (0, 0, 0, "parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
-    if len(packet.data) != 4:
-        return (0, 0, 0, "parseNetworkRouteSharePacket: len(packet.Data) != 4")
-    
-    addr = readINT16U(packet.data[:2])
-    cost = readINT16U(packet.data[2:])
+    addrSize = int(packet.data[0])
+    if len(packet.data) != (addrSize + 3):
+        return (0, 0, 0, "parseNetworkRouteSharePacket: len(packet.Data) != (addrSize + 3)")
+    addr = bytearray(packet.data[1:addrSize+1]).decode("utf-8")
+    cost = readINT16U(packet.data[addrSize+1:addrSize+3])
     return addr, packet.srcAddr, cost, None
 
 def makeNetworkServiceSharePacket(hostAddr, serviceID, serviceLoad):
-    data = writeINT16U(hostAddr) + \
-        writeINT16U(serviceID) + \
-        writeINT16U(serviceLoad)
+    data = []
+    data.extend(byteLen(hostAddr))
+    data.extend(bytes(hostAddr, "utf-8"))
+    data.extend(writeINT16U(serviceID))
+    data.extend(writeINT16U(serviceLoad))
     return Packet(netState=Packet.NET_SERVICE, data=data)
 
 # returns hostAddr, serviceID, load, error
@@ -34,12 +43,16 @@ def parseNetworkServiceSharePacket(packet):
     if packet.netState != Packet.NET_SERVICE:
         return (0, 0, 0, "parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
 
-    if len(packet.data) != AddressTypeSize+4:
-        return (0, 0, 0, "parseNetworkRouteSharePacket: len(packet.data != 6")
+    if len(packet.data) < 4:
+        return (0, 0, 0, "parseNetworkRouteSharePacket: payload too small")
 
-    hostAddr = bytesToAddressType(packet.data[:AddressTypeSize])
-    serviceID = readINT16U(packet.data[AddressTypeSize : AddressTypeSize+2])
-    serviceLoad = readINT16U(packet.data[AddressTypeSize+2:])
+    addrSize = int(packet.data[0])
+    if len(packet.data) != addrSize+5:
+        return (0, 0, 0, "parseNetworkRouteSharePacket: len(packet.data != " + str(addrSize+5))
+
+    hostAddr = bytearray(packet.data[1:addrSize+1]).decode("utf-8")
+    serviceID = readINT16U(packet.data[addrSize+1 : addrSize+3])
+    serviceLoad = readINT16U(packet.data[addrSize+3:])
     return hostAddr, serviceID, serviceLoad, None
 
 class RemoteNode:
@@ -78,8 +91,10 @@ class Router(Thread):
             if err is not None:
                 print("err:",err)
             else:
-                # msg = "NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
-                # print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
+                msg = "NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
+                print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
+                print("remoteAddress:")
+                print(remoteAddress)
                 if remoteAddress not in self.remoteNodeMap:
                     remoteNode = RemoteNode(remoteAddress, nextHop, cost, channel)
                     self.remoteNodeMap[remoteAddress] = remoteNode
@@ -202,7 +217,7 @@ class Router(Thread):
         with self.lock:
             self.serviceMap[serviceID] = handler
 
-    def unregister_service(elf, serviceID):
+    def unregister_service(self, serviceID):
         with self.lock:
             self.serviceMap.pol(serviceID, None)
 
@@ -242,7 +257,7 @@ class Router(Thread):
             for remoteAddress in self.loadMap: # TODO sort by increasing load (first tx'd is lowest load)
                 load = self.loadMap[remoteAddress]
                 # TODO filter expired or unroutable entries
-                services = append(services, makeNetworkServiceSharePacket(remoteAddress, serviceID, load))
+                services.append(makeNetworkServiceSharePacket(remoteAddress, serviceID, load))
         return services
 
     def close(self):

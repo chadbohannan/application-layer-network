@@ -6,7 +6,7 @@ from aln.packet import Packet
 
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, 2) # TODO dynamic address allocation protocol
+    router = Router(sel, "python-client-1") # TODO dynamic address allocation protocol
     router.start()
 
     # connect to an existing node in the network
@@ -24,7 +24,7 @@ def main():
         lock.release() # release the main thread
     signal.signal(signal.SIGINT, signal_handler)
 
-    PING_SERVICE_ID = 1
+    PING_SERVICE_ID = 3
 
     def on_pong(packet):
         print('received:', str(bytes(packet.data)))
@@ -36,9 +36,9 @@ def main():
     if msg: print("on send:", msg)
 
     # hang until ^C
-    lock.acquire()
-    lock.acquire() # enqueue a lock request, hanging the application
-    lock.release() # not really nessessary, but it feels cleaner
+    lock.acquire() # take the lock
+    lock.acquire() # enqueue a lock request to block the application
+    lock.release() # pong response recieved; clear the lock and exit
 
 if __name__ == "__main__":
     main()
