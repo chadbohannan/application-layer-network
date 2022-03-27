@@ -27,10 +27,7 @@ func (ch *WebSocketChannel) Send(p *Packet) error {
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
-	if _, err := ch.conn.WriteJSON(p); err != nil {
-		return err
-	}
-	return nil
+	return ch.conn.WriteJSON(p)
 }
 
 // Receive deserializes packets from it's socket
