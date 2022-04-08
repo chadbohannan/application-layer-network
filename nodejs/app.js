@@ -9,10 +9,7 @@ const cors = require('cors')
 app.use(express.json())
 app.use(compression())
 app.use(cors())
-
-// Logging
-
-app.use(morgan)
+app.use(morgan) // Logging
 
 // Define routes
 app.use('/', require('./routes'))
