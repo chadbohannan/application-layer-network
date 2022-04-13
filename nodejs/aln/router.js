@@ -73,7 +73,10 @@ class Router {
   // send() is the core routing function of Router. A packet is either expected
   //  locally by a registered Node, or on a multi-hop route to it's destination.
   send (packet) {
-    let handler = (packet) => { }
+    console.log(`node ${this.address} send: ${packet.toJson()}`)
+    let handler = (packet) => {
+      console.log(`[${this.address}] send(packet) => null handler`)
+    }
     if (!packet.src) {
       packet.src = this.address
     }
@@ -89,7 +92,7 @@ class Router {
         if (this.serviceQueue.has(packet.srv)) {
           q = this.serviceQueue.get(packet.srv)
         }
-        q.append(packet)
+        q.push(packet)
         this.serviceQueue.set(packet.srv, q)
         return 'no route for service, packet queued'
       }
@@ -102,6 +105,7 @@ class Router {
       } else {
         return `service ${packet.srv} not registered`
       }
+      handler(packet)
     } else if (!packet.nxt || packet.nxt === this.address) {
       if (this.remoteNodeMap.has(packet.dst)) {
         const route = this.remoteNodeMap.get(packet.dst)
@@ -111,7 +115,6 @@ class Router {
     } else {
       return 'packet is unroutable; no action taken'
     }
-    handler(packet)
     return null
   }
 
@@ -135,66 +138,71 @@ class Router {
     this.channels = this.channels.filter((ch) => ch !== channel)
   }
 
+  onPacket (packet, channel) {
+    switch (packet.net) {
+      case NET_ROUTE: {
+        // neighbor is sharing it's routing table
+        const [remoteAddress, nextHop, cost, routeErr] = parseNetworkRouteSharePacket(packet)
+        if (routeErr === null) {
+          console.log(`Node ${this.address} rcv'd NET_ROUTE remoteAddress:${remoteAddress}, nextHop:${nextHop}, cost:${cost}`)
+          let remoteNode = this.remoteNodeMap.get(remoteAddress)
+          if (!remoteNode) {
+            remoteNode = new RemoteNodeInfo(remoteAddress, nextHop, channel, cost, Date.now())
+            this.remoteNodeMap.set(remoteAddress, remoteNode)
+          }
+          if (remoteNode.cost === 0) {
+            this.remoteNodeMap.delete(remoteAddress)
+          } else if (cost <= remoteNode.cost) {
+            remoteNode.NextHop = nextHop
+            remoteNode.Channel = channel
+            remoteNode.Cost = cost
+            // relay update to other channels
+            const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
+            this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
+          }
+        } else {
+          console.log(`error parsing NET_ROUTE: ${routeErr}`)
+        }
+      } break
+      case NET_SERVICE: {
+        const [address, serviceID, serviceLoad, serviceErr] = parseNetworkServiceSharePacket(packet)
+        if (serviceErr === null) {
+          console.log(`NET_SERVICE node:${address}, service:${serviceID}, load:${serviceLoad}`)
+          if (!this.serviceLoadMap.has(serviceID)) {
+            this.serviceLoadMap.set(serviceID, new Map())
+          }
+          this.serviceLoadMap.get(serviceID).set(address, new NodeLoad(serviceLoad, Date.now()))
+          this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
+          if (this.serviceQueue.has(serviceID)) {
+            const packetList = this.serviceQueue.get(serviceID)
+            if (this.remoteNodeMap.has(address)) {
+              const route = this.remoteNodeMap.get(address)
+              packetList.forEach((p) => {
+                p.dst = address
+                p.nxt = route.nextHop
+                channel.send(p)
+              })
+              this.serviceQueue.delete(serviceID)
+            }
+          }
+        } else {
+          console.log(`error parsing NET_SERVICE: ${serviceErr}`)
+        }
+      } break
+      case NET_QUERY:
+        this.exportRouteTable().forEach((p) => channel.send(p))
+        this.exportServiceTable().forEach((p) => channel.send(p))
+        break
+      default:
+        this.send(packet)
+    }
+  }
+
   // attach a new communication channel to the router
   addChannel (channel) {
     this.channels.push(channel)
     channel.onPacket = (packet) => {
-      switch (packet.net) {
-        case NET_ROUTE: {
-          // neighbor is sharing it's routing table
-          const [remoteAddress, nextHop, cost, routeErr] = parseNetworkRouteSharePacket(packet)
-          if (routeErr === null) {
-            console.log(`NET_ROUTE [${this.address}] remoteAddress:${remoteAddress}, nextHop:${nextHop}, cost:${cost}`)
-            let remoteNode = this.remoteNodeMap.get(remoteAddress)
-            if (!remoteNode) {
-              remoteNode = new RemoteNodeInfo(remoteAddress)
-              this.remoteNodeMap[remoteAddress] = remoteNode
-            }
-            remoteNode.LastSeen = Date.now()
-            if (cost < remoteNode.cost || remoteNode.cost === 0) {
-              remoteNode.NextHop = nextHop
-              remoteNode.Channel = channel
-              remoteNode.Cost = cost
-              // relay update to other channels
-              const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
-              this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
-            }
-          } else {
-            console.log(`error parsing NET_ROUTE: ${routeErr}`)
-          }
-        } break
-        case NET_SERVICE: {
-          const [address, serviceID, serviceLoad, serviceErr] = parseNetworkServiceSharePacket(packet)
-          if (serviceErr === null) {
-            console.log(`NET_SERVICE node:${address}, service:${serviceID}, load:${serviceLoad}`)
-            if (!this.serviceLoadMap.has(serviceID)) {
-              this.serviceLoadMap = new Map()
-            }
-            this.serviceLoadMap.get(serviceID).set(address, new NodeLoad(serviceLoad, Date.now()))
-            this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
-            if (this.serviceQueue.has(serviceID)) {
-              const packetList = this.serviceQueue.get(serviceID)
-              if (this.remoteNodeMap.has(address)) {
-                const route = this.remoteNodeMap.get(address)
-                packetList.forEach((p) => {
-                  p.dst = address
-                  p.nxt = route.nextHop
-                  channel.send(p)
-                })
-                this.serviceQueue.delete(serviceID)
-              }
-            }
-          } else {
-            console.log(`error parsing NET_SERVICE: ${serviceErr}`)
-          }
-        } break
-        case NET_QUERY:
-          this.exportRouteTable().foreach((p) => channel.send(p))
-          this.exportServiceTable().foreach((p) => channel.send(p))
-          break
-        default:
-          this.send(packet)
-      }
+      this.onPacket(packet, channel)
     }
     channel.send(makeNetQueryPacket())
   }
@@ -235,6 +243,7 @@ class Router {
         dump.push(makeNetworkServiceSharePacket(address, serviceID, nodeLoad.load))
       })
     })
+    return dump
   }
 
   shareNetState () {

@@ -10,11 +10,11 @@ const Router = require('../aln/router')
 class LocalChannel {
   constructor (twin) {
     this.twin = twin || new LocalChannel(this)
-    this.onPacket = () => {}
+    this.onPacket = (packet) => {}
   }
 
   send (packet) {
-    this.twin.onPacket(packet)
+    setTimeout(() => this.twin.onPacket(packet))
   }
 }
 
@@ -34,14 +34,47 @@ describe('# Test Router', function () {
   })
 
   it('# route to a neighboring service (1 hop)', async function () {
-    // TODO create Routers router1 and router2
-    // TODO router1.onPacket(packet)
-    // TODO assert router2 service was called
+    const r1 = new Router('1')
+    const r2 = new Router('2')
+    let recievedPacket = null
+    r2.registerService(1, (packet) => { recievedPacket = packet })
+
+    const ch = new LocalChannel()
+    r1.addChannel(ch)
+    r2.addChannel(ch.twin)
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const p = new Packet()
+    p.srv = 1
+    r1.send(p)
+    await new Promise(resolve => setTimeout(resolve, 1))
+
+    assert.isNotNull(recievedPacket)
   })
 
   it('# route to a non-neighboring service (2 hops)', async function () {
-    // TODO create Routers router1 and router2
-    // TODO router1.onPacket(packet)
-    // TODO assert router2 service was called
+    const r1 = new Router('1')
+    const r2 = new Router('2')
+    const r3 = new Router('3')
+
+    let recievedPacket = null
+    r3.registerService(1, (packet) => { recievedPacket = packet })
+
+    const ch1 = new LocalChannel()
+    r1.addChannel(ch1)
+    r2.addChannel(ch1.twin)
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const ch2 = new LocalChannel()
+    r2.addChannel(ch2)
+    r3.addChannel(ch2.twin)
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    const p = new Packet()
+    p.srv = 1
+    r1.send(p)
+    await new Promise(resolve => setTimeout(resolve, 10))
+
+    assert.isNotNull(recievedPacket)
   })
 })
