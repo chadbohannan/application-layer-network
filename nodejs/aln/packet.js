@@ -66,9 +66,10 @@ class Packet {
     if (this.data) {
       cf |= CF_DATA
       buf.writeUint16(this.data.length)
-      for (let i = 0; i < this.data.length; i++) {
-        buf.writeByte(this.data[i])
-      }
+      buf.writeUTF8String(this.data)
+      // for (let i = 0; i < this.data.length; i++) {
+      //   buf.writeByte(this.data[i])
+      // }
     }
     const offset = buf.offset
     this.cf = cfHamEncode(cf)
