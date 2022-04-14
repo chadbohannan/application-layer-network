@@ -204,6 +204,7 @@ class Router {
     channel.onPacket = (packet) => {
       this.onPacket(packet, channel)
     }
+    channel.onClose = () => { this.removeChannel(channel) }
     channel.send(makeNetQueryPacket())
   }
 

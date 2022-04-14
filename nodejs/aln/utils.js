@@ -35,7 +35,7 @@ function parseNetworkRouteSharePacket (packet) {
   const dataBuf = ByteBuffer.fromBinary(packet.data)
   const addrSize = dataBuf.readUint8()
   if (packet.data.length !== addrSize + 3) {
-    return ['', '', 0, `parseNetworkRouteSharePacket: packet.data is ${packet.data}; expected ${addrSize + 3}`]
+    return ['', '', 0, `parseNetworkRouteSharePacket: packet.data is ${packet.data.len}; expected ${addrSize + 3}`]
   }
   const dest = dataBuf.readBytes(addrSize).toUTF8()
   const cost = dataBuf.readUint16()
@@ -52,6 +52,7 @@ function makeNetworkServiceSharePacket (hostAddr, serviceID, serviceLoad) {
   const p = new Packet()
   p.net = NET_SERVICE
   p.data = buf.reset().toBinary()
+  p.sz = p.data.length
   return p
 }
 

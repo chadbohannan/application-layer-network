@@ -30,7 +30,7 @@ class Packet {
       const buf = ByteBuffer.fromBinary(content)
       this.cf = buf.readUint16()
       if (this.cf & CF_NETSTATE) this.net = buf.readUint8()
-      if (this.cf & CF_SERVICEID) this.srv = buf.readUint16()
+      if (this.cf & CF_SERVICEID) this.srv = buf.readUint8()
       if (this.cf & CF_SRCADDR) this.src = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_DESTADDR) this.dst = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_NEXTADDR) this.nxt = buf.readBytes(buf.readUint8()).toUTF8()
@@ -39,8 +39,9 @@ class Packet {
       if (this.cf & CF_CONTEXTID) this.ctx = buf.readUint16()
       if (this.typ & CF_DATATYPE) this.typ = buf.readUint8()
       if (this.cf & CF_DATA) {
-        this.sz = buf.readUint8()
-        this.data = buf.readBytes(this.sz).toBinary(0, this.sz)
+        this.sz = buf.readUint16()
+        this.data = buf.readBytes(this.sz)
+        this.data = this.data.toString('binary')
       }
       if (this.cf & CF_CRC) this.crc = buf.readUint32() // TODO verify CRC
     }
