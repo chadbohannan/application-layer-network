@@ -4,6 +4,8 @@ const net = require('net')
 const logger = require('./logging/logger')
 const Router = require('./aln/router')
 const { TcpChannel } = require('./aln/tcpchannel')
+const { WebSocketChannel } = require('./aln/wschannel')
+const { WebSocketServer } = require('ws')
 
 const PORT = process.env.PORT || 8080
 const TCP_PORT = process.env.TCP_PORT || 8181
@@ -17,12 +19,22 @@ tcpServer.listen(TCP_PORT, () => {
 })
 tcpServer.on('connection', function(socket) {
   alnRouter.addChannel(new TcpChannel(socket))
-  console.log('A new connection has been established.');
+  console.log('A new TCP connection has been established.');
 });
 
 const webServer = http.createServer(app)
 webServer.listen(PORT, () => {
   logger.info(`web server on port ${PORT}`)
 })
+
+wss.on('connection', function connection(ws) {
+  alnRouter.addChannel(new WebSocketChannel(ws))
+});
+
+webServer.on('upgrade', function upgrade(request, socket, head) {
+  wss.handleUpgrade(request, socket, head, function done(ws) {
+    wss.emit('connection', ws, request);
+  });
+});
 
 logger.info('init complete')
