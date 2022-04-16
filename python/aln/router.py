@@ -3,14 +3,13 @@ from threading import Lock, Thread
 import random
 from .packet import Packet, readINT16U, writeINT16U
 
-# AddressTypeSize = 2  # TODO make it easier to use longer addresses
 bytesToAddressType = str
 
 def makeNetQueryPacket():
     return Packet(netState=Packet.NET_QUERY)
 
 def byteLen(buff):
-    return len(buff).to_bytes(1, 'little')
+    return len(buff).to_bytes(1, 'big')
 
 def makeNetworkRouteSharePacket(srcAddr, destAddr, cost):
     data = []

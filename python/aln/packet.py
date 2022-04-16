@@ -312,15 +312,15 @@ class Packet:
             packetBuffer.extend(writeINT16U(self.serviceID))
 
         if (self.controlFlags & Packet.CF_SRCADDR):
-            packetBuffer.extend(len(self.srcAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(len(self.srcAddr).to_bytes(1, 'big'))
             packetBuffer.extend(bytearray(self.srcAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_DESTADDR):
-            packetBuffer.extend(len(self.destAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(len(self.destAddr).to_bytes(1, 'big'))
             packetBuffer.extend(bytearray(self.destAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_NEXTADDR):
-            packetBuffer.extend(len(self.nextAddr).to_bytes(1, 'little'))
+            packetBuffer.extend(len(self.nextAddr).to_bytes(1, 'big'))
             packetBuffer.extend(bytearray(self.nextAddr, "utf-8"))
 
         if (self.controlFlags & Packet.CF_SEQNUM):
