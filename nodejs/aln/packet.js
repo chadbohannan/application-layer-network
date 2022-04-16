@@ -48,7 +48,16 @@ class Packet {
   }
 
   toJson () {
-    return JSON.stringify({ cf: this.cf, net: this.net, srv: this.srv, src: this.src, dst: this.dst, nxt: this.nxt, data_sz: this.sz })
+    return JSON.stringify({
+      cf: this.cf,
+      net: this.net,
+      srv: this.srv,
+      src: this.src,
+      dst: this.dst,
+      nxt: this.nxt,
+      data: Buffer.from(this.data).toString('base64'),
+      data_sz: this.data ? this.data.length : 0,
+    })
   }
 
   toBinary () {
@@ -68,9 +77,6 @@ class Packet {
       cf |= CF_DATA
       buf.writeUint16(this.data.length)
       buf.writeUTF8String(this.data)
-      // for (let i = 0; i < this.data.length; i++) {
-      //   buf.writeByte(this.data[i])
-      // }
     }
     const offset = buf.offset
     this.cf = cfHamEncode(cf)
