@@ -9,13 +9,15 @@ Drawbacks include that the routing table requires memory on each routing node of
 An ALN provides message routing to anywhere in a connected network. A connected network is one where enough links exists that a message can be routed from a node to any other node. An ALN provides messaging connectivity within an application without any concern to network topology or even underlying protocols. One technique is to use an ALN as a protocol bridge to make bluetooth peripherals accessible as services in your network application by using a generic ALN Router instance in an Android app.
 
 # Development Status
-| Language | Packet | Parser | Router | Local | TCP  | WebSocket |
-|----------|--------|--------|--------|-------|------|-----------|
-| C99      | Broken | Broken |        |       |      |           |
-| C#       | Broken |        |        |       |      |           |
-| Go       | Done   | Done   | Proto  | Done  | Done |           |
-| Java     | Broken | Broken |        |       |      |           |
-| Python   | Done   | Done   | Proto  |       | Done |           |
+| Language   | Packet | Parser | Router |  TCP  | WebSocket |
+|------------|--------|--------|--------|-------|-----------|
+| C99        | Broken | Broken |        |       |           |
+| C#         | Broken |        |        |       |           |
+| Go         | Done   | Done   | Proto  |  Done | Done      |
+| Java       | Done   | Done   |        |       |           |
+| NodeJS     | Done   | Done   | Proto  |  Done | Done      |
+| JavaScript | Done   | Done   | Proto  |       | Done      |
+| Python     | Done   | Done   | Proto  |  Done |           |
 
 Broken - design changed, code is obselete
 Proto - some functionality working but module is not incomplete
