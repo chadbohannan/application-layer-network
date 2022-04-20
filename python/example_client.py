@@ -11,7 +11,7 @@ def main():
 
     # connect to an existing node in the network
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', 8000))
+    sock.connect(('localhost', 8181))
 
     # join the network
     router.add_channel(TcpChannel(sock))

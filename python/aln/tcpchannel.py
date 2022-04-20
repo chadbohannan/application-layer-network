@@ -4,8 +4,8 @@ from .parser import Parser
 class TcpChannel():
     def __init__(self, sock):
         self.sock = sock
-        self.on_close = None
         self.sock.setblocking(False)
+        self.on_close = None
 
     def packet_handler(self, packet):
         self.on_packet_callback(self, packet)
@@ -19,20 +19,21 @@ class TcpChannel():
     def close(self):
         self.selector.unregister(self.sock)
         self.sock.close()
+        if self.on_close:
+            self.on_close(self)
 
     def send(self, packet):
         frame = packet.toFrameBytes()
-        print("sending frame:"+str(frame))
+        # print("sending frame:"+str(frame))
         try:
             self.sock.send(frame)
         except Exception as e:
-            print(e)
+            print('send exception', e)
             return False
         return True
 
     def recv(self, sock, mask):
         data = sock.recv(1024)
-        print("recv:"+str(data))
         if data:
             self.parser.readBytes(data)
         else:

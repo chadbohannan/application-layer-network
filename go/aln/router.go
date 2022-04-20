@@ -2,6 +2,7 @@ package aln
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -146,14 +147,41 @@ func (r *Router) ReleaseContext(ctxID uint16) {
 }
 
 func (r *Router) RemoveChannel(channel Channel) {
-	for i, ch := range r.channels {
-		if ch == channel {
-			a := r.channels
-			a[i] = a[len(a)-1]
-			a[len(a)-1] = nil
-			r.channels = a[:len(a)-1]
-			break
+	log.Printf("router:RemoveChannel")
+	go func() {
+		r.mutex.Lock()
+		defer r.mutex.Unlock()
+		// slice out the channel
+		for i, ch := range r.channels {
+			if ch == channel {
+				a := r.channels
+				a[i] = a[len(a)-1]
+				a[len(a)-1] = nil
+				r.channels = a[:len(a)-1]
+				break
+			}
 		}
+		// bcast the loss of routes through the channel
+		for address, nodeInfo := range r.remoteNodeMap {
+			if nodeInfo.Channel == channel {
+				log.Print("removing: ", address)
+				r.removeAddress(address)
+				for _, ch := range r.channels {
+					log.Print("sending reset packet")
+					ch.Send(makeNetworkRouteSharePacket(r.address, address, 0))
+				}
+			} else {
+				log.Print("keeping: ", address)
+			}
+		}
+	}()
+}
+
+func (r *Router) removeAddress(remoteAddress AddressType) {
+	// remove node and relay
+	delete(r.remoteNodeMap, remoteAddress)
+	for _, nodeLoadMap := range r.serviceLoadMap {
+		delete(nodeLoadMap, remoteAddress)
 	}
 }
 
@@ -163,22 +191,40 @@ func (r *Router) AddChannel(channel Channel) {
 	r.channels = append(r.channels, channel)
 	r.mutex.Unlock()
 
-	// TODO add OnClose callback to TcpChannel
-
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) {
-		// fmt.Printf("received packet to %d from %d via:%d net:%d ctxID:%d serviceID:%d data:%v\n",
+		// fmt.Printf("received packet dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d srv:%d data:%v\n",
 		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
 
-		if (packet.ControlFlags & CF_NETSTATE) == CF_NETSTATE {
-			switch packet.NetState {
-			case NET_ROUTE:
-				// neighbor is sharing it's routing table
-				if remoteAddress, nextHop, cost, err := parseNetworkRouteSharePacket(packet); err == nil {
-					msg := "NET_ROUTE [%s] remoteAddress:%s, nextHop:%s, cost:%d\n"
-					fmt.Printf(msg, r.address, remoteAddress, nextHop, cost)
-					r.mutex.Lock()
-					defer r.mutex.Unlock()
+		switch packet.NetState {
+		case NET_ROUTE:
+			// neighbor is sharing it's routing table
+			if remoteAddress, nextHop, cost, err := parseNetworkRouteSharePacket(packet); err == nil {
+				// msg := "NET_ROUTE [%s] remoteAddress:%s, nextHop:%s, cost:%d\n"
+				// log.Printf(msg, r.address, remoteAddress, nextHop, cost)
+				r.mutex.Lock()
+				defer r.mutex.Unlock()
+
+				if cost == 0 {
+					// remove the route
+					if remoteAddress == r.address {
+						go func() {
+							// a short delay lets the message finish proagating
+							//then this node pushes net state on all channels
+							time.Sleep(100 * time.Millisecond)
+							r.ShareNetState()
+						}()
+					} else if _, ok := r.remoteNodeMap[remoteAddress]; ok {
+						r.removeAddress(remoteAddress)
+						// relay update on other channels
+						for _, ch := range r.channels {
+							if ch != channel {
+								ch.Send(packet)
+							}
+						}
+					}
+				} else {
+					// add or update a route
 					var ok bool
 					var remoteNode *RemoteNodeInfo
 					if remoteNode, ok = r.remoteNodeMap[remoteAddress]; !ok {
@@ -200,50 +246,50 @@ func (r *Router) AddChannel(channel Channel) {
 							}
 						}
 					}
-				} else {
-					fmt.Printf("error parsing NET_ROUTE: %s\n", err.Error())
 				}
-
-			case NET_SERVICE:
-				if address, serviceID, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
-					fmt.Printf("NET_SERVICE node:%s, service:%d, load:%d\n", address, serviceID, serviceLoad)
-					r.mutex.Lock()
-					defer r.mutex.Unlock()
-					if _, ok := r.serviceLoadMap[serviceID]; !ok {
-						r.serviceLoadMap[serviceID] = NodeLoadMap{}
-					}
-					r.serviceLoadMap[serviceID][address] = NodeLoad{
-						Load:     serviceLoad,
-						LastSeen: time.Now().UTC(),
-					}
-					for _, c := range r.channels {
-						if c != channel {
-							c.Send(packet)
-						}
-					}
-					if packetList, ok := r.serviceQueue[serviceID]; ok {
-						if route, ok := r.remoteNodeMap[address]; ok {
-							for _, p := range packetList {
-								p.DestAddr = address
-								p.NextAddr = route.NextHop
-								channel.Send(p)
-							}
-						}
-						delete(r.serviceQueue, serviceID)
-					}
-				} else {
-					fmt.Printf("error parsing NET_SERVICE: %s\n", err.Error())
-				}
-
-			case NET_QUERY:
-				for _, routePacket := range r.ExportRouteTable() {
-					channel.Send(routePacket)
-				}
-				for _, servicePacket := range r.ExportServiceTable() {
-					channel.Send(servicePacket)
-				}
+			} else {
+				log.Print("error parsing NET_ROUTE", err)
 			}
-		} else {
+
+		case NET_SERVICE:
+			if address, serviceID, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
+				// fmt.Printf("NET_SERVICE node:%s, service:%d, load:%d\n", address, serviceID, serviceLoad)
+				r.mutex.Lock()
+				defer r.mutex.Unlock()
+				if _, ok := r.serviceLoadMap[serviceID]; !ok {
+					r.serviceLoadMap[serviceID] = NodeLoadMap{}
+				}
+				r.serviceLoadMap[serviceID][address] = NodeLoad{
+					Load:     serviceLoad,
+					LastSeen: time.Now().UTC(),
+				}
+				for _, c := range r.channels {
+					if c != channel {
+						c.Send(packet)
+					}
+				}
+				if packetList, ok := r.serviceQueue[serviceID]; ok {
+					if route, ok := r.remoteNodeMap[address]; ok {
+						for _, p := range packetList {
+							p.DestAddr = address
+							p.NextAddr = route.NextHop
+							channel.Send(p)
+						}
+					}
+					delete(r.serviceQueue, serviceID)
+				}
+			} else {
+				log.Printf("error parsing NET_SERVICE: %s\n", err.Error())
+			}
+
+		case NET_QUERY:
+			for _, routePacket := range r.ExportRouteTable() {
+				channel.Send(routePacket)
+			}
+			for _, servicePacket := range r.ExportServiceTable() {
+				channel.Send(servicePacket)
+			}
+		default:
 			r.Send(packet)
 		}
 	}, r.RemoveChannel)

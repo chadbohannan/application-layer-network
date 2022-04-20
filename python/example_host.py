@@ -27,7 +27,7 @@ def main():
         router.add_channel(tcpChannel)
 
     tcpHost = TcpHost()
-    tcpHost.listen(sel, 'localhost', 8000, on_connect)
+    tcpHost.listen(sel, 'localhost', 8181, on_connect)
     
     def signal_handler(signal, frame): # listen for ^C
         router.close()

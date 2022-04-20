@@ -2,6 +2,7 @@ package aln
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"sync"
@@ -30,7 +31,7 @@ func (host *TcpChannelHost) Listen(onConnect func(Channel)) {
 	}
 	defer l.Close()
 
-	fmt.Println("ALN:TcpChannelHost Listening on " + bindAddress)
+	log.Println("TcpChannelHost: " + bindAddress)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
@@ -70,8 +71,8 @@ func (ch *TCPChannel) Send(p *Packet) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v\n",
-		p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data)
+	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v\n",
+	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data)
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
@@ -98,6 +99,10 @@ func (ch *TCPChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) 
 	if onClose != nil {
 		onClose(ch)
 	}
+}
+
+func (ch *TCPChannel) ReceiveOne(OnCloseCallback) (*Packet, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // Close .
