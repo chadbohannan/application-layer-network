@@ -32,9 +32,4 @@ public class Frame {
 
     }
 
-    public static byte[] fromAX25Buffer(byte[] content) {
-        ByteBuffer byteBuffer = ByteBuffer.allocate(content.length);
-        // TODO
-        return byteBuffer.array();
-    }
 }

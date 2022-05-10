@@ -331,11 +331,11 @@ public class Packet {
         if ((controlField & ControlFlag.serviceID) != 0)
             s += String.format("srv:%d,", SerivceID);
         if ((controlField & ControlFlag.scrAddr) != 0)
-            s += String.format("src:0x%s,", SourceAddress);
+            s += String.format("src:%s,", SourceAddress);
         if ((controlField & ControlFlag.destAddr) != 0)
-            s += String.format("dst:0x%s,", DestAddress);
+            s += String.format("dst:%s,", DestAddress);
         if ((controlField & ControlFlag.nextAddr) != 0)
-            s += String.format("nxt:0x%s,", NextAddress);
+            s += String.format("nxt:%s,", NextAddress);
         if ((controlField & ControlFlag.seqNum) != 0)
             s += String.format("seq:%d,", SequenceNum);
         if ((controlField & ControlFlag.ackBlock) != 0)

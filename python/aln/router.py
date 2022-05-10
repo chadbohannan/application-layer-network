@@ -104,7 +104,7 @@ class Router(Thread):
                              ch.send(packet)
             else:
                 msg = "NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
-                print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
+                # print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
                 if remoteAddress not in self.remoteNodeMap:
                     remoteNode = RemoteNode(remoteAddress, nextHop, cost, channel)
                     self.remoteNodeMap[remoteAddress] = remoteNode
