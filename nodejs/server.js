@@ -27,6 +27,7 @@ webServer.listen(PORT, () => {
   logger.info(`web server on port ${PORT}`)
 })
 
+const wss = new WebSocketServer({noServer: true});
 wss.on('connection', function connection(ws) {
   alnRouter.addChannel(new WebSocketChannel(ws))
 });

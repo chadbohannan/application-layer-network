@@ -13,7 +13,6 @@ type ChannelHost interface {
 
 // LocalChannel wraps a pair of chan primatives; intended for development and testing
 type LocalChannel struct {
-	reciever PacketCallback
 	outbound chan *Packet
 	inbound  chan *Packet
 	close    chan bool
@@ -46,10 +45,11 @@ func (lc *LocalChannel) Send(packet *Packet) error {
 // Receive starts a go routine to call onPacket
 func (lc *LocalChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
 	go func() {
-		for {
+		cont := true
+		for cont {
 			select {
 			case packet := <-lc.inbound:
-				onPacket(packet)
+				cont = onPacket(packet)
 			case <-lc.close:
 				if onClose != nil {
 					onClose(lc)

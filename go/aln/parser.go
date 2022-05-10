@@ -14,7 +14,7 @@ const (
 	STATE_ESCAPED   = 1
 )
 
-type PacketCallback func(*Packet)
+type PacketCallback func(*Packet) bool
 type OnCloseCallback func(Channel)
 
 type Parser struct {

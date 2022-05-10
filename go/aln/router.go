@@ -167,11 +167,8 @@ func (r *Router) RemoveChannel(channel Channel) {
 				log.Print("removing: ", address)
 				r.removeAddress(address)
 				for _, ch := range r.channels {
-					log.Print("sending reset packet")
 					ch.Send(makeNetworkRouteSharePacket(r.address, address, 0))
 				}
-			} else {
-				log.Print("keeping: ", address)
 			}
 		}
 	}()
@@ -192,7 +189,7 @@ func (r *Router) AddChannel(channel Channel) {
 	r.mutex.Unlock()
 
 	// define onPacket() to either handle link-state updates or route data
-	go channel.Receive(func(packet *Packet) {
+	go channel.Receive(func(packet *Packet) bool {
 		// fmt.Printf("received packet dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d srv:%d data:%v\n",
 		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
 
@@ -292,6 +289,7 @@ func (r *Router) AddChannel(channel Channel) {
 		default:
 			r.Send(packet)
 		}
+		return true
 	}, r.RemoveChannel)
 	channel.Send(makeNetQueryPacket())
 }
@@ -324,6 +322,10 @@ func (r *Router) ExportRouteTable() []*Packet {
 		routes = append(routes, makeNetworkRouteSharePacket(r.address, address, remoteNode.Cost+1))
 	}
 	return routes
+}
+
+func (r *Router) NumChannels() int {
+	return len(r.channels)
 }
 
 // ExportServiceTable composes a list of packets encoding the service table of this node

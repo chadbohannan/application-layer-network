@@ -57,8 +57,9 @@ func TestParseFrame(t *testing.T) {
 
 	// parse the packet fram into a new packet body
 	var p *Packet
-	parser := NewParser(func(q *Packet) {
+	parser := NewParser(func(q *Packet) bool {
 		p = q
+		return false
 	})
 	parser.IngestStream(pktFrame)
 

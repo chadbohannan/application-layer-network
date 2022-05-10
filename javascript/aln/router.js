@@ -140,38 +140,26 @@ export class Router {
         // neighbor is sharing it's routing table
         const [remoteAddress, nextHop, cost, routeErr] = parseNetworkRouteSharePacket(packet)
         if (routeErr === null) {
-          console.log(`Node ${this.address} rcv'd NET_ROUTE remoteAddress:${remoteAddress}, nextHop:${nextHop}, cost:${cost}`)
-          if (cost === 0) { // route is being reset on a channel closing
-            if (remoteAddress === this.address) {
-              // readvertize self
-              const _this = this;
-              setTimeout(()=>{_this.shareNetState()}, 100)
-            } else {
-              // remove route
-              this.remoteNodeMap.delete(remoteAddress)
-              this.serviceLoadMap.forEach((loadMap) => loadMap.delete(address))
-              this.channels.forEach((ch) => {
-                if (ch !== channel) ch.send(packet)
-              })
-            }
-          } else {
-            // add new route
-            let remoteNode = this.remoteNodeMap.get(remoteAddress)
+          let remoteNode = this.remoteNodeMap.get(remoteAddress)
             if (!remoteNode) {
               remoteNode = new RemoteNodeInfo(remoteAddress, nextHop, channel, cost, Date.now())
               this.remoteNodeMap.set(remoteAddress, remoteNode)
             }
-            if (remoteNode.cost === 0) {
+            var p
+            if (cost === 0) {
               this.remoteNodeMap.delete(remoteAddress)
+              this.serviceLoadMap.forEach((loadMap, serviceID) => {
+                loadMap.delete(address)
+              })
+              p = makeNetworkRouteSharePacket(this.address, remoteAddress, 0)
             } else if (cost <= remoteNode.cost) {
               remoteNode.NextHop = nextHop
               remoteNode.Channel = channel
               remoteNode.Cost = cost
-              // relay update to other channels
-              const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
-              this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
+              p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
             }
-          }
+            // relay update to other channels
+            this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
         } else {
           console.log(`error parsing NET_ROUTE: ${routeErr}`)
         }
