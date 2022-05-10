@@ -1,6 +1,7 @@
 from datetime import datetime
 from threading import Lock, Thread
 import random
+import time
 from .packet import Packet, readINT16U, writeINT16U
 
 bytesToAddressType = str
@@ -89,11 +90,21 @@ class Router(Thread):
             remoteAddress, nextHop, cost, err = parseNetworkRouteSharePacket(packet)
             if err is not None:
                 print("err:",err)
+            elif cost == 0:
+                # TODO remove route
+                if remoteAddress == self.address: # readvertize self
+                    time.sleep(0.1)
+                    self.share_net_state()
+                else: # remove route
+                    del self.remoteNodeMap[remoteAddress]
+                    for loadMap in self.serviceLoadMap.values():
+                        del loadMap[address]
+                    for ch in self.channels:
+                        if ch != channel:
+                             ch.send(packet)
             else:
                 msg = "NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
-                print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
-                print("remoteAddress:")
-                print(remoteAddress)
+                # print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
                 if remoteAddress not in self.remoteNodeMap:
                     remoteNode = RemoteNode(remoteAddress, nextHop, cost, channel)
                     self.remoteNodeMap[remoteAddress] = remoteNode
@@ -108,8 +119,7 @@ class Router(Thread):
                         for chan in self.channels:
                             if chan is not channel:
                                 chan.send(p)
-
-        if packet.netState == Packet.NET_SERVICE: # neighbor is sharing service load info
+        elif packet.netState == Packet.NET_SERVICE: # neighbor is sharing service load info
             address, serviceID, serviceLoad, err = parseNetworkServiceSharePacket(packet)
             if err is not None:
                 print("error parsing NET_SERVICE: {0}", err)
@@ -134,15 +144,14 @@ class Router(Thread):
                         else:
                             print("NET ERROR no route for advertised service: ", serviceID)
                     del(self.serviceQueue, serviceID)
-
-        if packet.netState == Packet.NET_QUERY:     
+        elif packet.netState == Packet.NET_QUERY:     
             for routePacket in self.export_routes():
                 channel.send(routePacket)
             for servicePacket in self.export_services():
                 channel.send(servicePacket)
 
     def on_packet(self, channel, packet):
-        if packet.controlFlags & Packet.CF_NETSTATE == Packet.CF_NETSTATE:
+        if packet.netState:
             with self.lock:
                 self.handle_netstate(channel, packet)
         else:
@@ -150,7 +159,12 @@ class Router(Thread):
 
     def remove_channel(self, channel):
         with self.lock:
-            self.channels.remove(channel)            
+            self.channels.remove(channel)
+            delete = [addr for addr in self.remoteNodeMap if self.remoteNodeMap[addr].channel == channel]
+            for addr in delete:
+                del self.remoteNodeMap[addr]
+                for ch in self.channels:
+                    ch.send(makeNetworkRouteSharePacket(self.address, address, 0))
 
     def add_channel(self, channel):
         channel.on_close = self.remove_channel
@@ -258,6 +272,13 @@ class Router(Thread):
                 # TODO filter expired or unroutable entries
                 services.append(makeNetworkServiceSharePacket(remoteAddress, serviceID, load))
         return services
+
+    def share_net_state(self):
+        for channel in self.channels:
+            for routePacket in self.export_routes():
+                channel.send(routePacket)
+            for servicePacket in self.export_services():
+                channel.send(servicePacket)
 
     def close(self):
         self.stop = True

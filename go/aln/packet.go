@@ -74,9 +74,9 @@ const (
 
 // LinkState value enumerations (TODO support mesh routing)
 const (
-	NET_ROUTE   = 0x01 // packet contains route entry
-	NET_SERVICE = 0x02 // packet contains service entry
-	NET_QUERY   = 0x03 // packet is a request for content
+	NET_ROUTE   = byte(0x01) // packet contains route entry
+	NET_SERVICE = byte(0x02) // packet contains service entry
+	NET_QUERY   = byte(0x03) // packet is a request for content
 )
 
 type Packet struct {

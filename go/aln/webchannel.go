@@ -1,7 +1,6 @@
 package aln
 
 import (
-	"fmt"
 	"log"
 	"sync"
 
@@ -15,6 +14,7 @@ type WebSocketChannel struct {
 
 // NewWebSocketChannel creates a new channel around an existing connection
 func NewWebSocketChannel(conn *websocket.Conn) *WebSocketChannel {
+
 	return &WebSocketChannel{
 		conn: conn,
 	}
@@ -23,8 +23,8 @@ func NewWebSocketChannel(conn *websocket.Conn) *WebSocketChannel {
 // Send serializes a packet frame through the socket
 func (ch *WebSocketChannel) Send(p *Packet) error {
 	p.DataSize = uint16(len(p.Data))
-	fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v sz:%d\n",
-		p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data, p.DataSize)
+	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v sz:%d\n",
+	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data, p.DataSize)
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()
@@ -33,6 +33,10 @@ func (ch *WebSocketChannel) Send(p *Packet) error {
 
 // Receive deserializes packets from it's socket
 func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
+	ch.conn.SetCloseHandler(func(code int, text string) error {
+		log.Printf("WebSocketChannel:onCloseHandler")
+		return nil
+	})
 	for { // ever and ever
 		packet := &Packet{}
 		if err := ch.conn.ReadJSON(packet); err == nil {
@@ -42,6 +46,7 @@ func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCall
 			break // jk; not forever
 		}
 	}
+	log.Printf("closing websocket")
 	onClose(ch)
 }
 

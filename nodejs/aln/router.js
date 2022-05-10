@@ -73,10 +73,6 @@ class Router {
   // send() is the core routing function of Router. A packet is either expected
   //  locally by a registered Node, or on a multi-hop route to it's destination.
   send (packet) {
-    console.log(`node ${this.address} send: ${packet.toJson()}`)
-    let handler = (packet) => {
-      console.log(`[${this.address}] send(packet) => null handler`)
-    }
     if (!packet.src) {
       packet.src = this.address
     }
@@ -99,13 +95,12 @@ class Router {
     }
     if (packet.dst === this.address) {
       if (this.serviceMap.has(packet.srv)) {
-        handler = this.serviceMap.get(packet.srv)
+        this.serviceMap.get(packet.srv)(packet)
       } else if (this.contextMap.has(packet.srv)) {
-        handler = this.contextMap.get(packet.srv)
+        this.contextMap.get(packet.srv)(packet)
       } else {
         return `service ${packet.srv} not registered`
       }
-      handler(packet)
     } else if (!packet.nxt || packet.nxt === this.address) {
       if (this.remoteNodeMap.has(packet.dst)) {
         const route = this.remoteNodeMap.get(packet.dst)
@@ -136,6 +131,14 @@ class Router {
 
   removeChannel (channel) {
     this.channels = this.channels.filter((ch) => ch !== channel)
+    this.remoteNodeMap.forEach((nodeInfo, address) => {
+      if (nodeInfo.channel === channel) {
+        this.remoteNodeMap.delete(address)
+        this.serviceLoadMap.forEach((loadMap) => loadMap.delete(address))
+        const src = this.address
+        this.channels.forEach((ch) => { ch.send(makeNetworkRouteSharePacket(src, address, 0))})
+      }
+    })
   }
 
   onPacket (packet, channel) {
@@ -144,21 +147,36 @@ class Router {
         // neighbor is sharing it's routing table
         const [remoteAddress, nextHop, cost, routeErr] = parseNetworkRouteSharePacket(packet)
         if (routeErr === null) {
-          console.log(`Node ${this.address} rcv'd NET_ROUTE remoteAddress:${remoteAddress}, nextHop:${nextHop}, cost:${cost}`)
-          let remoteNode = this.remoteNodeMap.get(remoteAddress)
-          if (!remoteNode) {
-            remoteNode = new RemoteNodeInfo(remoteAddress, nextHop, channel, cost, Date.now())
-            this.remoteNodeMap.set(remoteAddress, remoteNode)
-          }
-          if (remoteNode.cost === 0) {
-            this.remoteNodeMap.delete(remoteAddress)
-          } else if (cost <= remoteNode.cost) {
-            remoteNode.NextHop = nextHop
-            remoteNode.Channel = channel
-            remoteNode.Cost = cost
-            // relay update to other channels
-            const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
-            this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
+          if (cost === 0) { // route is being reset on a channel closing
+            if (remoteAddress === this.address) {
+              // readvertize self
+              const _this = this;
+              setTimeout(()=>{_this.shareNetState()}, 100)
+            } else {
+              // remove route
+              this.remoteNodeMap.delete(remoteAddress)
+              this.serviceLoadMap.forEach((loadMap) => loadMap.delete(address))
+              this.channels.forEach((ch) => {
+                if (ch !== channel) ch.send(packet)
+              })
+            }
+          } else {
+            // add new route
+            let remoteNode = this.remoteNodeMap.get(remoteAddress)
+            if (!remoteNode) {
+              remoteNode = new RemoteNodeInfo(remoteAddress, nextHop, channel, cost, Date.now())
+              this.remoteNodeMap.set(remoteAddress, remoteNode)
+            }
+            if (remoteNode.cost === 0) {
+              this.remoteNodeMap.delete(remoteAddress)
+            } else if (cost <= remoteNode.cost) {
+              remoteNode.NextHop = nextHop
+              remoteNode.Channel = channel
+              remoteNode.Cost = cost
+              // relay update to other channels
+              const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
+              this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
+            }
           }
         } else {
           console.log(`error parsing NET_ROUTE: ${routeErr}`)

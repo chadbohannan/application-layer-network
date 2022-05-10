@@ -40,7 +40,7 @@ class ParserTest {
         assertEquals(1, parsedPackets.size());
 
         String expected = "cf:0x07fe,net:1,srv:2,src:0x3,dst:0x4,nxt:0x5,seq:6,ack:0x7,ctx:8,typ:9,len:2";
-        assertEquals(expected, parsedPackets.remove(0).toString());
+        assertEquals(expected, parsedPackets.get(0).toString());
 
     }
 }
