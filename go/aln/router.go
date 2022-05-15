@@ -17,7 +17,7 @@ Nodes may be local or remote addresses on the network.
 type contextHandlerMap map[uint16]func(*Packet)
 
 // serviceHandlerMap maps local endpoint nodes to packet handlers
-type serviceHandlerMap map[uint16]func(*Packet)
+type serviceHandlerMap map[string]func(*Packet)
 
 type RemoteNodeInfo struct {
 	Address  AddressType // target addres to communicate with
@@ -35,7 +35,7 @@ type NodeLoad struct {
 }
 
 type NodeLoadMap map[AddressType]NodeLoad  // map[adress]NodeLoad
-type ServiceLoadMap map[uint16]NodeLoadMap // map[serviceID][address]NodeLoad
+type ServiceLoadMap map[string]NodeLoadMap // map[service][address]NodeLoad
 
 // Router manages a set of channels and packet handlers
 type Router struct {
@@ -43,10 +43,10 @@ type Router struct {
 	address        AddressType
 	channels       []Channel
 	serviceMap     serviceHandlerMap // map[address]callback registered local node packet handlers
-	contextMap     serviceHandlerMap
+	contextMap     contextHandlerMap
 	remoteNodeMap  RemoteNodeMap // map[address][]RemoteNodes
 	serviceLoadMap ServiceLoadMap
-	serviceQueue   map[uint16][]*Packet // packets waiting for services during warmup
+	serviceQueue   map[string][]*Packet // packets waiting for services during warmup
 }
 
 // NewRouter instantiates an applications ELP Router
@@ -55,21 +55,21 @@ func NewRouter(address AddressType) *Router {
 		address:        address,
 		channels:       make([]Channel, 0),
 		serviceMap:     make(serviceHandlerMap),
-		contextMap:     make(serviceHandlerMap),
+		contextMap:     make(contextHandlerMap),
 		remoteNodeMap:  make(RemoteNodeMap),
 		serviceLoadMap: make(ServiceLoadMap),
-		serviceQueue:   make(map[uint16][]*Packet),
+		serviceQueue:   make(map[string][]*Packet),
 	}
 }
 
 // SelectService returns the address of the service with the lowest load, or zero
-func (r *Router) SelectService(serviceID uint16) AddressType {
-	if _, ok := r.serviceMap[serviceID]; ok {
+func (r *Router) SelectService(service string) AddressType {
+	if _, ok := r.serviceMap[service]; ok {
 		return r.address
 	}
 	var minLoad uint16
 	var remoteAddress AddressType
-	if loadMap, ok := r.serviceLoadMap[serviceID]; ok {
+	if loadMap, ok := r.serviceLoadMap[service]; ok {
 		for address, load := range loadMap {
 			if minLoad == 0 || minLoad > load.Load {
 				remoteAddress = address
@@ -94,24 +94,24 @@ func (r *Router) Send(p *Packet) error {
 	if len(p.SrcAddr) == 0 {
 		p.SrcAddr = r.address
 	}
-	if len(p.DestAddr) == 0 && p.ServiceID != 0 {
-		p.DestAddr = r.SelectService(p.ServiceID)
+	if len(p.DestAddr) == 0 && len(p.Service) != 0 {
+		p.DestAddr = r.SelectService(p.Service)
 		if len(p.DestAddr) == 0 {
-			if _, ok := r.serviceQueue[p.ServiceID]; !ok {
-				r.serviceQueue[p.ServiceID] = []*Packet{p}
+			if _, ok := r.serviceQueue[p.Service]; !ok {
+				r.serviceQueue[p.Service] = []*Packet{p}
 			} else {
-				r.serviceQueue[p.ServiceID] = append(r.serviceQueue[p.ServiceID], p)
+				r.serviceQueue[p.Service] = append(r.serviceQueue[p.Service], p)
 			}
-			return fmt.Errorf("serviceID %d unavailable, packet queued", p.ServiceID)
+			return fmt.Errorf("service '%s' unavailable, packet queued", p.Service)
 		}
 	}
 	if p.DestAddr == r.address {
-		if onPacket, ok := r.serviceMap[p.ServiceID]; ok {
+		if onPacket, ok := r.serviceMap[p.Service]; ok {
 			handler = onPacket
 		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
 			handler = onPacket
 		} else {
-			return fmt.Errorf("service %d not registered", p.ServiceID)
+			return fmt.Errorf("service '%s' not registered", p.Service)
 		}
 	} else if p.NextAddr == r.address || len(p.NextAddr) == 0 {
 		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
@@ -190,8 +190,8 @@ func (r *Router) AddChannel(channel Channel) {
 
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) bool {
-		// fmt.Printf("received packet dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d srv:%d data:%v\n",
-		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.ServiceID, packet.Data)
+		// fmt.Printf("received packet srv:'%s' dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d data:%v\n",
+		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.Service, packet.Data)
 
 		switch packet.NetState {
 		case NET_ROUTE:
@@ -249,14 +249,14 @@ func (r *Router) AddChannel(channel Channel) {
 			}
 
 		case NET_SERVICE:
-			if address, serviceID, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
-				// fmt.Printf("NET_SERVICE node:%s, service:%d, load:%d\n", address, serviceID, serviceLoad)
+			if address, service, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
+				// fmt.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
 				r.mutex.Lock()
 				defer r.mutex.Unlock()
-				if _, ok := r.serviceLoadMap[serviceID]; !ok {
-					r.serviceLoadMap[serviceID] = NodeLoadMap{}
+				if _, ok := r.serviceLoadMap[service]; !ok {
+					r.serviceLoadMap[service] = NodeLoadMap{}
 				}
-				r.serviceLoadMap[serviceID][address] = NodeLoad{
+				r.serviceLoadMap[service][address] = NodeLoad{
 					Load:     serviceLoad,
 					LastSeen: time.Now().UTC(),
 				}
@@ -265,7 +265,8 @@ func (r *Router) AddChannel(channel Channel) {
 						c.Send(packet)
 					}
 				}
-				if packetList, ok := r.serviceQueue[serviceID]; ok {
+				if packetList, ok := r.serviceQueue[service]; ok {
+					log.Printf("sending %d packet(s) to '%s'", len(packetList), address)
 					if route, ok := r.remoteNodeMap[address]; ok {
 						for _, p := range packetList {
 							p.DestAddr = address
@@ -273,7 +274,7 @@ func (r *Router) AddChannel(channel Channel) {
 							channel.Send(p)
 						}
 					}
-					delete(r.serviceQueue, serviceID)
+					delete(r.serviceQueue, service)
 				}
 			} else {
 				log.Printf("error parsing NET_SERVICE: %s\n", err.Error())
@@ -294,19 +295,19 @@ func (r *Router) AddChannel(channel Channel) {
 	channel.Send(makeNetQueryPacket())
 }
 
-// RegisterService binds a handler to a serviceID and shares the info with neighbors
-func (r *Router) RegisterService(serviceID uint16, onPacket func(*Packet)) {
+// RegisterService binds a handler to a service and shares the info with neighbors
+func (r *Router) RegisterService(service string, onPacket func(*Packet)) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.serviceMap[serviceID] = onPacket
+	r.serviceMap[service] = onPacket
 	go r.ShareNetState()
 }
 
 // UnregisterService releases the handler for a service
-func (r *Router) UnregisterService(serviceID uint16) {
+func (r *Router) UnregisterService(service string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	delete(r.serviceMap, serviceID)
+	delete(r.serviceMap, service)
 }
 
 // ExportRouteTable generates a set of packets that another router can read
@@ -333,14 +334,14 @@ func (r *Router) ExportServiceTable() []*Packet {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	services := []*Packet{}
-	for serviceID, _ := range r.serviceMap {
+	for service, _ := range r.serviceMap {
 		var load uint16 // TODO measure load
-		services = append(services, makeNetworkServiceSharePacket(r.address, serviceID, load))
+		services = append(services, makeNetworkServiceSharePacket(r.address, service, load))
 	}
-	for serviceID, loadMap := range r.serviceLoadMap {
+	for service, loadMap := range r.serviceLoadMap {
 		for address, load := range loadMap { // TODO sort by increasing load (first tx'd is lowest load)
 			// TODO filter expired or unroutable entries
-			services = append(services, makeNetworkServiceSharePacket(address, serviceID, load.Load))
+			services = append(services, makeNetworkServiceSharePacket(address, service, load.Load))
 		}
 	}
 	return services

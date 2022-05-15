@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"sync"
@@ -13,7 +14,6 @@ import (
 func main() {
 	// create first router
 	localAddress := aln.AddressType("client")
-	pingServiceID := uint16(3)
 
 	// setup the second node to connect to the first using TCP
 	router := aln.NewRouter(localAddress)
@@ -29,15 +29,15 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	ctx := router.RegisterContextHandler(func(response *aln.Packet) {
-		fmt.Println(string(response.Data)) // pong!
-		time.Sleep((100))                  // let print statement flush
-		wg.Done()                          // release the application lock
+		log.Printf("'%s' from '%s'", string(response.Data), response.SrcAddr)
+		time.Sleep((100)) // let print statement flush
+		wg.Done()         // release the application lock
 	})
 	defer router.ReleaseContext(ctx)
 
 	fmt.Println("ping") // the journey begins
 	if err := router.Send(&aln.Packet{
-		ServiceID: pingServiceID,
+		Service:   "ping",
 		ContextID: ctx,
 	}); err != nil {
 		fmt.Println(err.Error())

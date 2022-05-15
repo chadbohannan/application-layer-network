@@ -1,4 +1,4 @@
-package example_demo
+package main
 
 import (
 	"fmt"
@@ -14,7 +14,6 @@ func main() {
 	// create first router
 	r1Address := aln.AddressType(1)
 	r2Address := aln.AddressType(2)
-	pingServiceID := uint16(3)
 
 	// setup the first node to host a ping service
 	r1 := aln.NewRouter(r1Address)
@@ -24,7 +23,7 @@ func main() {
 	})
 
 	// create the ping service to send packets back where they came from
-	r1.RegisterService(pingServiceID, func(packet *aln.Packet) {
+	r1.RegisterService("ping", func(packet *aln.Packet) {
 		fmt.Printf("...") // this is the mid-point of the round-trip
 		r1.Send(&aln.Packet{
 			DestAddr:  packet.SrcAddr,
@@ -58,7 +57,7 @@ func main() {
 
 	fmt.Println("ping") // the journey begins
 	r2.Send(&aln.Packet{
-		ServiceID: pingServiceID,
+		Service:   "ping",
 		ContextID: ctx,
 	})
 

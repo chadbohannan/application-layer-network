@@ -27,7 +27,7 @@ const (
 	CF_HAMMING4  = 0x1000
 	CF_HAMMING5  = 0x0800
 	CF_NETSTATE  = 0x0400
-	CF_SERVICEID = 0x0200
+	CF_SERVICE   = 0x0200
 	CF_SRCADDR   = 0x0100
 	CF_DESTADDR  = 0x0080
 	CF_NEXTADDR  = 0x0040
@@ -43,7 +43,7 @@ const (
 const (
 	CF_FIELD_SIZE           = 2   // INT16U
 	NETSTATE_FIELD_SIZE     = 1   // INT08U enumerated
-	SERVICEID_FIELD_SIZE    = 2   // INT16U enumerated
+	SERVICE_FIELD_SIZE_MAX  = 256 // string
 	SRCADDR_FIELD_SIZE_MAX  = 256 // string
 	DESTADDR_FIELD_SIZE_MAX = 256 // string
 	NEXTADDR_FIELD_SIZE_MAX = 256 // string
@@ -59,7 +59,7 @@ const (
 const (
 	MAX_HEADER_SIZE = CF_FIELD_SIZE +
 		NETSTATE_FIELD_SIZE +
-		SERVICEID_FIELD_SIZE +
+		SERVICE_FIELD_SIZE_MAX +
 		SRCADDR_FIELD_SIZE_MAX +
 		DESTADDR_FIELD_SIZE_MAX +
 		NEXTADDR_FIELD_SIZE_MAX +
@@ -82,7 +82,7 @@ const (
 type Packet struct {
 	ControlFlags uint16      `bson:"cf" json:"cf"`
 	NetState     byte        `bson:"net" json:"net,omitempty"`
-	ServiceID    uint16      `bson:"srv" json:"srv,omitempty"`
+	Service      string      `bson:"srv" json:"srv,omitempty"`
 	SrcAddr      AddressType `bson:"src" json:"src,omitempty"`
 	DestAddr     AddressType `bson:"dst" json:"dst,omitempty"`
 	NextAddr     AddressType `bson:"nxt" json:"nxt,omitempty"`
@@ -114,10 +114,12 @@ func ParsePacket(packetBuffer []byte) (*Packet, error) {
 		pkt.NetState = packetBuffer[offset]
 		offset += NETSTATE_FIELD_SIZE
 	}
-	if pkt.ControlFlags&CF_SERVICEID != 0 {
-		seqBytes := packetBuffer[offset : offset+SERVICEID_FIELD_SIZE]
-		pkt.ServiceID = bytesToINT16U(seqBytes)
-		offset += SERVICEID_FIELD_SIZE
+	if pkt.ControlFlags&CF_SERVICE != 0 {
+		srvSize := int(packetBuffer[offset])
+		offset += 1
+		seqBytes := packetBuffer[offset : offset+srvSize]
+		pkt.Service = string(seqBytes)
+		offset += srvSize
 	}
 	if pkt.ControlFlags&CF_SRCADDR != 0 {
 		addrSize := int(packetBuffer[offset])
@@ -180,11 +182,12 @@ func HeaderFieldOffset(controlFlags uint16, field uint16, frame []byte) uint16 {
 	if controlFlags&CF_NETSTATE != 0 {
 		offset += NETSTATE_FIELD_SIZE
 	}
-	if field == CF_SERVICEID {
+	if field == CF_SERVICE {
 		return offset
 	}
-	if controlFlags&CF_SERVICEID != 0 {
-		offset += SERVICEID_FIELD_SIZE
+	if controlFlags&CF_SERVICE != 0 {
+		srvSize := uint16(frame[offset])
+		offset += srvSize
 	}
 	if field == CF_SRCADDR {
 		return offset
@@ -246,8 +249,8 @@ func (p *Packet) SetControlFlags() {
 	if p.NetState != 0 {
 		controlFlags |= CF_NETSTATE
 	}
-	if p.ServiceID != 0 {
-		controlFlags |= CF_SERVICEID
+	if len(p.Service) != 0 {
+		controlFlags |= CF_SERVICE
 	}
 	if len(p.SrcAddr) != 0 {
 		controlFlags |= CF_SRCADDR
@@ -291,8 +294,9 @@ func (p *Packet) ToBytes() ([]byte, error) {
 	if p.ControlFlags&CF_NETSTATE != 0 {
 		buff.Write([]byte{p.NetState})
 	}
-	if p.ControlFlags&CF_SERVICEID != 0 {
-		buff.Write(bytesOfINT16U(p.ServiceID))
+	if p.ControlFlags&CF_SERVICE != 0 {
+		buff.WriteByte(byte(len(p.Service)))
+		buff.Write([]byte(p.Service))
 	}
 	if p.ControlFlags&CF_SRCADDR != 0 {
 		buff.WriteByte(byte(len(p.SrcAddr)))

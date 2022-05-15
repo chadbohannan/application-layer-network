@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"os/signal"
 
@@ -9,7 +10,6 @@ import (
 
 func main() {
 	alnHostAddress := aln.AddressType("host")
-	pingServiceID := uint16(3)
 	router := aln.NewRouter(alnHostAddress)
 	tcpHost := aln.NewTcpChannelHost("localhost", 8181)
 	go tcpHost.Listen(func(newChannel aln.Channel) {
@@ -17,7 +17,8 @@ func main() {
 	})
 
 	// create the ping service to send packets back where they came from
-	router.RegisterService(pingServiceID, func(packet *aln.Packet) {
+	router.RegisterService("ping", func(packet *aln.Packet) {
+		log.Printf("ping from '%s'", packet.SrcAddr)
 		router.Send(&aln.Packet{
 			DestAddr:  packet.SrcAddr,
 			ContextID: packet.ContextID,

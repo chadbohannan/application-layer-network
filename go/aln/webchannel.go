@@ -23,8 +23,8 @@ func NewWebSocketChannel(conn *websocket.Conn) *WebSocketChannel {
 // Send serializes a packet frame through the socket
 func (ch *WebSocketChannel) Send(p *Packet) error {
 	p.DataSize = uint16(len(p.Data))
-	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v sz:%d\n",
-	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data, p.DataSize)
+	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d service:'%s' data:%v sz:%d\n",
+	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.Service, p.Data, p.DataSize)
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()

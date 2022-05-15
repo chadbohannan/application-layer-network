@@ -71,8 +71,8 @@ func (ch *TCPChannel) Send(p *Packet) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d serviceID:%d data:%v\n",
-	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.ServiceID, p.Data)
+	// fmt.Printf("send to %s from %s via:%s net:%d ctxID:%d service:'%s' data:%v\n",
+	// 	p.DestAddr, p.SrcAddr, p.NextAddr, p.NetState, p.ContextID, p.service, p.Data)
 
 	ch.mutex.Lock()
 	defer ch.mutex.Unlock()

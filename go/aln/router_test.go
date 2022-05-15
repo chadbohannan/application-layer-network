@@ -8,13 +8,13 @@ import (
 func TestRoute0Hop(t *testing.T) {
 	packetRecieved := false
 	rtr := NewRouter("1")
-	rtr.RegisterService(0x0001, func(*Packet) {
+	rtr.RegisterService("ping", func(*Packet) {
 		packetRecieved = true
 	})
 
 	pkt := NewPacket()
 	pkt.DestAddr = "1"
-	pkt.ServiceID = 0x0001
+	pkt.Service = "ping"
 	rtr.Send(pkt) // blocking call to local handler
 	if !packetRecieved {
 		t.Fatal("packet not recieved")
@@ -26,7 +26,7 @@ func TestRoute1Hop(t *testing.T) {
 	rtr1 := NewRouter("1")
 	rtr2 := NewRouter("2")
 
-	rtr1.RegisterService(0x0001, func(*Packet) { packetRecieved = true })
+	rtr1.RegisterService("ping", func(*Packet) { packetRecieved = true })
 
 	localChannel := NewLocalChannel()
 	rtr1.AddChannel(localChannel)
@@ -36,7 +36,7 @@ func TestRoute1Hop(t *testing.T) {
 
 	pkt := NewPacket()
 	pkt.DestAddr = "1"
-	pkt.ServiceID = 0x0001
+	pkt.Service = "ping"
 	if err := rtr2.Send(pkt); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestRoute2Hop(t *testing.T) {
 
 	packetRecieved := false
 	rtr1 := NewRouter("1")
-	rtr1.RegisterService(0x0001, func(*Packet) {
+	rtr1.RegisterService("ping", func(*Packet) {
 		packetRecieved = true
 	})
 	rtr2 := NewRouter("2")
@@ -69,7 +69,7 @@ func TestRoute2Hop(t *testing.T) {
 	time.Sleep(10 * time.Millisecond) // allow route and service table to sync
 
 	pkt := NewPacket()
-	pkt.ServiceID = 0x0001
+	pkt.Service = "ping"
 	if err := rtr3.Send(pkt); err != nil {
 		t.Fatal(err)
 	}
