@@ -10,8 +10,6 @@ def main():
     router = Router(sel, "python-host-1") # TODO dynamic address allocation protocol
     router.start()
 
-    # TODO register ping service
-    PING_SERVICE_ID = 1
     def ping_handler(packet):
         print("ping from [{0}]".format(packet.srcAddr))
         router.send(Packet(
@@ -20,7 +18,7 @@ def main():
             data="pong"
         ))
 
-    router.register_service(PING_SERVICE_ID, ping_handler)
+    router.register_service("ping", ping_handler)
 
     def on_connect(tcpChannel, addr):
         print('accepted connection from', addr)

@@ -30,15 +30,16 @@ def parseNetworkRouteSharePacket(packet): # returns dest, next-hop, cost, err
     cost = readINT16U(packet.data[addrSize+1:addrSize+3])
     return addr, packet.srcAddr, cost, None
 
-def makeNetworkServiceSharePacket(hostAddr, serviceID, serviceLoad):
+def makeNetworkServiceSharePacket(hostAddr, service, serviceLoad):
     data = []
     data.extend(byteLen(hostAddr))
     data.extend(bytes(hostAddr, "utf-8"))
-    data.extend(writeINT16U(serviceID))
+    data.extend(byteLen(service))
+    data.extend(bytes(service, "utf-8"))
     data.extend(writeINT16U(serviceLoad))
     return Packet(netState=Packet.NET_SERVICE, data=data)
 
-# returns hostAddr, serviceID, load, error
+# returns hostAddr, service, load, error
 def parseNetworkServiceSharePacket(packet):
     if packet.netState != Packet.NET_SERVICE:
         return (0, 0, 0, "parseNetworkRouteSharePacket: packet.NetState != NET_ROUTE")
@@ -46,14 +47,13 @@ def parseNetworkServiceSharePacket(packet):
     if len(packet.data) < 4:
         return (0, 0, 0, "parseNetworkRouteSharePacket: payload too small")
 
+    # TODO validate message length to avoid seg fault
     addrSize = int(packet.data[0])
-    if len(packet.data) != addrSize+5:
-        return (0, 0, 0, "parseNetworkRouteSharePacket: len(packet.data != " + str(addrSize+5))
-
     hostAddr = bytearray(packet.data[1:addrSize+1]).decode("utf-8")
-    serviceID = readINT16U(packet.data[addrSize+1 : addrSize+3])
-    serviceLoad = readINT16U(packet.data[addrSize+3:])
-    return hostAddr, serviceID, serviceLoad, None
+    srvSize = int(packet.data[addrSize+1])
+    service = bytearray(packet.data[addrSize+2:addrSize+2+srvSize]).decode("utf-8")
+    serviceLoad = readINT16U(packet.data[addrSize+2+srvSize:])
+    return hostAddr, service, serviceLoad, None
 
 class RemoteNode:
     def __init__(self, address, nextHop, cost, channel, lastSeen=datetime.now()):
@@ -73,8 +73,8 @@ class Router(Thread):
         self.contextMap = {}     # serviceHandlerMap
         self.remoteNodeMap = {}  # RemoteNodeMap // map[address]RemoteNodes
         self.serviceMap = {}     # map[address]callback registered local service handlers
-        self.serviceLoadMap = {} # ServiceLoadMap // map[serviceID][address]load (remote services)
-        self.serviceQueue = {}   # map[serviceID]PacketList
+        self.serviceLoadMap = {} # ServiceLoadMap // map[service][address]load (remote services)
+        self.serviceQueue = {}   # map[service]PacketList
         self.stop = False
         self.daemon = True
 
@@ -120,30 +120,30 @@ class Router(Thread):
                             if chan is not channel:
                                 chan.send(p)
         elif packet.netState == Packet.NET_SERVICE: # neighbor is sharing service load info
-            address, serviceID, serviceLoad, err = parseNetworkServiceSharePacket(packet)
+            address, service, serviceLoad, err = parseNetworkServiceSharePacket(packet)
             if err is not None:
                 print("error parsing NET_SERVICE: {0}", err)
             else:
-                # print("NET_SERVICE node:{0}, service:{1}, load:{2}".format(address, serviceID, serviceLoad))
-                if serviceID not in self.serviceLoadMap:
-                    self.serviceLoadMap[serviceID] = {}
-                self.serviceLoadMap[serviceID][address] = serviceLoad
+                print("NET_SERVICE node:{0}, service:{1}, load:{2}".format(address, service, serviceLoad))
+                if service not in self.serviceLoadMap:
+                    self.serviceLoadMap[service] = {}
+                self.serviceLoadMap[service][address] = serviceLoad
                 # first priority is to share the updates with neighbors
                 for chan in self.channels:
                     if chan is not channel:
                         chan.send(packet)
                 # second priority is to send queued packets waiting on service discovery
-                if serviceID in self.serviceQueue:
-                    for packet in self.serviceQueue[serviceID]:
+                if service in self.serviceQueue:
+                    for packet in self.serviceQueue[service]:
                         if address in self.remoteNodeMap:
                             packet.destAddr = address
                             packet.nextAddr = self.remoteNodeMap[address].nextHop
-                            # print("sending queued packet for serviceID {0} to host:{1} via:{2}".format(
-                            #     serviceID, packet.destAddr, packet.nextAddr))
+                            print("sending queued packet for service {0} to host:{1} via:{2}".format(
+                                service, packet.destAddr, packet.nextAddr))
                             channel.send(packet)
                         else:
-                            print("NET ERROR no route for advertised service: ", serviceID)
-                    del(self.serviceQueue, serviceID)
+                            print("NET ERROR no route for advertised service: ", service)
+                    del(self.serviceQueue, service)
         elif packet.netState == Packet.NET_QUERY:     
             for routePacket in self.export_routes():
                 channel.send(routePacket)
@@ -158,13 +158,14 @@ class Router(Thread):
             self.send(packet)
 
     def remove_channel(self, channel):
+        print("channel disconnected")
         with self.lock:
             self.channels.remove(channel)
             delete = [addr for addr in self.remoteNodeMap if self.remoteNodeMap[addr].channel == channel]
             for addr in delete:
                 del self.remoteNodeMap[addr]
                 for ch in self.channels:
-                    ch.send(makeNetworkRouteSharePacket(self.address, address, 0))
+                    ch.send(makeNetworkRouteSharePacket(self.address, addr, 0))
 
     def add_channel(self, channel):
         channel.on_close = self.remove_channel
@@ -177,28 +178,28 @@ class Router(Thread):
         if packet.srcAddr == None:
             packet.srcAddr = self.address
 
-        # print("send from {0} to {1} via {2}, serviceID:{3}, ctxID:{4}, datalen:{5}".format(
-        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.serviceID, packet.contextID, len(packet.data))
+        # print("send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}".format(
+        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data))
         # )
 
         packetHandler = None
         with self.lock:
-            if packet.destAddr is None and packet.serviceID is not None:
-                packet.destAddr = self.select_service(packet.serviceID)
+            if packet.destAddr is None and packet.service is not None:
+                packet.destAddr = self.select_service(packet.service)
                 if not packet.destAddr:
-                    if packet.serviceID in self.serviceQueue:
-                        self.serviceQueue[packet.serviceID].append(packet)
+                    if packet.service in self.serviceQueue:
+                        self.serviceQueue[packet.service].append(packet)
                     else:
-                        self.serviceQueue[packet.serviceID] = [packet]
-                        return "service {0} unavailable, packet queued".format(packet.serviceID)
+                        self.serviceQueue[packet.service] = [packet]
+                        return "service {0} unavailable, packet queued".format(packet.service)
             
-            if packet.destAddr is self.address:
-                if packet.serviceID in self.serviceMap:
-                    packetHandler = self.serviceMap[packet.serviceID]
+            if packet.destAddr == self.address:
+                if packet.service in self.serviceMap:
+                    packetHandler = self.serviceMap[packet.service]
                 elif packet.contextID in self.contextMap:
                     packetHandler = self.contextMap[packet.contextID]
                 else:
-                    return ("send err, service:" + packet.serviceID + " context:"+ packet.contextID + " not registered")
+                    return ("send err, service:" + packet.service + " context:"+ packet.contextID + " not registered")
 
             elif packet.nextAddr == self.address or packet.nextAddr == None:
                 if packet.destAddr in self.remoteNodeMap:
@@ -226,25 +227,25 @@ class Router(Thread):
         with self.lock:
             self.contextMap.pop(ctxID, None)
 
-    def register_service(self, serviceID, handler):
+    def register_service(self, service, handler):
         with self.lock:
-            self.serviceMap[serviceID] = handler
+            self.serviceMap[service] = handler
 
-    def unregister_service(self, serviceID):
+    def unregister_service(self, service):
         with self.lock:
-            self.serviceMap.pol(serviceID, None)
+            self.serviceMap.pol(service, None)
 
-    def select_service(self, serviceID):
+    def select_service(self, service):
         # return the address of service with lowest reported load or None
-        if serviceID in self.serviceMap:
+        if service in self.serviceMap:
             return self.address
 
         minLoad = 0
         remoteAddress = None
-        if serviceID in self.serviceLoadMap: 
-            for addr in self.serviceLoadMap[serviceID]:
-                if remoteAddress is None or self.serviceLoadMap[serviceID][addr] < minLoad:
-                    minLoad = self.serviceLoadMap[serviceID][addr]
+        if service in self.serviceLoadMap: 
+            for addr in self.serviceLoadMap[service]:
+                if remoteAddress is None or self.serviceLoadMap[service][addr] < minLoad:
+                    minLoad = self.serviceLoadMap[service][addr]
                     remoteAddress = addr
         return remoteAddress
 
@@ -262,15 +263,15 @@ class Router(Thread):
     def export_services(self):
         # compose a list of packets encoding the service table of this node
         services = []
-        for serviceID in self.serviceMap:
+        for service in self.serviceMap:
             load = 0 # TODO measure load
-            services.append(makeNetworkServiceSharePacket(self.address, serviceID, load))
-        for serviceID in self.serviceLoadMap:
-            loadMap = self.serviceLoadMap[serviceID]
+            services.append(makeNetworkServiceSharePacket(self.address, service, load))
+        for service in self.serviceLoadMap:
+            loadMap = self.serviceLoadMap[service]
             for remoteAddress in self.loadMap: # TODO sort by increasing load (first tx'd is lowest load)
                 load = self.loadMap[remoteAddress]
                 # TODO filter expired or unroutable entries
-                services.append(makeNetworkServiceSharePacket(remoteAddress, serviceID, load))
+                services.append(makeNetworkServiceSharePacket(remoteAddress, service, load))
         return services
 
     def share_net_state(self):

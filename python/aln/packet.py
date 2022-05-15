@@ -1,4 +1,4 @@
-import json
+import base64, json
 from .frame import toAX25FrameBytes
 
 # Packet class can compose and decompose packets for frame-link transit
@@ -110,7 +110,7 @@ class Packet:
 
     # Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
     CF_NETSTATE = 0x0400
-    CF_SERVICEID = 0x0200
+    CF_SERVICE = 0x0200
     CF_SRCADDR = 0x0100
     CF_DESTADDR = 0x0080
     CF_NEXTADDR = 0x0040
@@ -124,7 +124,7 @@ class Packet:
     # Packet header field sizes
     CF_FIELD_SIZE = 2  # INT16U
     NETSTATE_FIELD_SIZE = 1  # INT08U enumerated
-    SERVICEID_FIELD_SIZE = 2  # INT16U
+    SERVICE_FIELD_SIZE_MAX = 256
     SRCADDR_FIELD_SIZE_MAX = 256
     DESTADDR_FIELD_SIZE_MAX = 256
     NEXTADDR_FIELD_SIZE_MAX = 256
@@ -137,7 +137,7 @@ class Packet:
 
     MAX_HEADER_SIZE = CF_FIELD_SIZE + \
         NETSTATE_FIELD_SIZE + \
-        SERVICEID_FIELD_SIZE + \
+        SERVICE_FIELD_SIZE_MAX + \
         SRCADDR_FIELD_SIZE_MAX + \
         DESTADDR_FIELD_SIZE_MAX + \
         NEXTADDR_FIELD_SIZE_MAX + \
@@ -158,7 +158,7 @@ class Packet:
     def __init__(self,
         body=None,
         netState=None,
-        serviceID=None,
+        service=None,
         srcAddr=None,
         destAddr=None,
         nextAddr=None,
@@ -171,7 +171,7 @@ class Packet:
         # initialize fields 
         self.controlFlags = 0x0000
         self.netState = netState
-        self.serviceID = serviceID
+        self.service = service
         self.srcAddr = srcAddr
         self.destAddr = destAddr
         self.nextAddr = nextAddr
@@ -190,8 +190,8 @@ class Packet:
         len = 2  # length of controlFlags
         if(controlFlags & Packet.CF_NETSTATE):
             len += Packet.NETSTATE_FIELD_SIZE
-        if(controlFlags & Packet.CF_SERVICEID):
-            len += Packet.SERVICEID_FIELD_SIZE
+        if(controlFlags & Packet.CF_SERVICE):
+            len += buffer[len]
         if(controlFlags & Packet.CF_SRCADDR):
             len += buffer[len]
         if(controlFlags & Packet.CF_DESTADDR):
@@ -219,10 +219,10 @@ class Packet:
         if (controlFlags & Packet.CF_NETSTATE):
             offset += Packet.NETSTATE_FIELD_SIZE
 
-        if (field == Packet.CF_SERVICEID):
+        if (field == Packet.CF_SERVICE):
             return offset
-        if (controlFlags & Packet.CF_SERVICEID):
-            offset += Packet.SERVICEID_FIELD_SIZE
+        if (controlFlags & Packet.CF_SERVICE):
+            offset += buffer[offset]
 
         if (field == Packet.CF_SRCADDR):
             return offset
@@ -280,8 +280,8 @@ class Packet:
         self.controlFlags = 0  # Packet.CF_CRC
         if (self.netState):
             self.controlFlags |= Packet.CF_NETSTATE
-        if (self.serviceID):
-            self.controlFlags |= Packet.CF_SERVICEID
+        if (self.service):
+            self.controlFlags |= Packet.CF_SERVICE
         if (self.srcAddr):
             self.controlFlags |= Packet.CF_SRCADDR
         if (self.destAddr):
@@ -308,8 +308,9 @@ class Packet:
         if (self.controlFlags & Packet.CF_NETSTATE):
             packetBuffer.append(self.netState)
 
-        if (self.controlFlags & Packet.CF_SERVICEID):
-            packetBuffer.extend(writeINT16U(self.serviceID))
+        if (self.controlFlags & Packet.CF_SERVICE):
+            packetBuffer.extend(len(self.service).to_bytes(1, 'big'))
+            packetBuffer.extend(bytearray(self.service, "utf-8"))
 
         if (self.controlFlags & Packet.CF_SRCADDR):
             packetBuffer.extend(len(self.srcAddr).to_bytes(1, 'big'))
@@ -361,10 +362,12 @@ class Packet:
             self.netState = packetBuffer[offset]
             offset += Packet.NETSTATE_FIELD_SIZE  # 1
 
-        if(self.controlFlags & Packet.CF_SERVICEID):
-            srvBytes = packetBuffer[offset:offset+Packet.SERVICEID_FIELD_SIZE]
-            self.serviceID = readINT16U(srvBytes)
-            offset += Packet.SERVICEID_FIELD_SIZE
+        if(self.controlFlags & Packet.CF_SERVICE):
+            srvSize = int(packetBuffer[offset])
+            offset += 1
+            value = packetBuffer[offset:offset+srvSize]
+            self.service = bytearray(value).decode("utf-8")
+            offset += srvSize
 
         if(self.controlFlags & Packet.CF_SRCADDR):
             addrSize = int(packetBuffer[offset])
@@ -428,7 +431,7 @@ class Packet:
         if "net" in obj:
             p.netState = obj["net"]
         if "srv" in obj:
-            p.netState = obj["srv"]
+            p.service = obj["srv"]
         if "src" in obj:
             p.srcAddr = obj["src"]
         if "dst" in obj:
@@ -453,7 +456,7 @@ class Packet:
         return {
             "cf": self.controlFlags,
             "net": self.netState,
-            "srv": self.serviceID,
+            "srv": self.service,
             "src": self.srcAddr,
             "dst": self.destAddr,
             "nxt": self.nextAddr,
@@ -461,8 +464,9 @@ class Packet:
             "ack": self.ackBlock,
             "ctx": self.contextID,
             "typ": self.dataType,
-            "data": self.data,
+            "data": base64.b64encode(bytes(self.data)).decode('utf-8'),
         }
 
     def toJsonString(self):
-        return json.dumps(self.toJsonStruct(), indent=" ")
+        struct = self.toJsonStruct()
+        return json.dumps(struct, indent=" ")
