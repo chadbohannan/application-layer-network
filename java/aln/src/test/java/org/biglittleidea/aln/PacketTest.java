@@ -14,8 +14,8 @@ class PacketTest {
     @Test
     void testPacketBuffer() {
         Packet packet = new Packet();
-        packet.NetState = 1;
-        packet.SerivceID = 2;
+        packet.Net = 1;
+        packet.Service = "2";
         packet.SourceAddress = "3";
         packet.DestAddress = "4";
         packet.NextAddress = "5";

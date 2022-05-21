@@ -33,9 +33,9 @@ public class TcpChannel implements IChannel {
             int buffSize = 4096;
             ByteBuffer[] buffer = new ByteBuffer[]{ByteBuffer.allocate(buffSize)};
             try {                
-                int offset = 0;
                 long timeout = 500;
-                CompletionHandler completionHandler = new CompletionHandler<Long,Integer>(){
+                CompletionHandler<Long,Integer> completionHandler = 
+                new CompletionHandler<Long,Integer>(){
                     public void completed(Long result, Integer a){
                         long num = result.longValue();
                         if (num < 0) { // number of bytes read

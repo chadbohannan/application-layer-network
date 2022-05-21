@@ -65,7 +65,7 @@ public class Packet {
 
     public class ControlFlag {
         public static final int netState  = 0x0400;
-        public static final int serviceID = 0x0200;
+        public static final int service   = 0x0200;
         public static final int scrAddr   = 0x0100;
         public static final int destAddr  = 0x0080;
         public static final int nextAddr  = 0x0040;
@@ -77,14 +77,14 @@ public class Packet {
         public static final int crc      = 0x0001;
     }
 
-    public class NetState {
+    public static class NetState {
         public static final byte ROUTE   = 0x01; // packet contains route entry
         public static final byte SERVICE = 0x02; // packet contains service entry
         public static final byte QUERY   = 0x03; // packet is a request for content
     }
     
-    public byte NetState;
-    public short SerivceID;
+    public byte Net;
+    public String Service;
     public String SourceAddress;
     public String DestAddress;
     public String NextAddress;
@@ -98,8 +98,8 @@ public class Packet {
     public Packet() { }
 
     public Packet(Packet p) {
-        NetState = p.NetState;
-        SerivceID = p.SerivceID;
+        Net = p.Net;
+        Service = p.Service;
         SourceAddress = p.SourceAddress;
         DestAddress = p.DestAddress;
         NextAddress = p.NextAddress;
@@ -147,7 +147,7 @@ public class Packet {
     public static int headerLength(short controlFlags, byte[] buffer) {
         int len = 2; // control flag bytes
         if ((controlFlags & ControlFlag.netState) != 0) len += 1;
-        if ((controlFlags & ControlFlag.serviceID) != 0) len += 2;
+        if ((controlFlags & ControlFlag.service) != 0) len += 2;
         if ((controlFlags & ControlFlag.scrAddr) != 0) len += 1 + buffer[len];
         if ((controlFlags & ControlFlag.destAddr) != 0) len += 1 + buffer[len];
         if ((controlFlags & ControlFlag.nextAddr) != 0) len += 1 + buffer[len];
@@ -163,12 +163,15 @@ public class Packet {
         short controlFlags = readUINT16(pData, 0);
         int offset = 2;
         if ((controlFlags & ControlFlag.netState) != 0) {
-            NetState = pData[offset];
+            Net = pData[offset];
             offset += 1;
         }
-        if ((controlFlags & ControlFlag.serviceID) != 0) {
-            SerivceID = readUINT16(pData, offset);
-            offset += 2;
+        if ((controlFlags & ControlFlag.service) != 0) {
+            int srvSize = pData[offset];
+            offset += 1;
+            byte[] srvBuf = Arrays.copyOfRange(pData, offset, offset+srvSize);
+            offset += srvSize;
+            Service = new String(srvBuf);
         }
         if ((controlFlags & ControlFlag.scrAddr) != 0) {
             int addrSize = pData[offset];
@@ -229,7 +232,7 @@ public class Packet {
     }
 
     public void clear() {
-        NetState = 0;
+        Net = 0;
         SourceAddress = null;
         DestAddress = null;
         NextAddress = null;
@@ -241,8 +244,8 @@ public class Packet {
     // returns the hamming encoded Control Field
     public short ControlField() {
         short controlField = 0;
-        if (NetState != 0) controlField |= ControlFlag.netState;
-        if (SerivceID != 0) controlField |= ControlFlag.serviceID;
+        if (Net != 0) controlField |= ControlFlag.netState;
+        if (Service != null) controlField |= ControlFlag.service;
         if (SourceAddress != null) controlField |= ControlFlag.scrAddr;
         if (DestAddress != null) controlField |= ControlFlag.destAddr;
         if (NextAddress != null) controlField |= ControlFlag.nextAddr;
@@ -274,10 +277,12 @@ public class Packet {
         int controlField = ControlField();
         buffer.put(writeUINT16(controlField));
         if ((controlField & ControlFlag.netState) != 0) {
-            buffer.put(NetState);
+            buffer.put(Net);
         }
-        if ((controlField & ControlFlag.serviceID) != 0) {
-            buffer.put(writeUINT16(SerivceID));
+        if ((controlField & ControlFlag.service) != 0) {
+            byte[] service = Service.getBytes();
+            buffer.put((byte)service.length);
+            buffer.put(service);
         }
         if ((controlField & ControlFlag.scrAddr) != 0) {
             byte[] srcAddr = SourceAddress.getBytes();
@@ -327,9 +332,9 @@ public class Packet {
         byte[] cf = writeUINT16(controlField);
         String s = String.format("cf:0x%02x%02x,", cf[0], cf[1]);
         if ((controlField & ControlFlag.netState) != 0)
-            s += String.format("net:%d,", NetState);
-        if ((controlField & ControlFlag.serviceID) != 0)
-            s += String.format("srv:%d,", SerivceID);
+            s += String.format("net:%d,", Net);
+        if ((controlField & ControlFlag.service) != 0)
+            s += String.format("srv:%s,", Service);
         if ((controlField & ControlFlag.scrAddr) != 0)
             s += String.format("src:%s,", SourceAddress);
         if ((controlField & ControlFlag.destAddr) != 0)

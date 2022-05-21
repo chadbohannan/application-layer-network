@@ -131,9 +131,9 @@ func (r *Router) Send(p *Packet) error {
 func (r *Router) RegisterContextHandler(packetHandler func(*Packet)) uint16 {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	ctxID := uint16(rand.Intn(2<<15 + 1))
+	ctxID := uint16(rand.Intn(2 << 16))
 	for _, ok := r.contextMap[ctxID]; ok; {
-		ctxID = uint16(rand.Intn(2<<15 + 1))
+		ctxID = uint16(rand.Intn(2 << 16))
 	}
 	r.contextMap[ctxID] = packetHandler
 	return ctxID
@@ -334,7 +334,7 @@ func (r *Router) ExportServiceTable() []*Packet {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	services := []*Packet{}
-	for service, _ := range r.serviceMap {
+	for service := range r.serviceMap {
 		var load uint16 // TODO measure load
 		services = append(services, makeNetworkServiceSharePacket(r.address, service, load))
 	}
