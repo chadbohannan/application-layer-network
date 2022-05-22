@@ -101,7 +101,7 @@ public class Router {
             }   
         }
 
-        if (p.DestAddress == this.address) {
+        if (p.DestAddress.equals(this.address)) {
             IPacketHandler handler;
             if (this.serviceHandlerMap.containsKey(p.Service)) {
                 handler = this.serviceHandlerMap.get(p.Service);
@@ -110,15 +110,13 @@ public class Router {
                 handler = this.contextHandlerMap.get(p.ContextID);
                 handler.onPacket(p);
             } else {
-                return System.out.printf("service '%s' not registered", p.Service).toString();
+                return System.out.printf("service '%s' not registered\n", p.Service).toString();
             }
-        } else if (p.NextAddress == this.address || p.NextAddress == null || p.NextAddress.length() == 0) {
+        } else if (p.NextAddress == null || p.NextAddress.equals(this.address) || p.NextAddress.length() == 0) {
             if (this.remoteNodeMap.containsKey(p.DestAddress)) {
                 RemoteNodeInfo rni = this.remoteNodeMap.get(p.DestAddress);
                 p.NextAddress = rni.nextHop;
                 rni.channel.send(p);
-            }else {
-                return System.out.printf("packet queued for delayed send t %s", p.DestAddress).toString();
             }
         } else {
             return "packet is unroutable; no action taken";
@@ -141,15 +139,15 @@ public class Router {
         }
     }
 
-    protected Packet composeNetRouteShare(RemoteNodeInfo info) {
+    protected Packet composeNetRouteShare(String address, short cost) {
         Packet p = new Packet();
         p.Net = Packet.NetState.ROUTE;
         p.SourceAddress = this.address;
-        p.Data = new byte[info.address.length()+3];
+        p.Data = new byte[address.length()+3];
         ByteBuffer buffer = ByteBuffer.allocate(Frame.BufferSize);
-        buffer.put((byte)info.address.length());
-        buffer.put(info.address.getBytes());
-        buffer.put(Packet.writeUINT16(info.cost));
+        buffer.put((byte)address.length());
+        buffer.put(address.getBytes());
+        buffer.put(Packet.writeUINT16(cost));
         buffer.rewind();
         buffer.get(p.Data);
         return p;
@@ -226,100 +224,128 @@ public class Router {
           return info;
     }
 
-    protected void handleNetState(Packet packet) {
-        switch (packet.NetState) {
-        case NET_ROUTE:
+    protected Packet composeNetQuery() {
+        Packet p = new Packet();
+        p.Net = Packet.NetState.QUERY;
+        return p;
+    }
+
+    protected void handleNetState(IChannel channel, Packet packet) {
+        switch (packet.Net) {
+        case Packet.NetState.ROUTE:
+            System.out.printf("router '%s' recv'd ROUTE update\n", address);
             // neighbor is sharing it's routing table
             RemoteNodeInfo info = parseNetRouteShare(packet);
             if (info.err != null) {
                 System.out.println(info.err);
                 return;
             }
-            synchronized(this){
-                // msg := "NET_ROUTE [%s] remoteAddress:%s, nextHop:%s, cost:%d\n"
-                // log.Printf(msg, r.address, remoteAddress, nextHop, cost)
-                if (info.cost == 0) { // zero cost routes are removed
-                    if (info.address == this.address) { // fight the lie
+
+            // msg := "NET_ROUTE [%s] remoteAddress:%s, nextHop:%s, cost:%d\n"
+            // log.Printf(msg, r.address, remoteAddress, nextHop, cost)
+            if (info.cost == 0) { // zero cost routes are removed
+                if (info.address.equals(this.address)) {
+                    // fight the lie
+                    try {
                         Thread.sleep(500);
-                        this.shareNetState();
-                        return;
-                    } 
-
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    this.shareNetState();
+                    return;
+                } else if (this.remoteNodeMap.containsKey(info.address)) {
                     // remove the route
-                    if (this.remoteNodeMap.containsKey(info.address)) {
-                        RemoteNodeInfo localInfo = remoteNodeMap.get(info.address);
-                        removeAddress(info.address);
-                        for(IChannel ch : channels) {
-                            if (ch != localInfo.channel) {
-                                ch.send(packet);
-                            }
-                        }
-                    }
-                } else {
-                    // add or update a route
-                    var ok bool
-                    var remoteNode *RemoteNodeInfo
-                    if remoteNode, ok = r.remoteNodeMap[remoteAddress]; !ok {
-                        remoteNode = &RemoteNodeInfo{
-                            Address: remoteAddress,
-                        }
-                        r.remoteNodeMap[remoteAddress] = remoteNode
-                    }
-                    remoteNode.LastSeen = time.Now().UTC()
-                    if cost < remoteNode.Cost || remoteNode.Cost == 0 {
-                        remoteNode.NextHop = nextHop
-                        remoteNode.Channel = channel
-                        remoteNode.Cost = cost
-                        // relay update to other channels
-                        p := makeNetworkRouteSharePacket(r.address, remoteAddress, cost+1)
-                        for _, c := range r.channels {
-                            if c != channel {
-                                c.Send(p)
-                            }
-                        }
-                    }
-                }
-            }
 
-        case NET_SERVICE:
-            if address, service, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
-                // fmt.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
-                r.mutex.Lock()
-                defer r.mutex.Unlock()
-                if _, ok := r.serviceLoadMap[service]; !ok {
-                    r.serviceLoadMap[service] = NodeLoadMap{}
-                }
-                r.serviceLoadMap[service][address] = NodeLoad{
-                    Load:     serviceLoad,
-                    LastSeen: time.Now().UTC(),
-                }
-                for _, c := range r.channels {
-                    if c != channel {
-                        c.Send(packet)
-                    }
-                }
-                if packetList, ok := r.serviceQueue[service]; ok {
-                    log.Printf("sending %d packet(s) to '%s'", len(packetList), address)
-                    if route, ok := r.remoteNodeMap[address]; ok {
-                        for _, p := range packetList {
-                            p.DestAddr = address
-                            p.NextAddr = route.NextHop
-                            channel.Send(p)
+                    RemoteNodeInfo localInfo = remoteNodeMap.get(info.address);
+                    removeAddress(info.address);
+                    for(IChannel ch : channels) {
+                        if (ch != localInfo.channel) {
+                            ch.send(packet);
                         }
                     }
-                    delete(r.serviceQueue, service)
                 }
             } else {
-                log.Printf("error parsing NET_SERVICE: %s\n", err.Error())
+                // add or update a route
+                RemoteNodeInfo localInfo;
+                synchronized(this) {
+                    if (remoteNodeMap.containsKey(info.address)) {
+                        localInfo = remoteNodeMap.get(info.address);
+                    } else {
+                        localInfo = new RemoteNodeInfo();
+                        localInfo.address = info.address;
+                        remoteNodeMap.put(info.address, localInfo);
+                    }
+                }
+                localInfo.lastSeen = new Date();
+                if (info.cost < localInfo.cost || localInfo.cost == 0) {
+                    localInfo.channel = channel;
+                    localInfo.cost = info.cost;
+                    localInfo.nextHop = info.nextHop;
+                    Packet p = composeNetRouteShare(info.address, ++info.cost);
+                    for(IChannel ch : channels) {
+                        if (ch != channel) {
+                            ch.send(p);
+                        }
+                    }
+                }
             }
+            
+            break;
 
-        case NET_QUERY:
-            for _, routePacket := range r.ExportRouteTable() {
-                channel.Send(routePacket)
+        case Packet.NetState.SERVICE:
+        System.out.printf("router '%s' recv'd SERVICE update\n", address);
+            ServiceNodeInfo serviceInfo = parseNetServiceShare(packet);
+            if (serviceInfo.err != null) {
+                System.out.printf("error parsing net service: %s\n", serviceInfo.err);
+                return;
             }
-            for _, servicePacket := range r.ExportServiceTable() {
-                channel.Send(servicePacket)
+            synchronized(this) {
+                NodeLoad nodeLoad = new NodeLoad();
+                nodeLoad.Load = serviceInfo.load;
+                nodeLoad.lastSeen = new Date();
+                HashMap<String, NodeLoad> loadMap;
+                if (!serviceLoadMap.containsKey(serviceInfo.service)) {
+                    loadMap = new HashMap<>();
+                    serviceLoadMap.put(serviceInfo.service, loadMap);
+                } else {
+                    loadMap = serviceLoadMap.get(serviceInfo.service);       
+                    if (loadMap.containsKey(serviceInfo.address) &&
+                        loadMap.get(serviceInfo.address).Load == nodeLoad.Load) {
+                        return; // drop redunant packet to avoid propagation loops
+                    }
+                }
+
+                loadMap.put(serviceInfo.address, nodeLoad);
+
+                if (serviceQueue.containsKey(serviceInfo.service)) {
+                    ArrayList<Packet> sq = serviceQueue.get(serviceInfo.service);
+                    System.out.printf("sending %d packet(s) to '%s'\n", sq.size(), serviceInfo.address);
+                    if (remoteNodeMap.containsKey(serviceInfo.address)) {
+                        RemoteNodeInfo routeInfo = remoteNodeMap.get(serviceInfo.address);
+                        for (Packet p : sq) {
+                            p.DestAddress = serviceInfo.address;
+                            p.NextAddress = routeInfo.nextHop;
+                            routeInfo.channel.send(p);
+                        }
+                        serviceQueue.remove(serviceInfo.service);
+                    } else {
+                        System.out.printf("no route to discovered service %s\n",serviceInfo.service);
+                    }
+                }
             }
+            // forward the service load
+            for (IChannel ch: channels) {
+                if (ch != channel) {
+                    ch.send(packet);
+                }
+            }
+            break;
+
+        case Packet.NetState.QUERY:
+        System.out.printf("router '%s' recv'd QUERY\n", address);
+            for (Packet p : exportRouteTable()) channel.send(p);
+            for (Packet p : exportServiceTable()) channel.send(p);
+            break;
         }
     }
 
@@ -331,43 +357,109 @@ public class Router {
         channel.receive(new IPacketHandler(){
             @Override
             public void onPacket(Packet packet) {
-                // TODO Auto-generated method stub
                 if (packet.Net != 0) {
-                    handleNetState(packet);
+                    handleNetState(channel, packet);
                 } else {
                     send(packet);
                 }
             }
         }, new IChannelCloseHandler(){
             @Override
-            public void onChannelClosed(IChannel c) {
-                // TODO Auto-generated method stub        
+            public void onChannelClosed(IChannel ch) {
+                removeChannel(ch);     
             }
         });
-        // channel.Send(makeNetQueryPacket()) // TODO send a query on the new connection
+        System.out.printf("router '%s' sending QUERY\n", address);
+        
+        channel.send(composeNetQuery()); // immediately query the new connection
     }
 
-    public void removeChannel(IChannel ch) { }
-
-    protected void removeAddress(String address) { }
-
-    public void registerService(String service, IPacketHandler handler) { }
-
-    public void unregisterService(String service) { }
-
-    public ArrayList<Packet> exportRouteTable() {
-        return null;
+    public void removeChannel(IChannel ch) {
+        System.out.println("router:RemoveChannel");
+        synchronized(this) {
+            channels.remove(ch);
+            // bcast the loss of routes through the channel
+            for (String address : remoteNodeMap.keySet()) {
+                System.out.printf("router:RemoveChannel address '%s'\n", address);
+                RemoteNodeInfo nodeInfo = remoteNodeMap.get(address);
+                if (nodeInfo.channel == ch) {
+                    removeAddress(address);
+                    for (IChannel c : channels) {
+                        c.send(composeNetRouteShare(address, (short)0));
+                    }
+                }
+            }
+        }
     }
 
-    public int numChannels() {
-        return 0;
+    protected void removeAddress(String address) {
+        synchronized(this) {
+            remoteNodeMap.remove(address);
+            for (HashMap<String, NodeLoad> nlm : serviceLoadMap.values()) {
+                nlm.remove(address);
+            }
+        }
     }
 
-    public ArrayList<Packet> exportServiceTable() {
-        return null;
+    public void registerService(String service, IPacketHandler handler) {
+        synchronized(this) {
+            serviceHandlerMap.put(service, handler);
+        }        
+    }
+
+    public void unregisterService(String service) {
+        synchronized(this) {
+            serviceHandlerMap.remove(service);
+        }
+    }
+
+    public Packet[] exportRouteTable() {
+        Packet[] routes = new Packet[remoteNodeMap.size()+1];
+        int i = 0;
+        routes[i++] = composeNetRouteShare(address, (short)1);
+        for (String address : remoteNodeMap.keySet()) {
+            RemoteNodeInfo routeInfo =  remoteNodeMap.get(address);
+            routes[i++] = composeNetRouteShare(address, (short)(routeInfo.cost+1));
+        }
+        return routes;
+    }
+
+    public Packet[] exportServiceTable() {
+        int sz = serviceHandlerMap.size();
+        for (HashMap<String,NodeLoad> loadMap : serviceLoadMap.values()) {
+            sz += loadMap.size();
+        }
+        Packet[] services = new Packet[sz];
+        int i = 0;
+        for (String service : serviceHandlerMap.keySet()) {
+            services[i++] = composeNetServiceShare(this.address, service, (short)0);
+        }
+        for (String service : serviceLoadMap.keySet()) {
+            HashMap<String,NodeLoad> loadMap = serviceLoadMap.get(service);
+            for ( String address : loadMap.keySet()) {
+                NodeLoad loadInfo = loadMap.get(address);
+                services[i++] = composeNetServiceShare(address, service, loadInfo.Load);
+            }
+        }
+        return services;
     }
 
     public void shareNetState() {
-        // TODO
+        Packet[] routes, services;
+        synchronized(this){
+            routes = exportRouteTable();
+            services = exportServiceTable();
+        }
+        for (IChannel ch : channels) {
+            for (Packet p : routes) ch.send(p);
+            for (Packet p : services) ch.send(p);
+        }    
     }
+
+    public int numChannels() {
+        synchronized(this) {
+            return channels.size();
+        }
+    }
+
 }

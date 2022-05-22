@@ -1,8 +1,13 @@
 package org.biglittleidea.aln;
 
+import java.util.ArrayList;
+
 public class LocalChannel implements IChannel {
+    ArrayList<Packet> queue = new ArrayList<Packet>();
     IPacketHandler packetHandler = new IPacketHandler() {
-        public void onPacket(Packet packet) { }
+        public void onPacket(Packet packet) {
+            queue.add(packet);
+        }
     };
 
     LocalChannel loopBack;
@@ -24,6 +29,11 @@ public class LocalChannel implements IChannel {
 
     public void receive(IPacketHandler packetHandler, IChannelCloseHandler closeHandler) {
         this.packetHandler = packetHandler;
+        if (queue.size() > 0) {
+            for (Packet p : queue)
+                packetHandler.onPacket(p);
+            queue.clear();
+        }
     }
 
     public void close() {

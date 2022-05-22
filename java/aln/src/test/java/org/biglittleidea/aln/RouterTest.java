@@ -18,8 +18,6 @@ class RouterTest {
 
         Router router1 = new Router("r1");
         Router router2 = new Router("r2");
-        router1.addChannel(lc);
-        router2.addChannel(lb);
         
         Semaphore lock = new Semaphore(1);
         lock.tryAcquire();
@@ -30,6 +28,9 @@ class RouterTest {
                 recvdPkt[0] = p;                
                 lock.release();
             }});
+
+        router1.addChannel(lc);
+        router2.addChannel(lb);
         
         Packet packet = new Packet();
         packet.Service = "test";
@@ -49,14 +50,13 @@ class RouterTest {
     @Test
     void testNetShareParser() {
         Router r = new Router("node-a");
-        Router.RemoteNodeInfo info = r.new RemoteNodeInfo();
-        info.address = "node-b";
-        info.cost = 3;
-        Packet packet = r.composeNetRouteShare(info);
+        String address = "node-b";
+        short cost = 3;
+        Packet packet = r.composeNetRouteShare(address, cost);
         Router.RemoteNodeInfo parsedInfo = r.parseNetRouteShare(packet);
         assertNull(parsedInfo.err);
-        assertEquals(info.address, parsedInfo.address);
-        assertEquals(info.cost, parsedInfo.cost);
+        assertEquals(address, parsedInfo.address);
+        assertEquals(cost, parsedInfo.cost);
         assertEquals(r.address, parsedInfo.nextHop);
     }
 
@@ -71,4 +71,5 @@ class RouterTest {
         assertEquals("ping", parsedInfo.service);
         assertEquals((short)2, parsedInfo.load);
     }
+
 }

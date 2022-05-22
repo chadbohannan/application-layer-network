@@ -256,6 +256,11 @@ func (r *Router) AddChannel(channel Channel) {
 				if _, ok := r.serviceLoadMap[service]; !ok {
 					r.serviceLoadMap[service] = NodeLoadMap{}
 				}
+				if nl, ok := r.serviceLoadMap[service][address]; ok {
+					if nl.Load == serviceLoad {
+						return true // drop packet to avoid propagation loops
+					}
+				}
 				r.serviceLoadMap[service][address] = NodeLoad{
 					Load:     serviceLoad,
 					LastSeen: time.Now().UTC(),
@@ -273,8 +278,11 @@ func (r *Router) AddChannel(channel Channel) {
 							p.NextAddr = route.NextHop
 							channel.Send(p)
 						}
+						delete(r.serviceQueue, service)
+					} else {
+						log.Printf("no route to discovered service: %s", service)
 					}
-					delete(r.serviceQueue, service)
+
 				}
 			} else {
 				log.Printf("error parsing NET_SERVICE: %s\n", err.Error())
