@@ -9,6 +9,7 @@ public class LocalChannel implements IChannel {
             queue.add(packet);
         }
     };
+    IChannelCloseHandler closeHandler = null;
 
     LocalChannel loopBack;
     public LocalChannel() {
@@ -29,6 +30,7 @@ public class LocalChannel implements IChannel {
 
     public void receive(IPacketHandler packetHandler, IChannelCloseHandler closeHandler) {
         this.packetHandler = packetHandler;
+        this.closeHandler = closeHandler;
         if (queue.size() > 0) {
             for (Packet p : queue)
                 packetHandler.onPacket(p);
@@ -37,6 +39,9 @@ public class LocalChannel implements IChannel {
     }
 
     public void close() {
-        
+        if (closeHandler != null) {
+            closeHandler.onChannelClosed(this);
+            closeHandler = null;
+        }
     }
 }

@@ -47,7 +47,7 @@ public class TcpChannel implements IChannel {
                         }    
                     }
                     public void failed(Throwable exc, Integer a){
-                        //System.out.println(exc.getLocalizedMessage());
+                        closeHandler.onChannelClosed(TcpChannel.this);
                     }
                 };
                 socket.read(buffer, 0, 1, timeout, TimeUnit.MILLISECONDS, 42, completionHandler);
