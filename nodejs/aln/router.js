@@ -136,7 +136,7 @@ class Router {
         this.remoteNodeMap.delete(address)
         this.serviceLoadMap.forEach((loadMap) => loadMap.delete(address))
         const src = this.address
-        this.channels.forEach((ch) => { ch.send(makeNetworkRouteSharePacket(src, address, 0))})
+        this.channels.forEach((ch) => { ch.send(makeNetworkRouteSharePacket(src, address, 0)) })
       }
     })
   }
@@ -150,12 +150,12 @@ class Router {
           if (cost === 0) { // route is being reset on a channel closing
             if (remoteAddress === this.address) {
               // readvertize self
-              const _this = this;
-              setTimeout(()=>{_this.shareNetState()}, 100)
+              const _this = this
+              setTimeout(() => { _this.shareNetState() }, 100)
             } else {
               // remove route
               this.remoteNodeMap.delete(remoteAddress)
-              this.serviceLoadMap.forEach((loadMap) => loadMap.delete(address))
+              this.serviceLoadMap.forEach((loadMap) => loadMap.delete(remoteAddress))
               this.channels.forEach((ch) => {
                 if (ch !== channel) ch.send(packet)
               })

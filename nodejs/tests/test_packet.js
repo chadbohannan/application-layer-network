@@ -10,6 +10,7 @@ describe('# Test Packet', function () {
     let parsedPacket = null
     const parser = new Parser((packet) => { parsedPacket = packet })
     const packet = new Packet()
+    packet.srv = 'ping'
     packet.src = '1'
     packet.dst = '42'
     packet.nxt = '8675309'

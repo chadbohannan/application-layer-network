@@ -1,12 +1,12 @@
 const ByteBuffer = require('bytebuffer')
-const { Packet } = require("./packet");
+const { Packet } = require('./packet')
 
 class WebSocketChannel {
   constructor (ws) {
     this.ws = ws
-    this.onPacket = () => { console.log("WebSocketChannel::onPacket; default")}
-    ws.on('message', function message(data) {
-      console.log('ws received: %s', data);
+    this.onPacket = () => { console.log('WebSocketChannel::onPacket; default') }
+    ws.on('message', function message (data) {
+      console.log('ws received: %s', data)
       const obj = JSON.parse(data)
       const packet = new Packet()
       if (obj.cf) packet.cf = obj.cf
@@ -21,10 +21,10 @@ class WebSocketChannel {
       if (obj.typ) packet.typ = obj.typ
       if (obj.data) packet.data = ByteBuffer.fromBase64(obj.data).toBinary()
       this.onPacket(new Packet(data))
-    });
+    })
   }
 
-  send(packet) {
+  send (packet) {
     this.ws.send(packet.toJson())
   }
 }

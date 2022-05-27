@@ -31,7 +31,7 @@ public class Parser {
     }
 
     public void readAx25FrameBytes(byte[] data, int length){
-        for( int i = 0; i < data.length; i++){
+        for( int i = 0; i < length; i++){
             if (data[i] == Frame.End){
                 acceptPacket();
             } else if (state == Parser.State.Escaped) {
@@ -44,7 +44,11 @@ public class Parser {
             } else if (data[i] == Frame.Esc) {
                 state = Parser.State.Escaped;
             } else {
+                try {
                 buffer.put(data[i]);
+                } catch(Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

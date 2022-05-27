@@ -1,7 +1,7 @@
 import ByteBuffer from 'bytebuffer'
 
 const CF_NETSTATE = 0x0400
-const CF_SERVICEID = 0x0200
+const CF_SERVICE = 0x0200
 const CF_SRCADDR = 0x0100
 const CF_DESTADDR = 0x0080
 const CF_NEXTADDR = 0x0040
@@ -31,7 +31,7 @@ export class Packet {
       const buf = ByteBuffer.fromBinary(content)
       this.cf = buf.readUint16()
       if (this.cf & CF_NETSTATE) this.net = buf.readUint8()
-      if (this.cf & CF_SERVICEID) this.srv = buf.readUint8()
+      if (this.cf & CF_SERVICE) this.srv = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_SRCADDR) this.src = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_DESTADDR) this.dst = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_NEXTADDR) this.nxt = buf.readBytes(buf.readUint8()).toUTF8()
@@ -66,7 +66,7 @@ export class Packet {
     let cf = 0x0000
     buf.writeUint16(cf)
     if (this.net) (cf |= CF_NETSTATE) && buf.writeByte(this.net)
-    if (this.srv) (cf |= CF_SERVICEID) && buf.writeByte(this.srv)
+    if (this.srv) (cf |= CF_SERVICE) && buf.writeByte(this.srv.length) && buf.writeUTF8String(this.srv)
     if (this.src) (cf |= CF_SRCADDR) && buf.writeByte(this.src.length) && buf.writeUTF8String(this.src)
     if (this.dst) (cf |= CF_DESTADDR) && buf.writeByte(this.dst.length) && buf.writeUTF8String(this.dst)
     if (this.nxt) (cf |= CF_NEXTADDR) && buf.writeByte(this.nxt.length) && buf.writeUTF8String(this.nxt)

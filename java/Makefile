@@ -5,6 +5,7 @@ JC = javac
 		$(JC) $(JFLAGS) $*.java
 
 CLASSES = \
+		Router.java \
 		Packet.java \
 		Parser.java \
 		Example.java 
