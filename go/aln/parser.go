@@ -37,19 +37,22 @@ func (p *Parser) Clear() {
 	p.state = STATE_BUFFERING
 }
 
-func (p *Parser) acceptPacket() {
+func (p *Parser) acceptPacket() bool {
+	defer p.Clear()
 	if pkt, err := ParsePacket(p.buffer.Bytes()); err == nil {
-		p.packetCallback(pkt)
+		return p.packetCallback(pkt)
 	} else {
 		fmt.Println("on acceptPacket, ParsePacket:" + err.Error())
 	}
-	p.Clear()
+	return true
 }
 
-func (p *Parser) IngestStream(buffer []byte) {
+func (p *Parser) IngestStream(buffer []byte) bool {
 	for _, msg := range buffer {
 		if msg == FRAME_END {
-			p.acceptPacket()
+			if !p.acceptPacket() {
+				return false
+			}
 		} else if p.state == STATE_ESCAPED {
 			switch msg {
 			case FRAME_END_T:
@@ -66,4 +69,5 @@ func (p *Parser) IngestStream(buffer []byte) {
 			p.buffer.WriteByte(msg)
 		}
 	}
+	return true
 }
