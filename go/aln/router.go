@@ -220,7 +220,7 @@ func (r *Router) AddChannel(channel Channel) {
 							}
 						}
 					}
-				} else {
+				} else if remoteAddress != r.address {
 					// add or update a route
 					var ok bool
 					var remoteNode *RemoteNodeInfo
