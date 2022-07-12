@@ -164,7 +164,6 @@ func (r *Router) RemoveChannel(channel Channel) {
 		// bcast the loss of routes through the channel
 		for address, nodeInfo := range r.remoteNodeMap {
 			if nodeInfo.Channel == channel {
-				log.Print("removing: ", address)
 				r.removeAddress(address)
 				for _, ch := range r.channels {
 					ch.Send(makeNetworkRouteSharePacket(r.address, address, 0))
@@ -190,8 +189,8 @@ func (r *Router) AddChannel(channel Channel) {
 
 	// define onPacket() to either handle link-state updates or route data
 	go channel.Receive(func(packet *Packet) bool {
-		// fmt.Printf("received packet srv:'%s' dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d data:%v\n",
-		// 	packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.Service, packet.Data)
+		// log.Printf("received packet srv:'%s' dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d data:%v\n",
+		// 	packet.Service, packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.Data)
 
 		switch packet.NetState {
 		case NET_ROUTE:
@@ -250,7 +249,7 @@ func (r *Router) AddChannel(channel Channel) {
 
 		case NET_SERVICE:
 			if address, service, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
-				// fmt.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
+				// log.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
 				r.mutex.Lock()
 				defer r.mutex.Unlock()
 				if _, ok := r.serviceLoadMap[service]; !ok {
@@ -271,7 +270,7 @@ func (r *Router) AddChannel(channel Channel) {
 					}
 				}
 				if packetList, ok := r.serviceQueue[service]; ok {
-					log.Printf("sending %d packet(s) to '%s'", len(packetList), address)
+					// log.Printf("sending %d packet(s) to '%s'", len(packetList), address)
 					if route, ok := r.remoteNodeMap[address]; ok {
 						for _, p := range packetList {
 							p.DestAddr = address
@@ -343,12 +342,14 @@ func (r *Router) ExportServiceTable() []*Packet {
 	defer r.mutex.Unlock()
 	services := []*Packet{}
 	for service := range r.serviceMap {
-		var load uint16 // TODO measure load
+		var load uint16 = 1 // TODO measure load
+		log.Printf("sharing local service: %s", service)
 		services = append(services, makeNetworkServiceSharePacket(r.address, service, load))
 	}
 	for service, loadMap := range r.serviceLoadMap {
 		for address, load := range loadMap { // TODO sort by increasing load (first tx'd is lowest load)
 			// TODO filter expired or unroutable entries
+			// log.Printf("sharing remote service: %s at %s", service, address)
 			services = append(services, makeNetworkServiceSharePacket(address, service, load.Load))
 		}
 	}
