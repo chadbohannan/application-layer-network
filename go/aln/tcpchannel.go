@@ -103,28 +103,6 @@ func (ch *TCPChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) 
 	}
 }
 
-// func (ch *TCPChannel) ReceiveOne(onClose OnCloseCallback) (*Packet, error) {
-// 	byteBuff := []byte{0}
-// 	cont := true
-// 	var packet *Packet
-// 	parser := NewParser(func(p *Packet) bool {
-// 		packet = p
-// 		cont = false
-// 		return false
-// 	})
-// 	for cont {
-// 		n, err := ch.conn.Read(byteBuff)
-// 		if n < 1 || err != nil {
-// 			if onClose != nil {
-// 				onClose(ch)
-// 			}
-// 			break
-// 		}
-// 		parser.IngestStream(byteBuff)
-// 	}
-// 	return packet, nil
-// }
-
 // Close .
 func (ch *TCPChannel) Close() {
 	ch.conn.Close()
