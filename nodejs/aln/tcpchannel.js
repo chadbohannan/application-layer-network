@@ -1,5 +1,4 @@
 const { Parser, toAx25Frame } = require('./parser')
-// const { Packet } = require('../aln/packet')
 
 class TcpChannel {
   constructor (socket) {
@@ -8,7 +7,7 @@ class TcpChannel {
     this.onClose = () => { console.log('TcpChannel::onClose; default') }
     const parser = new Parser((packet) => _this.onPacket(packet, this))
     socket.on('data', function (chunk) {
-      console.log(`TcpChannel: on data: ${chunk.length} bytes.`)
+      // console.log(`TcpChannel: on data: ${chunk.length} bytes.`)
       parser.readAx25FrameBytes(chunk.toString('binary'), chunk.length)
     })
     socket.on('end', function () {
@@ -31,10 +30,6 @@ class TcpChannel {
     console.log('ZTcpChannel::close()')
     this.socket.close()
   }
-
-  // onClose() {
-  //   console.log('TcpChannel::onClose; default')
-  // }
 }
 
 module.exports.TcpChannel = TcpChannel

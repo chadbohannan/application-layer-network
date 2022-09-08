@@ -35,12 +35,12 @@ func main() {
 	})
 	defer router.ReleaseContext(ctx)
 
-	fmt.Println("ping") // the journey begins
+	log.Println("generating ping packet") // the journey begins
 	if err := router.Send(&aln.Packet{
 		Service:   "ping",
 		ContextID: ctx,
 	}); err != nil {
-		fmt.Println(err.Error())
+		log.Print(err.Error())
 	}
 
 	wg.Wait() // wait for pong

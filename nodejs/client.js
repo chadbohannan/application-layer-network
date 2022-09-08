@@ -22,3 +22,12 @@ const tcpChannel = new TcpChannel(socket)
 alnRouter.addChannel(tcpChannel)
 
 logger.info('init complete')
+
+logger.info('sending ping')
+const ctx = alnRouter.registerContextHandler((p) => {
+  console.log('ping response:', p.data)
+})
+const pingPacket = new Packet()
+pingPacket.srv = 'ping'
+pingPacket.ctx = ctx
+alnRouter.send(pingPacket)

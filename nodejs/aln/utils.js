@@ -44,10 +44,11 @@ function parseNetworkRouteSharePacket (packet) {
 }
 
 function makeNetworkServiceSharePacket (hostAddr, serviceID, serviceLoad) {
-  const buf = new ByteBuffer(hostAddr.length + 5)
+  const buf = new ByteBuffer(hostAddr.length + serviceID.length + 4)
   buf.writeUint8(hostAddr.length)
   buf.writeUTF8String(hostAddr)
-  buf.writeUint16(serviceID)
+  buf.writeUint8(serviceID.length)
+  buf.writeUTF8String(serviceID)
   buf.writeUint16(serviceLoad)
   const p = new Packet()
   p.net = NET_SERVICE
@@ -58,17 +59,16 @@ function makeNetworkServiceSharePacket (hostAddr, serviceID, serviceLoad) {
 
 // returns address, serviceID, load, error
 function parseNetworkServiceSharePacket (packet) {
+  const fname = 'parseNetworkServiceSharePacket'
   if (packet.net !== NET_SERVICE) {
-    return ['', 0, 0, 'parseNetworkServiceSharePacket: packet.NetState != NET_ROUTE']
+    return ['', 0, 0, fname + ': packet.NetState != NET_ROUTE']
   }
   const dataBuf = ByteBuffer.fromBinary(packet.data)
   const addrSize = dataBuf.readUint8()
 
-  if (packet.data.length !== addrSize + 5) {
-    return ['', 0, 0, `parseNetworkServiceSharePacket: len(packet.Data) = ${packet.data.length}; expected: ${addrSize + 5}`]
-  }
   const addr = dataBuf.readBytes(addrSize).toUTF8()
-  const serviceID = dataBuf.readUint16()
+  const serviceIDsize = dataBuf.readUint8()
+  const serviceID = dataBuf.readBytes(serviceIDsize).toUTF8()
   const serviceLoad = dataBuf.readUint16()
   return [addr, serviceID, serviceLoad, null]
 }

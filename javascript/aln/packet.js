@@ -16,7 +16,7 @@ export class Packet {
   constructor (content) {
     this.cf = 0
     this.net = 0
-    this.srv = 0
+    this.srv = ''
     this.src = ''
     this.dst = ''
     this.nxt = ''

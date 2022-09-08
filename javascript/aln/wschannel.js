@@ -8,7 +8,6 @@ export class WebSocketChannel {
     this.onClose = () => { console.log("WebSocketChannel::onClose; default")}
 
     ws.onmessage = (event) => {
-      console.log('ws received: %s', event.data);
       const obj = JSON.parse(event.data)
       const packet = new Packet()
       if (obj.cf) packet.cf = obj.cf
@@ -29,13 +28,17 @@ export class WebSocketChannel {
     };
     
     ws.onclose = (event) => {
-        console.log(event);
+      this.onClose()
     };
-    
+  }
+
+  close() {
+    this.onClose()
+    this.ws.close()
   }
 
   send(packet) {
-    console.log('sending:', packet.toJson())
+    // console.log('sending:', packet.toJson())
     this.ws.send(packet.toJson())
   }
 }

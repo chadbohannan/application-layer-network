@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 
 class RouterTest {
     @Test

@@ -416,7 +416,7 @@ class Packet:
                                        Packet.DATALENGTH_FIELD_SIZE]
             self.dataSize = readINT16U(lengthBytes)
             offset += Packet.DATALENGTH_FIELD_SIZE
-            self.data = packetBuffer[offset:offset+self.dataSize]
+            self.data = bytearray(packetBuffer[offset:offset+self.dataSize])
 
         return None
 

@@ -6,12 +6,20 @@ const Router = require('./aln/router')
 const { TcpChannel } = require('./aln/tcpchannel')
 const { WebSocketChannel } = require('./aln/wschannel')
 const { WebSocketServer } = require('ws')
+const { Packet } = require('./aln/packet')
 
 const PORT = process.env.PORT || 8080
 const TCP_PORT = process.env.TCP_PORT || 8181
 
 const alnRouter = new Router('nodejs-host')
-alnRouter.registerService(1, (packet) => { console.log('packet recieved', packet.toJson()) })
+alnRouter.registerService('ping', (packet) => {
+  console.log('ping handler for:', packet.toJson())
+  const pongPacket = new Packet()
+  pongPacket.dst = packet.src
+  pongPacket.ctx = packet.ctx
+  pongPacket.data = 'pong'
+  alnRouter.send(pongPacket)
+})
 
 const tcpServer = net.createServer()
 tcpServer.listen(TCP_PORT, () => {

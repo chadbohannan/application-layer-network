@@ -19,7 +19,6 @@ class Parser:
         
     def acceptPacket(self):
         packet = Packet(self.frameBuffer)
-        print("packet recv'd:", packet.toJsonString())
         err = None
         if (self.packet_callback):
             err = self.packet_callback(packet) # deliver to application code

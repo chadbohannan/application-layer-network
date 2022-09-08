@@ -96,8 +96,8 @@ class Router {
     if (packet.dst === this.address) {
       if (this.serviceMap.has(packet.srv)) {
         this.serviceMap.get(packet.srv)(packet)
-      } else if (this.contextMap.has(packet.srv)) {
-        this.contextMap.get(packet.srv)(packet)
+      } else if (this.contextMap.has(packet.ctx)) {
+        this.contextMap.get(packet.ctx)(packet)
       } else {
         return `service ${packet.srv} not registered`
       }
@@ -120,7 +120,7 @@ class Router {
     while (this.contextMap.has(ctxID)) {
       ctxID = Math.floor(Math.random() * 2 << 15)
     }
-    this.contextMap[ctxID] = packetHandler
+    this.contextMap.set(ctxID, packetHandler)
     return ctxID
   }
 

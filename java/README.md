@@ -1,5 +1,3 @@
-# Status
+Open repository folder in Visual Studio Code.
 
-Packet implemented but depends on java.util.zip for CRC32 computation.
-
-Parser works.
+Right-click on `java/aln/src/main/java/org/biglittleidea/aln_client/ClientExample.java` and select `Run Java`

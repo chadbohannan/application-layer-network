@@ -22,13 +22,13 @@ describe('# Test Router', function () {
   it('# route to a local service', async function () {
     let recievedPacket = null
     const router = new Router('42')
-    router.registerService(1, (p) => { recievedPacket = p })
+    router.registerService('test', (p) => { recievedPacket = p })
 
     const localChannel = new LocalChannel()
     router.addChannel(localChannel)
 
     const packet = new Packet()
-    packet.srv = 1
+    packet.srv = 'test'
     localChannel.onPacket(packet)
     assert.isNotNull(recievedPacket)
   })
@@ -37,7 +37,7 @@ describe('# Test Router', function () {
     const r1 = new Router('1')
     const r2 = new Router('2')
     let recievedPacket = null
-    r2.registerService(1, (packet) => { recievedPacket = packet })
+    r2.registerService('test', (packet) => { recievedPacket = packet })
 
     const ch = new LocalChannel()
     r1.addChannel(ch)
@@ -45,7 +45,7 @@ describe('# Test Router', function () {
     await new Promise(resolve => setTimeout(resolve, 10))
 
     const p = new Packet()
-    p.srv = 1
+    p.srv = 'test'
     r1.send(p)
     await new Promise(resolve => setTimeout(resolve, 1))
 
@@ -58,7 +58,7 @@ describe('# Test Router', function () {
     const r3 = new Router('3')
 
     let recievedPacket = null
-    r3.registerService(1, (packet) => { recievedPacket = packet })
+    r3.registerService('test', (packet) => { recievedPacket = packet })
 
     const ch1 = new LocalChannel()
     r1.addChannel(ch1)
@@ -71,7 +71,7 @@ describe('# Test Router', function () {
     await new Promise(resolve => setTimeout(resolve, 10))
 
     const p = new Packet()
-    p.srv = 1
+    p.srv = 'test'
     r1.send(p)
     await new Promise(resolve => setTimeout(resolve, 10))
 

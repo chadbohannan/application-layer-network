@@ -1,7 +1,7 @@
 import selectors
 from .parser import Parser
 
-class TcpChannel():
+class BtChannel():
     def __init__(self, sock):
         self.sock = sock
         self.sock.setblocking(False)
@@ -25,14 +25,17 @@ class TcpChannel():
     def send(self, packet):
         frame = packet.toFrameBytes()
         try:
-            self.sock.send(frame)
+            self.sock.send(bytes(frame))
         except Exception as e:
-            print('tcpchannel send exception', e)
+            print('btchannel send exception', e)
             return False
         return True
 
     def recv(self, sock, mask):
-        data = sock.recv(1024)
+        try:
+            data = sock.recv(1024)
+        except:
+            data = None
         if data:
             self.parser.readBytes(data)
         else:

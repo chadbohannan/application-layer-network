@@ -29,12 +29,12 @@ describe('# Test Utils', function () {
   })
 
   it('# makes a NET_SERVICE packet', async function () {
-    const p = makeNetworkServiceSharePacket('42', 1, 2)
-    assert.equal(p.toBinary().length, 12)
+    const p = makeNetworkServiceSharePacket('42', 'test', 2)
+    assert.equal(p.toBinary().length, 15)
     const [address, serviceID, load, err] = parseNetworkServiceSharePacket(p)
     assert.isNull(err)
     assert.equal(address, '42')
-    assert.equal(serviceID, 1)
+    assert.equal(serviceID, 'test')
     assert.equal(load, 2)
   })
 })
