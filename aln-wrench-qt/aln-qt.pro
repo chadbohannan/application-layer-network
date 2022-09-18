@@ -12,6 +12,8 @@ SOURCES += \
     addchanneldialog.cpp \
     aln/alntypes.cpp \
     aln/ax25frame.cpp \
+    aln/channel.cpp \
+    aln/localchannel.cpp \
     aln/packet.cpp \
     aln/parser.cpp \
     aln/router.cpp \
@@ -24,6 +26,7 @@ HEADERS += \
     aln/alntypes.h \
     aln/ax25frame.h \
     aln/channel.h \
+    aln/localchannel.h \
     aln/packet.h \
     aln/parser.h \
     aln/router.h \

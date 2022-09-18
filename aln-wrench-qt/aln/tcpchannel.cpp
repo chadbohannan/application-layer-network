@@ -2,11 +2,10 @@
 #include "ax25frame.h"
 #include <QDebug>
 
-TcpChannel::TcpChannel(QTcpSocket* s)
-    : socket(s)
+TcpChannel::TcpChannel(QTcpSocket* s, QObject* parent)
+    : Channel(parent), socket(s)
 {
     if (socket->isOpen()) {
-//        onConnected();
         QMetaObject::invokeMethod(this, "onConnected", Qt::QueuedConnection);
     } else {
         connect(socket, SIGNAL(connected()), this, SLOT(onConnected()));
@@ -63,7 +62,7 @@ bool TcpChannel::listen() {
 
 void TcpChannel::disconnect() {
     QObject::disconnect(socket, &QTcpSocket::readyRead, this, &TcpChannel::onSocketDataReady);
-    emit onClose();
+    emit onClose(this);
     if (socket->isOpen())
         socket->close();
 }

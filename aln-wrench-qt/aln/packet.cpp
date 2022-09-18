@@ -26,6 +26,13 @@ Packet::Packet(QString dest, INT16U contextID, QByteArray content) {
     data = content;
 }
 
+Packet::Packet(QString dest, QString service, QByteArray content) {
+    clear();
+    destAddress = dest;
+    srv = service;
+    data = content;
+}
+
 void Packet::init(QByteArray data) {
     INT08U* pData = (INT08U*)data.data();
     INT16U controlFlags = readINT16U(pData);

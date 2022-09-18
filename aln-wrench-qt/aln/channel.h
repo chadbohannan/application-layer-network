@@ -7,12 +7,13 @@
 class Channel : public QObject {
     Q_OBJECT;
 public:
+    Channel(QObject* parent = 0);
     virtual bool send(Packet*) = 0;
     virtual bool listen() = 0;
     virtual void disconnect() = 0;
 
 signals:
-    void onClose();
+    void onClose(Channel*);
     void onPacket(Channel*, Packet*);
 };
 

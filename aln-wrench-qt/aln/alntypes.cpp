@@ -23,6 +23,11 @@ void writeINT16U(INT08U* buffer, INT16U value)
   buffer[1] = value & 0xFF;
 }
 
+void writeToBuffer(QBuffer* buffer, INT08U value) {
+  char v = value;
+  buffer->write(&v, 1);
+}
+
 void writeToBuffer(QBuffer* buffer, INT16U value)
 {
   char ary[2];

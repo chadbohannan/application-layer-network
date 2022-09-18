@@ -45,11 +45,18 @@ public:
     QByteArray data;
     INT32U crc;
 
+    enum NetState {
+        ROUTE = 1,
+        SERVICE = 2,
+        QUERY = 3
+    };
+
 public:
     Packet();
     Packet(QByteArray packetBuffer);
     Packet(QString dest, QByteArray content);
     Packet(QString dest, INT16U contextID, QByteArray content);
+    Packet(QString dest, QString service, QByteArray content);
     void init(QByteArray);
     void clear();
 

@@ -15,7 +15,7 @@ private:
     QList<Packet*> packetQueue;
 
 public:
-    TcpChannel(QTcpSocket*);
+    TcpChannel(QTcpSocket*, QObject* = 0);
     QString lastError();
 
     // AlnChannel interface

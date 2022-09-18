@@ -10,6 +10,19 @@
 #include <QTcpSocket>
 #include <QUuid>
 
+#include <aln/localchannel.h>
+
+class TestPacketHandler : public PacketHandler {
+    bool* testFlag = 0;
+public:
+    TestPacketHandler(bool* tf) {
+        testFlag = tf;
+    }
+    void onPacket(Packet *) {
+        *testFlag = true;
+    }
+};
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -31,12 +44,26 @@ MainWindow::MainWindow(QWidget *parent)
     assert(testFlag);
 
     alnRouter = new Router();
+    Router* testRouter1 = new Router("test-router-1");
+    LocalChannel* lc1 = new LocalChannel();
+    alnRouter->addChannel(lc1);
+    testRouter1->addChannel(lc1->buddy());
+
+    Router* testRouter2 = new Router("test-router-2");
+    LocalChannel* lc2 = new LocalChannel();
+    testRouter1->addChannel(lc2);
+    testRouter2->addChannel(lc2->buddy());
+
+    testRouter2->registerService("test", new TestPacketHandler(&testFlag));
+    testFlag = false;
+    qDebug() << "onSend:" << alnRouter->send(new Packet("", "test", QByteArray()));
+
     this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
 
     // TODO compose list model for local interfaces widget
     QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
     foreach(QNetworkInterface iFace, allInterfaces) {
-        QNetworkAddressEntry entry = iFace.addressEntries()[0];
+        QNetworkAddressEntry entry = iFace.addressEntries().first();
         QHostAddress address = entry.ip();
         switch(iFace.type()){
         case QNetworkInterface::InterfaceType::Ethernet:
@@ -49,8 +76,6 @@ MainWindow::MainWindow(QWidget *parent)
             break;
         }
     }
-
-
 }
 
 MainWindow::~MainWindow()
