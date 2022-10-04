@@ -20,7 +20,7 @@ bool LocalChannel::send(Packet* p) {
 }
 
 void LocalChannel::doSend(Packet* p) {
-    emit onPacket(this, p);
+    emit packetReceived(this, p);
 }
 
 void LocalChannel::tx(Packet* p) {
@@ -33,5 +33,5 @@ bool LocalChannel::listen() {
 
 void LocalChannel::disconnect()
 {
-    emit onClose(this);
+    emit closing(this);
 }

@@ -177,7 +177,6 @@ Packet* Router::composeNetQuery() {
 }
 
 void Router::removeAddress(QString address) {
-    QMutexLocker lock(&mMutex);
     remoteNodeMap.remove(address);
     foreach(QString service, serviceLoadMap.keys())
         serviceLoadMap[service].remove(address);
@@ -205,6 +204,7 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
                 // remove the route
 
                 RemoteNodeInfo* localInfo = remoteNodeMap[info.address];
+                QMutexLocker lock(&mMutex);
                 removeAddress(info.address);
                 for (Channel* ch : channels) {
                     if (ch != localInfo->channel) {
@@ -298,6 +298,7 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
 }
 
 void Router::onPacket(Channel* channel, Packet* packet) {
+    qDebug() << "Router::onPacket from" << packet->srcAddress << ":" << QString(packet->data);
     if (packet->net != 0) {
         handleNetState(channel, packet);
     } else {
@@ -315,16 +316,19 @@ void Router::addChannel(Channel* channel) {
         channels.append(channel);
     }
 
-    connect(channel, SIGNAL(onPacket(Channel*,Packet*)), this, SLOT(onPacket(Channel*,Packet*)), Qt::QueuedConnection);
-    connect(channel, SIGNAL(onClose(Channel*)), this, SLOT(onChannelClose(Channel*)));
+    connect(channel, SIGNAL(packetReceived(Channel*,Packet*)), this, SLOT(onPacket(Channel*,Packet*)), Qt::QueuedConnection);
+    connect(channel, SIGNAL(closing(Channel*)), this, SLOT(onChannelClose(Channel*)));
 
     qDebug() << QString("router '%1' sending QUERY").arg(mAddress);
 
     channel->send(composeNetQuery()); // immediately query the new connection
+    emit channelsChanged();
 }
 
 void Router::removeChannel(Channel* ch) {
     qDebug() << "router:RemoveChannel";
+    disconnect(ch, SIGNAL(packetReceived(Channel*,Packet*)), this, SLOT(onPacket(Channel*,Packet*)));
+    disconnect(ch, SIGNAL(closing(Channel*)), this, SLOT(onChannelClose(Channel*)));
     {
         QMutexLocker lock(&mMutex);
         channels.remove(channels.indexOf(ch));
@@ -340,6 +344,7 @@ void Router::removeChannel(Channel* ch) {
             }
         }
     }
+    emit channelsChanged();
 }
 
 void Router::registerService(QString service, PacketHandler* handler) {

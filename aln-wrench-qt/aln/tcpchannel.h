@@ -29,7 +29,7 @@ private slots:
     void onSocketClose();
     void onPacketParsed(Packet*);
     void onConnected();
-    void onSocketError(int);
+    void onSocketError(QAbstractSocket::SocketError);
 };
 
 #endif // TCPCHANNEL_H

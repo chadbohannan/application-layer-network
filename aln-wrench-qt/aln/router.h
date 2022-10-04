@@ -74,6 +74,9 @@ public slots:
     void onPacket(Channel*, Packet*);
     void onChannelClose(Channel*);
 
+signals:
+    void channelsChanged();
+
 private:
     void handleNetState(Channel*, Packet*);
 

@@ -10,6 +10,7 @@ CONFIG += c++17 testcase no_testcase_installs
 
 SOURCES += \
     addchanneldialog.cpp \
+    advertiserthread.cpp \
     aln/alntypes.cpp \
     aln/ax25frame.cpp \
     aln/channel.cpp \
@@ -18,11 +19,14 @@ SOURCES += \
     aln/parser.cpp \
     aln/router.cpp \
     aln/tcpchannel.cpp \
+    connectionitemmodel.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    networkinterfacesitemmodel.cpp
 
 HEADERS += \
     addchanneldialog.h \
+    advertiserthread.h \
     aln/alntypes.h \
     aln/ax25frame.h \
     aln/channel.h \
@@ -31,7 +35,9 @@ HEADERS += \
     aln/parser.h \
     aln/router.h \
     aln/tcpchannel.h \
-    mainwindow.h
+    connectionitemmodel.h \
+    mainwindow.h \
+    networkinterfacesitemmodel.h
 
 FORMS += \
     mainwindow.ui

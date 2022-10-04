@@ -5,12 +5,11 @@
 #include "aln/packet.h"
 #include "aln/parser.h"
 #include "aln/ax25frame.h"
+#include <aln/localchannel.h>
 
 #include <QNetworkInterface>
-#include <QTcpSocket>
 #include <QUuid>
 
-#include <aln/localchannel.h>
 
 class TestPacketHandler : public PacketHandler {
     bool* testFlag = 0;
@@ -30,20 +29,34 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     connect(ui->addChannelButton, SIGNAL(clicked()), this, SLOT(onAddChannelButtonClicked()));
 
+    alnRouter = new Router();
+    selfTest();
+
+    populateNetworkInterfaces();
+    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+
+    connect(niim, SIGNAL(listenRequest(QString,int,bool)), this, SLOT(onListenRequest(QString,int,bool)));
+    connect(niim, SIGNAL(advertiseRequest(QString, QString, int, bool)), this, SLOT(onBroadcastAdvertRequest(QString,QString,int,bool)));
+    connect(niim, SIGNAL(advertiseListenRequest(QString,int,bool)), this, SLOT(onBroadcastListenRequest(QString,int,bool)));
+
+    this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
+}
+
+MainWindow::~MainWindow()
+{
+    foreach(AdvertiserThread* at, urlAdvertisers.values()) {
+        at->stop();
+    }
+    delete ui;
+}
+
+void MainWindow::selfTest() {
     // smoke test of the ALN implementation
     Packet p1("target", 42, "test");
     QByteArray p1bytes = p1.toByteArray();
     Packet p2(p1bytes);
     assert(p2.toByteArray() == p1bytes);
 
-    testFlag = false;
-    Parser parser = Parser();
-    connect(&parser, &Parser::onPacket,
-            this, &MainWindow::onPacket);
-    parser.read(toAx25Buffer(p1bytes));
-    assert(testFlag);
-
-    alnRouter = new Router();
     Router* testRouter1 = new Router("test-router-1");
     LocalChannel* lc1 = new LocalChannel();
     alnRouter->addChannel(lc1);
@@ -58,29 +71,58 @@ MainWindow::MainWindow(QWidget *parent)
     testFlag = false;
     qDebug() << "onSend:" << alnRouter->send(new Packet("", "test", QByteArray()));
 
-    this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
+    QThread::msleep(10);
 
-    // TODO compose list model for local interfaces widget
+    lc1->disconnect();
+    lc2->disconnect();
+    QThread::msleep(1);
+
+    lc1->deleteLater();
+    lc2->deleteLater();
+    QThread::msleep(1);
+
+    testRouter1->deleteLater();
+    testRouter2->deleteLater();
+}
+
+void MainWindow::populateNetworkInterfaces() {
+    QStringList networkInterfaces, types, bcastAddresses;
     QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
     foreach(QNetworkInterface iFace, allInterfaces) {
-        QNetworkAddressEntry entry = iFace.addressEntries().first();
+        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
+        if (entries.isEmpty()) continue;
+        QNetworkAddressEntry entry = entries.first();
         QHostAddress address = entry.ip();
         switch(iFace.type()){
         case QNetworkInterface::InterfaceType::Ethernet:
-            qDebug() << QString("%1 - Ethernet").arg(address.toString());
+            networkInterfaces << address.toString();
+            types << "eth";
+            bcastAddresses << entry.broadcast().toString();
             break;
         case QNetworkInterface::InterfaceType::Wifi:
-            qDebug() << QString("%1 - Wifi").arg(address.toString());
+            networkInterfaces << address.toString();
+            types << "wifi";
+            bcastAddresses << entry.broadcast().toString();
             break;
         default:
             break;
         }
     }
-}
 
-MainWindow::~MainWindow()
-{
-    delete ui;
+    QList<NetworkInterfaceItem*> interfaces;
+    for(int i = 0; i < networkInterfaces.count(); i++) {
+        interfaces << new NetworkInterfaceItem(types.at(i), networkInterfaces.at(i), 8081, bcastAddresses.at(i));
+    }
+
+    niim = new NetworkInterfacesItemModel(interfaces, this);
+    ui->networkInterfacesTableView->setModel(niim);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Type, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Listen, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::BroadcastPort, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Advertise, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::BroadcastListen, QHeaderView::ResizeToContents);
 }
 
 void MainWindow::onAddChannelButtonClicked() {
@@ -89,27 +131,91 @@ void MainWindow::onAddChannelButtonClicked() {
     dialog->show();
 }
 
+void MainWindow::onChannelClosing(Channel* ch)
+{
+    for(int i = 0; i < connectionItems.length(); i++) {
+        if (connectionItems.at(i)->channel() == ch) {
+            connectionItems.removeAt(i);
+            break;
+        }
+    }
+    QItemSelectionModel *m = ui->channelsListView->selectionModel();
+    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+    if (m) delete m;
+}
+
 void MainWindow::onConnectRequest(QString urlString) {
     QUrl url = QUrl::fromEncoded(urlString.toUtf8());
     if (url.scheme() == "tcp+maln") {
         QTcpSocket* socket = new QTcpSocket(this);
         socket->connectToHost(url.host(), url.port());
         TcpChannel* channel = new TcpChannel(socket);
-        QString malnAddr = url.scheme().remove("/");
+        QString malnAddr = url.path().remove("/");
         channel->send(new Packet(malnAddr, QByteArray()));
-        channels.append(channel);
-
+        alnRouter->addChannel(channel);
+        connectionItems.append(new ConnectionItem(channel, urlString));
+        ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
     } else if (url.scheme() == "tls+maln") {
         // TODO QSslSocket
     } else if (url.scheme() == "tcp+aln") {
         QTcpSocket* socket = new QTcpSocket(this);
         socket->connectToHost(url.host(), url.port());
-        channels.append(new TcpChannel(socket));
+        TcpChannel* channel = new TcpChannel(socket);
+        alnRouter->addChannel(channel);
+        connectionItems.append(new ConnectionItem(channel, urlString));
+        ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
     } else if (url.scheme() == "tls+aln") {
         // TODO QSslSocket
     }
 }
 
-void MainWindow::onPacket(Packet* p) {
-    testFlag = true;
+void MainWindow::onListenRequest(QString interface, int port, bool enable) {
+    QTcpServer* srvr;
+    QString key = QString("%1:%2").arg(interface).arg(port);
+    if (tcpServers.contains(key)) {
+        srvr = tcpServers.value(key);
+    } else {
+        srvr = new QTcpServer(this);
+        connect(srvr, SIGNAL(newConnection()), this,SLOT(onTcpListenPending()));
+        tcpServers.insert(key, srvr);
+    }
+    if (enable && !srvr->isListening()) {
+        srvr->listen(QHostAddress(interface), port);
+    } else if (!enable && srvr->isListening()) {
+        srvr->close();
+    }
+}
+
+void MainWindow::onTcpListenPending() {
+    foreach (QTcpServer* srvr, tcpServers) {
+        while (srvr->hasPendingConnections()) {
+            QTcpSocket* s = srvr->nextPendingConnection();
+            TcpChannel* ch = new TcpChannel(s, this);
+            QString url = QString("tcp+aln://%1:%2").arg(srvr->serverAddress().toString()).arg(srvr->serverPort());
+            connectionItems.append(new ConnectionItem(ch, url));
+            connect(ch, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
+            alnRouter->addChannel(ch);
+        }
+    }
+    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+}
+
+void MainWindow::onBroadcastListenRequest(QString addr, int port, bool enable) {
+    // TODO
+}
+
+void MainWindow::onBroadcastAdvertRequest(QString url, QString addr, int port, bool enable) {
+    QString key = QString("%1:%2").arg(addr).arg(port);
+    AdvertiserThread* adThread;
+    if (urlAdvertisers.contains(key)) {
+        adThread = urlAdvertisers.value(key);
+    } else {
+        adThread = new AdvertiserThread(url, addr, port, this);
+        urlAdvertisers.insert(key, adThread);
+    }
+    if (adThread->isRunning() && !enable) {
+        adThread->stop();
+    } else if (!adThread->isRunning() && enable) {
+        adThread->start(QThread::LowestPriority);
+    }
 }

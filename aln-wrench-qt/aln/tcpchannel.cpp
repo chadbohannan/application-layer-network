@@ -11,14 +11,15 @@ TcpChannel::TcpChannel(QTcpSocket* s, QObject* parent)
         connect(socket, SIGNAL(connected()), this, SLOT(onConnected()));
     }
     connect(socket, SIGNAL(readyRead()), this, SLOT(onSocketDataReady()));
-    connect(socket, SIGNAL(errorOccurred(QAbstractSocket::SocketError)), this, SLOT(onSocketError(int)));
+    connect(socket, SIGNAL(errorOccurred(QAbstractSocket::SocketError)), this, SLOT(onSocketError(QAbstractSocket::SocketError)));
+    connect(socket, SIGNAL(disconnected()), this, SLOT(onSocketClose()));
 
     parser = new Parser;
-    connect(parser, SIGNAL(onPacket()), this, SLOT(onPacketParsed()));
+    connect(parser, SIGNAL(onPacket(Packet*)), this, SLOT(onPacketParsed(Packet*)));
 }
 
 void TcpChannel::onPacketParsed(Packet* p) {
-    emit onPacket(this, p);
+    emit packetReceived(this, p);
 }
 
 QString TcpChannel::lastError() {
@@ -62,19 +63,18 @@ bool TcpChannel::listen() {
 
 void TcpChannel::disconnect() {
     QObject::disconnect(socket, &QTcpSocket::readyRead, this, &TcpChannel::onSocketDataReady);
-    emit onClose(this);
+    emit closing(this);
     if (socket->isOpen())
         socket->close();
 }
 
-void TcpChannel::onSocketError(int errCode) {
+void TcpChannel::onSocketError(QAbstractSocket::SocketError errCode) {
     qDebug() << "socket error code:" << errCode;
+    disconnect();
 }
 
 void TcpChannel::onSocketDataReady() {
-    QByteArray data = socket->readAll();
-    qDebug() << "recieved:" << data;
-    parser->read(data);
+    parser->read(socket->readAll());
 }
 
 void TcpChannel::onSocketClose() {

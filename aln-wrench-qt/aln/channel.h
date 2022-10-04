@@ -13,8 +13,8 @@ public:
     virtual void disconnect() = 0;
 
 signals:
-    void onClose(Channel*);
-    void onPacket(Channel*, Packet*);
+    void closing(Channel*);
+    void packetReceived(Channel*, Packet*);
 };
 
 #endif // CHANNEL_H

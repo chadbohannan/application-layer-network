@@ -123,7 +123,9 @@ public class Router {
         short ctx;
         synchronized (this) {
             ctx = (short) ThreadLocalRandom.current().nextInt(1, 2 << 16);
-            this.contextHandlerMap.put(ctx, handler);
+            while (contextHandlerMap.containsKey(ctx))
+                ctx = (short) ThreadLocalRandom.current().nextInt(1, 2 << 16);;
+            contextHandlerMap.put(ctx, handler);
         }
         return ctx;
     }
@@ -171,9 +173,7 @@ public class Router {
         info.address = new String(Arrays.copyOfRange(data, offset, offset + addrSize));
         offset += addrSize;
         info.cost = Packet.readUINT16(data, offset);
-        offset += 2;
         info.nextHop = packet.SourceAddress;
-
         return info;
     }
 
