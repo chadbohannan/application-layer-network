@@ -57,6 +57,7 @@ public:
     Packet(QString dest, QByteArray content);
     Packet(QString dest, INT16U contextID, QByteArray content);
     Packet(QString dest, QString service, QByteArray content);
+    Packet(QString dest, QString service, INT16U contextID, QByteArray content);
     void init(QByteArray);
     void clear();
 

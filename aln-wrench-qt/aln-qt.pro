@@ -22,7 +22,8 @@ SOURCES += \
     connectionitemmodel.cpp \
     main.cpp \
     mainwindow.cpp \
-    networkinterfacesitemmodel.cpp
+    networkinterfacesitemmodel.cpp \
+    packetsenddialog.cpp
 
 HEADERS += \
     addchanneldialog.h \
@@ -37,10 +38,13 @@ HEADERS += \
     aln/tcpchannel.h \
     connectionitemmodel.h \
     mainwindow.h \
-    networkinterfacesitemmodel.h
+    networkinterfacesitemmodel.h \
+    packetsenddialog.h
 
 FORMS += \
     mainwindow.ui
+
+RESOURCES = aln-qt.qrc
 
 TRANSLATIONS += \
     aln-qt_en_US.ts

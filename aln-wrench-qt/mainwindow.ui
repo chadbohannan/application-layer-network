@@ -115,12 +115,20 @@
        </widget>
       </item>
       <item>
-       <widget class="QTreeWidget" name="meshTreeWidget">
-        <column>
-         <property name="text">
-          <string notr="true">1</string>
+       <widget class="QScrollArea" name="scrollArea">
+        <property name="widgetResizable">
+         <bool>true</bool>
+        </property>
+        <widget class="QWidget" name="scrollAreaWidgetContents">
+         <property name="geometry">
+          <rect>
+           <x>0</x>
+           <y>0</y>
+           <width>460</width>
+           <height>381</height>
+          </rect>
          </property>
-        </column>
+        </widget>
        </widget>
       </item>
       <item>

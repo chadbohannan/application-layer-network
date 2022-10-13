@@ -1,5 +1,6 @@
 #include "addchanneldialog.h"
 #include "mainwindow.h"
+#include "packetsenddialog.h"
 #include "ui_mainwindow.h"
 
 #include "aln/packet.h"
@@ -30,10 +31,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->addChannelButton, SIGNAL(clicked()), this, SLOT(onAddChannelButtonClicked()));
 
     alnRouter = new Router();
+
+    connect(alnRouter, SIGNAL(netStateChanged()), this, SLOT(onNetStateChanged()));
     selfTest();
 
     populateNetworkInterfaces();
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+
+    // TODO connect serviceButtonGroup
+    connect(&serviceButtonGroup, SIGNAL(idClicked(int)), this, SLOT(onServiceButtonClicked(int)));
 
     connect(niim, SIGNAL(listenRequest(QString,int,bool)), this, SLOT(onListenRequest(QString,int,bool)));
     connect(niim, SIGNAL(advertiseRequest(QString, QString, int, bool)), this, SLOT(onBroadcastAdvertRequest(QString,QString,int,bool)));
@@ -202,6 +208,68 @@ void MainWindow::onTcpListenPending() {
 
 void MainWindow::onBroadcastListenRequest(QString addr, int port, bool enable) {
     // TODO
+}
+
+void MainWindow::onNetStateChanged() {
+    qDebug() << "onNetStateChanged";
+    QVBoxLayout* layout = new QVBoxLayout();
+
+    QMap<QString, QStringList> nodeMap = alnRouter->nodeServices();
+
+    // clear QButtonGroup
+    foreach(QAbstractButton* button, serviceButtonGroup.buttons()) {
+        serviceButtonGroup.removeButton(button);
+    }
+    buttonIdMap.clear();
+
+    foreach(QString nodeAddress, nodeMap.keys()) {
+        QFrame* serviceRow = new QFrame;
+        serviceRow->setLineWidth(1);
+        serviceRow->setFrameStyle(QFrame::Box);
+
+        serviceRow->setLayout(new QVBoxLayout);
+        serviceRow->layout()->addWidget(new QLabel(nodeAddress));
+        QHBoxLayout* buttonLayout = new QHBoxLayout;
+
+        QStringList services = nodeMap.value(nodeAddress);
+        if (services.length() == 0) {
+            buttonLayout->addWidget(new QLabel("no services"));
+        } else {
+            foreach(QString service, services) {
+                QPushButton* serviceButton = new QPushButton(service);
+                int buttonID = buttonIdMap.size();
+                buttonIdMap.insert(buttonID, QPair<QString, QString>(nodeAddress, service));
+                serviceButtonGroup.addButton(serviceButton, buttonID);
+                buttonLayout->addWidget(serviceButton);
+            }
+        }
+
+        QWidget* buttonWidget = new QWidget;
+        buttonWidget->setLayout(buttonLayout);
+        serviceRow->layout()->addWidget(buttonWidget);
+        layout->addWidget(serviceRow);
+    }
+
+    layout->addStretch();
+    QWidget* widget = new QWidget();
+    if (ui->scrollArea->widget()) {
+        ui->scrollArea->takeWidget()->deleteLater();
+    }
+    widget->setLayout(layout);
+    ui->scrollArea->setWidget(widget);
+    widget->show();
+}
+
+void MainWindow::onServiceButtonClicked(int id) {
+    QPair<QString, QString> data = buttonIdMap.value(id);
+    QString nodeAddress = data.first;
+    QString service = data.second;
+    // TODO create dialog
+    PacketSendDialog* dialog = new PacketSendDialog(alnRouter, this);
+    dialog->setDest(nodeAddress);
+    dialog->setService(service);
+    dialog->show();
+    qDebug() << "onServiceButtonClicked" << nodeAddress << service;
 }
 
 void MainWindow::onBroadcastAdvertRequest(QString url, QString addr, int port, bool enable) {

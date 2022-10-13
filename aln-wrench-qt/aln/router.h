@@ -38,6 +38,7 @@ public:
     virtual void onPacket(Packet*) = 0;
 };
 
+
 class Router : public QObject
 {
     Q_OBJECT
@@ -70,12 +71,15 @@ public:
     short registerContextHandler(PacketHandler*);
     void releaseContext(short);
 
+    QMap<QString, QStringList> nodeServices();
+
 public slots:
     void onPacket(Channel*, Packet*);
     void onChannelClose(Channel*);
 
 signals:
     void channelsChanged();
+    void netStateChanged();
 
 private:
     void handleNetState(Channel*, Packet*);

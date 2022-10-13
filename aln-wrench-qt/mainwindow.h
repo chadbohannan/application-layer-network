@@ -5,6 +5,7 @@
 #include "connectionitemmodel.h"
 #include "networkinterfacesitemmodel.h"
 
+#include <QButtonGroup>
 #include <QMainWindow>
 #include <QStandardItemModel>
 #include <QTcpServer>
@@ -32,6 +33,9 @@ class MainWindow : public QMainWindow
     QMap<QString, AdvertiserThread*> urlAdvertisers;
     QList<ConnectionItem*> connectionItems;
 
+    QButtonGroup serviceButtonGroup;
+    QMap<int, QPair<QString, QString>> buttonIdMap;
+
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -52,7 +56,9 @@ public slots:
     void onBroadcastAdvertRequest(QString url, QString addr, int port, bool enable);
     void onBroadcastListenRequest(QString addr, int port, bool enable); // TODO
 
+    void onNetStateChanged();
 
+    void onServiceButtonClicked(int id);
 signals:
     void connectionAdded(QString url);
 };

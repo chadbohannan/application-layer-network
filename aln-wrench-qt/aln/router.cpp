@@ -85,6 +85,23 @@ void Router::releaseContext(short ctx) {
     contextHandlerMap.remove(ctx);
 }
 
+QMap<QString, QStringList> Router::nodeServices() {
+    QMap<QString, QStringList> nodeServiceMap;
+    nodeServiceMap.insert(mAddress, serviceHandlerMap.keys());
+    foreach (QString service, serviceLoadMap.keys()) {
+        QMap<QString, NodeLoad*> loadMap = serviceLoadMap[service];
+        foreach (QString address, loadMap.keys()) {
+            QStringList services;
+            if (nodeServiceMap.contains(address)) {
+                services = nodeServiceMap.value(address);
+            }
+            services.append(service);
+            nodeServiceMap.insert(address, services);
+        }
+    }
+    return nodeServiceMap;
+}
+
 Packet* Router::composeNetRouteShare(QString address, short cost) {
     Packet* p = new Packet();
     p->net = Packet::NetState::ROUTE;
@@ -183,6 +200,7 @@ void Router::removeAddress(QString address) {
 }
 
 void Router::handleNetState(Channel* channel, Packet* packet) {
+    bool stateChanged = false;
     switch (packet->net) {
     case Packet::NetState::ROUTE: {
         qDebug() << QString("router '%1' recv'd ROUTE update").arg(mAddress);
@@ -206,6 +224,7 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
                 RemoteNodeInfo* localInfo = remoteNodeMap[info.address];
                 QMutexLocker lock(&mMutex);
                 removeAddress(info.address);
+                stateChanged = true;
                 for (Channel* ch : channels) {
                     if (ch != localInfo->channel) {
                         ch->send(packet);
@@ -225,6 +244,7 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
 
 //            localInfo.lastSeen = new Date();
             if (info.cost < localInfo->cost || localInfo->cost == 0) {
+                stateChanged = true;
                 localInfo->channel = channel;
                 localInfo->cost = info.cost;
                 localInfo->nextHop = info.nextHop;
@@ -251,17 +271,16 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
             nodeLoad->load = serviceInfo.load;
             nodeLoad->lastSeen = QDate::currentDate();
             QMap<QString, NodeLoad*> loadMap;
-            if (!serviceLoadMap.contains(serviceInfo.service)) {
-                serviceLoadMap.insert(serviceInfo.service, loadMap);
-            } else {
+            if (serviceLoadMap.contains(serviceInfo.service)) {
                 loadMap = serviceLoadMap[serviceInfo.service];
                 if (loadMap.contains(serviceInfo.address) &&
                         loadMap[serviceInfo.address]->load == nodeLoad->load) {
                     return; // drop redunant packet to avoid propagation loops
                 }
-            }
-
+            }           
             loadMap.insert(serviceInfo.address, nodeLoad);
+            serviceLoadMap.insert(serviceInfo.service, loadMap);
+            stateChanged = true;
 
             if (serviceQueue.contains(serviceInfo.service)) {
                 QList<Packet*> sq = serviceQueue[serviceInfo.service];
@@ -295,6 +314,9 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
             channel->send(p);
         break;
     }
+
+    if (stateChanged)
+        emit netStateChanged();
 }
 
 void Router::onPacket(Channel* channel, Packet* packet) {
@@ -345,6 +367,7 @@ void Router::removeChannel(Channel* ch) {
         }
     }
     emit channelsChanged();
+    emit netStateChanged();
 }
 
 void Router::registerService(QString service, PacketHandler* handler) {
