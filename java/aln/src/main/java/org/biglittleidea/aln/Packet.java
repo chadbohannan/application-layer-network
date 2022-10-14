@@ -216,6 +216,7 @@ public class Packet {
             Data = new byte[dataLength];
             for (int i = 0; i < dataLength; i++)
                 Data[i] = pData[offset++];
+            offset += dataLength;
         }
         // evaluate CRC
         if ((controlFlags & ControlFlag.crc) != 0) {

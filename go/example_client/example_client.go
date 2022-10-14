@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// create first router
-	localAddress := aln.AddressType("client")
+	localAddress := aln.AddressType("go-client-da01b5")
 
 	// setup the second node to connect to the first using TCP
 	router := aln.NewRouter(localAddress)

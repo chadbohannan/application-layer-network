@@ -12,8 +12,8 @@ import (
 
 func main() {
 	// create first router
-	r1Address := aln.AddressType(1)
-	r2Address := aln.AddressType(2)
+	r1Address := aln.AddressType("1")
+	r2Address := aln.AddressType("2")
 
 	// setup the first node to host a ping service
 	r1 := aln.NewRouter(r1Address)
