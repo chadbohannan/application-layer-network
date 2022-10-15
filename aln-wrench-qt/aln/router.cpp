@@ -99,6 +99,11 @@ QMap<QString, QStringList> Router::nodeServices() {
             nodeServiceMap.insert(address, services);
         }
     }
+    foreach (QString address, remoteNodeMap.keys()) {
+        if (!nodeServiceMap.contains(address)) {
+            nodeServiceMap.insert(address, QStringList());
+        }
+    }
     return nodeServiceMap;
 }
 

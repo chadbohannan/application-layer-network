@@ -9,6 +9,7 @@
 #include <aln/localchannel.h>
 
 #include <QNetworkInterface>
+#include <QSslSocket>
 #include <QUuid>
 
 
@@ -152,27 +153,25 @@ void MainWindow::onChannelClosing(Channel* ch)
 
 void MainWindow::onConnectRequest(QString urlString) {
     QUrl url = QUrl::fromEncoded(urlString.toUtf8());
-    if (url.scheme() == "tcp+maln") {
+    TcpChannel* channel;
+    if (url.scheme().startsWith("tls")) {
+        QSslSocket* socket = new QSslSocket(this);
+        socket->connectToHostEncrypted(url.host(), url.port());
+        channel = new TcpChannel(socket);
+    } else {
         QTcpSocket* socket = new QTcpSocket(this);
         socket->connectToHost(url.host(), url.port());
-        TcpChannel* channel = new TcpChannel(socket);
+        channel = new TcpChannel(socket);
+    }
+    if (url.scheme().endsWith("maln")) {
         QString malnAddr = url.path().remove("/");
         channel->send(new Packet(malnAddr, QByteArray()));
-        alnRouter->addChannel(channel);
-        connectionItems.append(new ConnectionItem(channel, urlString));
-        ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
-    } else if (url.scheme() == "tls+maln") {
-        // TODO QSslSocket
-    } else if (url.scheme() == "tcp+aln") {
-        QTcpSocket* socket = new QTcpSocket(this);
-        socket->connectToHost(url.host(), url.port());
-        TcpChannel* channel = new TcpChannel(socket);
-        alnRouter->addChannel(channel);
-        connectionItems.append(new ConnectionItem(channel, urlString));
-        ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
-    } else if (url.scheme() == "tls+aln") {
-        // TODO QSslSocket
     }
+
+    alnRouter->addChannel(channel);
+    connectionItems.append(new ConnectionItem(channel, urlString));
+    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+    connect(channel, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
 }
 
 void MainWindow::onListenRequest(QString interface, int port, bool enable) {
@@ -207,11 +206,10 @@ void MainWindow::onTcpListenPending() {
 }
 
 void MainWindow::onBroadcastListenRequest(QString addr, int port, bool enable) {
-    // TODO
+    qDebug() << "TODO onBroadcastListenRequest";
 }
 
 void MainWindow::onNetStateChanged() {
-    qDebug() << "onNetStateChanged";
     QVBoxLayout* layout = new QVBoxLayout();
 
     QMap<QString, QStringList> nodeMap = alnRouter->nodeServices();
@@ -278,7 +276,7 @@ void MainWindow::onBroadcastAdvertRequest(QString url, QString addr, int port, b
     if (urlAdvertisers.contains(key)) {
         adThread = urlAdvertisers.value(key);
     } else {
-        adThread = new AdvertiserThread(url, addr, port, this);
+        adThread = new AdvertiserThread(url, addr, port);
         urlAdvertisers.insert(key, adThread);
     }
     if (adThread->isRunning() && !enable) {

@@ -28,7 +28,6 @@ AddChannelDialog::AddChannelDialog(QWidget *parent) : QDialog(parent) {
 }
 
 void AddChannelDialog::okClicked() {
-    qDebug() << textEdit->toPlainText();
     QString txt = textEdit->toPlainText();
     QUrl url = QUrl::fromEncoded(txt.toUtf8(), QUrl::StrictMode);
     if (url.isValid() && url.toDisplayString() == txt) {
@@ -37,6 +36,4 @@ void AddChannelDialog::okClicked() {
     } else {
         errorLabel->setText("URL format error " + url.errorString());
     }
-
-    qDebug() << url.scheme() << url.host() << url.port() << url.path().remove("/");
 }
