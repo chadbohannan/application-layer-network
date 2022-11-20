@@ -6,12 +6,10 @@
 
 enum Column {
     Type = 0,
+    Scheme,
     Address,
     ListenPort,
     Listen,
-    BroadcastPort,
-    Advertise,
-    BroadcastListen,
     NumColumns
 };
 
@@ -19,8 +17,8 @@ class NetworkInterfaceItem {
     QString mType;
     QString mListenAddress;
     QString mBroadcastAddress;
-    int mListenPort;
-    int mBroadcastPort;
+    short mListenPort;
+    short mBroadcastPort;
     bool mIsListening;
     bool mIsAdvertising;
     bool mIsBroadcastListening;
@@ -33,13 +31,13 @@ public:
     }
     QString typ() const { return mType; }
     QString listenAddress() const { return mListenAddress; }
-    int listenPort() const { return mListenPort; }
-    void setListenPort(int value) { mListenPort = value;}
+    short listenPort() const { return mListenPort; }
+    void setListenPort(short value) { mListenPort = value;}
     bool isListening() { return mIsListening; }
     void setIsListening(bool value) { mIsListening = value; }
 
     QString broadcastAddress() { return mBroadcastAddress; }
-    int broadcastPort() const { return mBroadcastPort; }
+    short broadcastPort() const { return mBroadcastPort; }
     void setAdvertisingPort(int value) { mBroadcastPort = value;}
     bool isAdvertising() { return mIsAdvertising; }
     void setIsAdvertising(bool value) { mIsAdvertising = value; }
@@ -66,9 +64,9 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value, int role);
 
 signals:
-    void listenRequest(QString interface, int port, bool enable);
-    void advertiseRequest(QString url, QString interface, int port, bool enable);
-    void advertiseListenRequest(QString interface, int port, bool enable);
+    void listenRequest(QString scheme, QString interface, short port, bool enable);
+    void advertiseRequest(QString url, QString interface, short port, bool enable);
+    void advertiseListenRequest(QString interface, short port, bool enable);
 };
 
 #endif // NETWORKINTERFACESITEMMODEL_H

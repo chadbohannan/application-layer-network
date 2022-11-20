@@ -44,7 +44,7 @@ bool TcpChannel::send(Packet* p) {
 }
 
 void TcpChannel::onConnected() {
-    qDebug() << "TcpChannel::onConnected";
+    qDebug() << "TcpChannel Connected";
     foreach(Packet* p, packetQueue) {
         qDebug() << "sending queued packet";
         send(p);
@@ -69,7 +69,7 @@ void TcpChannel::disconnect() {
 }
 
 void TcpChannel::onSocketError(QAbstractSocket::SocketError errCode) {
-    qDebug() << "socket error code:" << errCode;
+    qWarning() << "socket error code:" << errCode;
     disconnect();
 }
 

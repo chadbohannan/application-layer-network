@@ -46,7 +46,9 @@ void PacketSendDialog::onSendClicked() {
     QString dst = destLineEdit->text();
     QString srv = serviceLineEdit->text();
     QString data = dataLineEdit->text();
-    router->send(new Packet(dst, srv, contextID, data.toUtf8()));
+    Packet* packet = new Packet(dst, srv, contextID, data.toUtf8());
+    qInfo() << "Sending " << packet->toString();
+    router->send(packet);
 }
 
 void PacketSendDialog::onCloseClicked() {

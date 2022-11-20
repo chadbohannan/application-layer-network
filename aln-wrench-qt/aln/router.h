@@ -33,9 +33,12 @@ public:
     QDate lastSeen;
 };
 
-class PacketHandler {
+class PacketHandler : public QObject {
+    Q_OBJECT
 public:
     virtual void onPacket(Packet*) = 0;
+signals:
+    void packetReceived(Packet* packet);
 };
 
 

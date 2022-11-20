@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QBuffer>
+#include <QStringBuilder>
 
 Packet::Packet() {
     clear();
@@ -103,6 +104,16 @@ void Packet::init(QByteArray data) {
 //            // TODO error handling
 //        }
     }
+}
+
+QString Packet::toString() {
+    QString buff;
+    if (net) buff += QString("net: %0,").arg(net);
+    if (srv.size()) buff += QString("srv: %0, ").arg(srv);
+    if (srcAddress.size()) buff += QString("src: %0, ").arg(srcAddress);
+    if (destAddress.size()) buff += QString("dst: %0, ").arg(destAddress);
+    if (nxtAddress.size()) buff += QString("nxt: %0, ").arg(nxtAddress);
+    if (data.size()) buff += QString("data: %0").arg(data);
 }
 
 INT16U Packet::controlField() {

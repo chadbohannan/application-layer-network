@@ -4,12 +4,12 @@
 #include "ui_mainwindow.h"
 
 #include "aln/packet.h"
-#include "aln/parser.h"
-#include "aln/ax25frame.h"
 #include <aln/localchannel.h>
 
+#include <QDateTime>
 #include <QNetworkInterface>
 #include <QSslSocket>
+#include <QStringListModel>
 #include <QUuid>
 
 
@@ -24,29 +24,20 @@ public:
     }
 };
 
+class PacketSignaler: public PacketHandler {
+public:
+    PacketSignaler() { }
+    void onPacket(Packet *packet) {
+        emit packetReceived(packet);
+    }
+};
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    connect(ui->addChannelButton, SIGNAL(clicked()), this, SLOT(onAddChannelButtonClicked()));
-
-    alnRouter = new Router();
-
-    connect(alnRouter, SIGNAL(netStateChanged()), this, SLOT(onNetStateChanged()));
-    selfTest();
-
-    populateNetworkInterfaces();
-    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
-
-    // TODO connect serviceButtonGroup
-    connect(&serviceButtonGroup, SIGNAL(idClicked(int)), this, SLOT(onServiceButtonClicked(int)));
-
-    connect(niim, SIGNAL(listenRequest(QString,int,bool)), this, SLOT(onListenRequest(QString,int,bool)));
-    connect(niim, SIGNAL(advertiseRequest(QString, QString, int, bool)), this, SLOT(onBroadcastAdvertRequest(QString,QString,int,bool)));
-    connect(niim, SIGNAL(advertiseListenRequest(QString,int,bool)), this, SLOT(onBroadcastListenRequest(QString,int,bool)));
-
-    this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
+    connect(this, SIGNAL(logLineReady(QString)), SLOT(addLogLine(QString)), Qt::QueuedConnection);
 }
 
 MainWindow::~MainWindow()
@@ -55,6 +46,128 @@ MainWindow::~MainWindow()
         at->stop();
     }
     delete ui;
+}
+
+void MainWindow::init() {
+    connect(ui->addChannelButton, SIGNAL(clicked()),
+            this, SLOT(onAddChannelButtonClicked()));
+
+    alnRouter = new Router();
+    PacketSignaler* signaler = new PacketSignaler();
+    connect(signaler, SIGNAL(packetReceived(Packet*)), this, SLOT(logServicePacketHandler(Packet*)));
+    alnRouter->registerService("log", signaler);
+
+    connect(alnRouter, SIGNAL(netStateChanged()),
+            this, SLOT(onNetStateChanged()));
+    selfTest();
+
+    populateNetworkInterfaces();
+    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+
+    connect(&serviceButtonGroup, SIGNAL(idClicked(int)),
+            this, SLOT(onServiceButtonClicked(int)));
+
+    // network host interfaces model
+    connect(niim, SIGNAL(listenRequest(QString,QString,short,bool)),
+            this, SLOT(onListenRequest(QString,QString,short,bool)));
+
+    // network advertising panel
+    if (ui->netInterfacesScrollArea->widget()) {
+        ui->netInterfacesScrollArea->takeWidget()->deleteLater();
+    }
+    bcastInterfaceLineEdit = new QLineEdit();
+    if (interfaces.isEmpty()) {
+        bcastInterfaceLineEdit->setText("no network interfaces found");
+        bcastInterfaceLineEdit->setEnabled(false);
+    } else {
+        QString interfaceName = interfaces.at(0)->broadcastAddress();
+        bcastInterfaceLineEdit->setText(interfaceName);
+    }
+
+    bcastPortSpinbox = new QSpinBox();
+    bcastPortSpinbox->setMinimum(1025);
+    bcastPortSpinbox->setMaximum((1<<16)-1);
+    bcastPortSpinbox->setValue(8082);
+
+    netBroadcastEnableCheckbox = new QCheckBox("Broadcast");
+    connect(netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
+            this, SLOT(onBroadcastAdvertRequest(int)));
+    netAdvertiseContent = new QLineEdit("scheme://address:port");
+
+    QVBoxLayout* advertLayout = new QVBoxLayout();
+    QHBoxLayout* advertInterfaceLayout = new QHBoxLayout();
+    advertInterfaceLayout->addWidget(bcastInterfaceLineEdit);
+    advertInterfaceLayout->addWidget(bcastPortSpinbox);
+    advertInterfaceLayout->addWidget(netBroadcastEnableCheckbox);
+    advertLayout->addLayout(advertInterfaceLayout);
+    advertLayout->addWidget(netAdvertiseContent);
+
+    QWidget* advertWidget = new QWidget();
+    advertWidget->setLayout(advertLayout);
+    ui->netInterfacesScrollArea->setWidget(advertWidget);
+    advertWidget->show();
+
+    // bluetooth discovery
+    btDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
+    connect(btDiscoveryAgent, SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)),
+            this, SLOT(deviceDiscovered(QBluetoothDeviceInfo)));
+    connect(ui->btDiscoveryGroupBox, SIGNAL(toggled(bool)),
+            this, SLOT(btDiscoveryCheckboxChanged(bool)));
+    connect(&btConnectButtonGroup, SIGNAL(idClicked(int)),
+            this, SLOT(onBtConnectButtonClicked(int)));
+
+    this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
+
+    serviceUuidToNameMap.insert("94f39d29-7d6d-437d-973b-fba39e49d4ee", "rfcomm-client");
+    serviceUuidToNameMap.insert("00001101-0000-1000-8000-10ca10ddba11", "blinky-bt");
+    serviceUuidToNameMap.insert("00001101-0000-1000-8000-00805F9B34FB", "serial adapter");
+    serviceUuidToNameMap.insert("00001101-0000-1000-8000-00805f9b34fb", "serial adapter");
+}
+
+void MainWindow::logServicePacketHandler(Packet* packet) {
+    while (logServiceBufferList.size() > 20)
+        logServiceBufferList.removeFirst();
+    logServiceBufferList.append(QString("%0 - %1").arg(packet->srcAddress).arg(packet->data));
+    ui->logServiceListView->setModel(new QStringListModel(logServiceBufferList));
+}
+
+void MainWindow::addLogLine(QString msg) {
+    while (debugBufferList.size() > 20)
+        debugBufferList.removeFirst();
+    debugBufferList.append(msg);
+    ui->statusLogListView->setModel(new QStringListModel(debugBufferList));
+
+}
+
+void MainWindow::onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
+    QString line;
+
+    QByteArray localMsg = msg.toLocal8Bit();
+    const char *file = context.file ? context.file : "";
+    const char *function = context.function ? context.function : "";
+    switch (type) {
+    case QtDebugMsg:
+        if (ui->logDebugCheckBox->isChecked())
+            emit logLineReady(QString("%0 DEBUG %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+        break;
+    case QtInfoMsg:
+        if (ui->logInfoCheckBox->isChecked())
+            emit logLineReady(QString("%0 INFO %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+        break;
+    case QtWarningMsg:
+        if (ui->logErrorCheckBox->isChecked())
+            emit logLineReady(QString("%0 WARNING %1 (%2:%3, %4)").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+        fprintf(stderr, "Warning: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
+        break;
+    case QtCriticalMsg:
+        if (ui->logErrorCheckBox->isChecked())
+            emit logLineReady(QString("%0 CRITICAL %1 (%2:%3, %4)").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+        fprintf(stderr, "Critical: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
+        break;
+    case QtFatalMsg:
+        fprintf(stderr, "Fatal: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
+        break;
+    }
 }
 
 void MainWindow::selfTest() {
@@ -116,7 +229,6 @@ void MainWindow::populateNetworkInterfaces() {
         }
     }
 
-    QList<NetworkInterfaceItem*> interfaces;
     for(int i = 0; i < networkInterfaces.count(); i++) {
         interfaces << new NetworkInterfaceItem(types.at(i), networkInterfaces.at(i), 8081, bcastAddresses.at(i));
     }
@@ -124,12 +236,11 @@ void MainWindow::populateNetworkInterfaces() {
     niim = new NetworkInterfacesItemModel(interfaces, this);
     ui->networkInterfacesTableView->setModel(niim);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Type, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Scheme, QHeaderView::ResizeToContents);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Listen, QHeaderView::ResizeToContents);
-    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::BroadcastPort, QHeaderView::ResizeToContents);
-    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Advertise, QHeaderView::ResizeToContents);
-    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::BroadcastListen, QHeaderView::ResizeToContents);
+
 }
 
 void MainWindow::onAddChannelButtonClicked() {
@@ -174,12 +285,13 @@ void MainWindow::onConnectRequest(QString urlString) {
     connect(channel, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
 }
 
-void MainWindow::onListenRequest(QString interface, int port, bool enable) {
+void MainWindow::onListenRequest(QString scheme, QString interface, short port, bool enable) {
     QTcpServer* srvr;
     QString key = QString("%1:%2").arg(interface).arg(port);
     if (tcpServers.contains(key)) {
         srvr = tcpServers.value(key);
     } else {
+        // TODO handle various scheme
         srvr = new QTcpServer(this);
         connect(srvr, SIGNAL(newConnection()), this,SLOT(onTcpListenPending()));
         tcpServers.insert(key, srvr);
@@ -189,6 +301,9 @@ void MainWindow::onListenRequest(QString interface, int port, bool enable) {
     } else if (!enable && srvr->isListening()) {
         srvr->close();
     }
+
+    if (netAdvertiseContent->isEnabled())
+        netAdvertiseContent->setText(QString("%1://%2:%3").arg(scheme).arg(interface).arg(port));
 }
 
 void MainWindow::onTcpListenPending() {
@@ -205,8 +320,34 @@ void MainWindow::onTcpListenPending() {
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
 }
 
-void MainWindow::onBroadcastListenRequest(QString addr, int port, bool enable) {
-    qDebug() << "TODO onBroadcastListenRequest";
+void MainWindow::onBroadcastListenRequest(QString addr, short port, bool enable) {
+    qInfo() << "Enable BroadcastListen:" << (enable ? "true" : "false");
+    QString key = QString("%1:%2").arg(addr).arg(port);
+
+    if (urlAdvertisers.contains(key)) {
+        qInfo() << "cannot listen on advertising port";
+        return;
+    }
+
+    QUdpSocket* udpSocket;
+    if (udpSockets.contains(key)) {
+        udpSocket = udpSockets.value(key);
+    } else {
+        udpSocket = new QUdpSocket(this);
+        udpSockets.insert(key, udpSocket);
+        connect(udpSocket, SIGNAL(readyRead()), this, SLOT(onUdpBroadcastRx()));
+    }
+    if (enable && !udpSocket->isOpen()) {
+        udpSocket->bind(port, QUdpSocket::ShareAddress);
+        udpSocket->connectToHost(addr, port);
+    }
+    if (!enable && udpSocket->isOpen()) {
+        udpSocket->disconnectFromHost();
+    }
+}
+
+void MainWindow::onUdpBroadcastRx() {
+    qInfo() << "TODO MainWindow::onUdpBroadcastRx()";
 }
 
 void MainWindow::onNetStateChanged() {
@@ -267,10 +408,14 @@ void MainWindow::onServiceButtonClicked(int id) {
     dialog->setDest(nodeAddress);
     dialog->setService(service);
     dialog->show();
-    qDebug() << "onServiceButtonClicked" << nodeAddress << service;
 }
 
-void MainWindow::onBroadcastAdvertRequest(QString url, QString addr, int port, bool enable) {
+void MainWindow::onBroadcastAdvertRequest(int checkState) {
+    bool enable =checkState == Qt::CheckState::Checked;
+    QString addr = bcastInterfaceLineEdit->text();
+    int port = bcastPortSpinbox->value();
+    QString url = netAdvertiseContent->text();
+
     QString key = QString("%1:%2").arg(addr).arg(port);
     AdvertiserThread* adThread;
     if (urlAdvertisers.contains(key)) {
@@ -280,8 +425,97 @@ void MainWindow::onBroadcastAdvertRequest(QString url, QString addr, int port, b
         urlAdvertisers.insert(key, adThread);
     }
     if (adThread->isRunning() && !enable) {
+        qInfo() << "stopping " << key;
         adThread->stop();
     } else if (!adThread->isRunning() && enable) {
+        qInfo() << "starting " << key;
+        adThread->setUrl(url);
         adThread->start(QThread::LowestPriority);
+    }
+
+    bcastInterfaceLineEdit->setEnabled(!enable);
+    bcastPortSpinbox->setEnabled(!enable);
+    netAdvertiseContent->setEnabled(!enable);
+}
+
+void MainWindow::btDiscoveryCheckboxChanged(bool enabled) {
+    if (enabled) {
+        qInfo() << "startint BT discovery";
+        btDiscoveryAgent->start();
+    } else {
+        qInfo() << "stopping BT discovery";
+        btDiscoveryAgent->stop();
+    }
+}
+
+
+void MainWindow::deviceDiscovered(QBluetoothDeviceInfo device) {
+    foreach(QBluetoothUuid serviceUUID, device.serviceUuids()) {
+        qDebug() << "inspecting " <<serviceUUID.toString(QBluetoothUuid::WithoutBraces);
+        if( serviceUuidToNameMap.contains(serviceUUID.toString(QBluetoothUuid::WithoutBraces))) {
+            qInfo() << "discovered bt device: " << device.name();
+            auto pair = QPair<QBluetoothDeviceInfo, QBluetoothUuid>(device, serviceUUID);
+            btAddressToDeviceInfoMap.insert(device.address().toString(), pair);
+            btDiscoveryStateChanged();
+            break;
+        }
+    }
+}
+
+void MainWindow::btDiscoveryStateChanged() {
+    if (ui->btDiscoveryScrollArea->widget()) { // remove previous layout
+        ui->btDiscoveryScrollArea->takeWidget()->deleteLater();
+    }
+    foreach(QAbstractButton* button, btConnectButtonGroup.buttons()) {
+        btConnectButtonGroup.removeButton(button);
+    }
+
+    QVBoxLayout* layout = new QVBoxLayout();
+    foreach(QString btAddress, btAddressToDeviceInfoMap.keys()) {
+        QFrame* serviceRow = new QFrame;
+        serviceRow->setLineWidth(1);
+        serviceRow->setFrameStyle(QFrame::Box);
+        serviceRow->setLayout(new QHBoxLayout);
+        serviceRow->layout()->addWidget(new QLabel(btAddress));
+
+        QPair<QBluetoothDeviceInfo, QBluetoothUuid> pair = btAddressToDeviceInfoMap.value(btAddress);
+        QString deviceName = pair.first.name();
+        serviceRow->layout()->addWidget(new QLabel(deviceName));
+
+        // TODO if not connected
+        QPushButton* connectButton = new QPushButton("Connect");
+        int id = btConnectIdToAddressMap.size();
+        btConnectIdToAddressMap.insert(id, btAddress);
+        btConnectButtonGroup.addButton(connectButton, id);
+        serviceRow->layout()->addWidget(connectButton);
+
+        layout->addWidget(serviceRow);
+    }
+    layout->addStretch();
+
+    QWidget* widget = new QWidget();
+    widget->setLayout(layout);
+    ui->btDiscoveryScrollArea->setWidget(widget);
+    widget->show();
+}
+
+void MainWindow::onBtConnectButtonClicked(int id) {
+    QString btAddress = btConnectIdToAddressMap.value(id);
+    QPair<QBluetoothDeviceInfo, QBluetoothUuid> pair = btAddressToDeviceInfoMap.value(btAddress);
+    QBluetoothUuid serviceUUID = pair.second;
+
+    QBluetoothSocket* socket;
+    if (btAddressSocketMap.contains(btAddress)){
+        socket = btAddressSocketMap.value(btAddress);
+    } else {
+        socket = new QBluetoothSocket(QBluetoothServiceInfo::RfcommProtocol);
+        btAddressSocketMap.insert(btAddress, socket);
+    }
+    if (socket->isOpen()) {
+        qInfo()<< "closing BT socket " << serviceUUID;
+        socket->close();
+    } else {
+        qInfo()<< "connecting to BT socket " << serviceUUID;
+        socket->connectToService(QBluetoothAddress(btAddress), serviceUUID);
     }
 }
