@@ -52,10 +52,10 @@ void Packet::init(QByteArray data) {
         offset += 1;
     }
     if (controlFlags & CF_SERVICE) {
-        int srvSize = pData[offset];
+        int sz = pData[offset];
         offset += 1;
-        srv = QString(data.mid(offset, offset+srvSize));
-        offset += srvSize;
+        srv = QString(data.mid(offset, sz));
+        offset += sz;
     }
     if (controlFlags & CF_SRCADDR) {
         int sz = pData[offset];

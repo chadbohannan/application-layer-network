@@ -17,6 +17,7 @@ private:
 public:
     TcpChannel(QTcpSocket*, QObject* = 0);
     QString lastError();
+    QString peerName();
 
     // AlnChannel interface
 public:

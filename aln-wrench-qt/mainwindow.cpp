@@ -72,40 +72,16 @@ void MainWindow::init() {
             this, SLOT(onListenRequest(QString,QString,short,bool)));
 
     // network advertising panel
-    if (ui->netInterfacesScrollArea->widget()) {
-        ui->netInterfacesScrollArea->takeWidget()->deleteLater();
-    }
-    bcastInterfaceLineEdit = new QLineEdit();
     if (interfaces.isEmpty()) {
-        bcastInterfaceLineEdit->setText("no network interfaces found");
-        bcastInterfaceLineEdit->setEnabled(false);
+        ui->bcastInterfaceLineEdit->setText("no network interfaces found");
+        ui->bcastInterfaceLineEdit->setEnabled(false);
     } else {
         QString interfaceName = interfaces.at(0)->broadcastAddress();
-        bcastInterfaceLineEdit->setText(interfaceName);
+        ui->bcastInterfaceLineEdit->setText(interfaceName);
     }
 
-    bcastPortSpinbox = new QSpinBox();
-    bcastPortSpinbox->setMinimum(1025);
-    bcastPortSpinbox->setMaximum((1<<16)-1);
-    bcastPortSpinbox->setValue(8082);
-
-    netBroadcastEnableCheckbox = new QCheckBox("Broadcast");
-    connect(netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
+    connect(ui->netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
             this, SLOT(onBroadcastAdvertRequest(int)));
-    netAdvertiseContent = new QLineEdit("scheme://address:port");
-
-    QVBoxLayout* advertLayout = new QVBoxLayout();
-    QHBoxLayout* advertInterfaceLayout = new QHBoxLayout();
-    advertInterfaceLayout->addWidget(bcastInterfaceLineEdit);
-    advertInterfaceLayout->addWidget(bcastPortSpinbox);
-    advertInterfaceLayout->addWidget(netBroadcastEnableCheckbox);
-    advertLayout->addLayout(advertInterfaceLayout);
-    advertLayout->addWidget(netAdvertiseContent);
-
-    QWidget* advertWidget = new QWidget();
-    advertWidget->setLayout(advertLayout);
-    ui->netInterfacesScrollArea->setWidget(advertWidget);
-    advertWidget->show();
 
     // bluetooth discovery
     btDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
@@ -291,19 +267,22 @@ void MainWindow::onListenRequest(QString scheme, QString interface, short port, 
     if (tcpServers.contains(key)) {
         srvr = tcpServers.value(key);
     } else {
+        qInfo() << "creating server for "<< key;
         // TODO handle various scheme
         srvr = new QTcpServer(this);
         connect(srvr, SIGNAL(newConnection()), this,SLOT(onTcpListenPending()));
         tcpServers.insert(key, srvr);
     }
     if (enable && !srvr->isListening()) {
+        qInfo() << "starting server for " << key;
         srvr->listen(QHostAddress(interface), port);
     } else if (!enable && srvr->isListening()) {
+        qInfo() << "stopping server for " << key;
         srvr->close();
     }
 
-    if (netAdvertiseContent->isEnabled())
-        netAdvertiseContent->setText(QString("%1://%2:%3").arg(scheme).arg(interface).arg(port));
+    if (ui->netAdvertiseContent->isEnabled())
+        ui->netAdvertiseContent->setText(QString("%1://%2:%3").arg(scheme).arg(interface).arg(port));
 }
 
 void MainWindow::onTcpListenPending() {
@@ -315,6 +294,7 @@ void MainWindow::onTcpListenPending() {
             connectionItems.append(new ConnectionItem(ch, url));
             connect(ch, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
             alnRouter->addChannel(ch);
+            qInfo() << "accepting " <<s->peerAddress().toString() << " via" << url;
         }
     }
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
@@ -411,10 +391,10 @@ void MainWindow::onServiceButtonClicked(int id) {
 }
 
 void MainWindow::onBroadcastAdvertRequest(int checkState) {
-    bool enable =checkState == Qt::CheckState::Checked;
-    QString addr = bcastInterfaceLineEdit->text();
-    int port = bcastPortSpinbox->value();
-    QString url = netAdvertiseContent->text();
+    bool enable = checkState == Qt::CheckState::Checked;
+    QString addr = ui->bcastInterfaceLineEdit->text();
+    int port = ui->bcastPortSpinbox->value();
+    QString url = ui->netAdvertiseContent->text();
 
     QString key = QString("%1:%2").arg(addr).arg(port);
     AdvertiserThread* adThread;
@@ -425,17 +405,17 @@ void MainWindow::onBroadcastAdvertRequest(int checkState) {
         urlAdvertisers.insert(key, adThread);
     }
     if (adThread->isRunning() && !enable) {
-        qInfo() << "stopping " << key;
+        qInfo() << "stopping broadcast on " << key;
         adThread->stop();
     } else if (!adThread->isRunning() && enable) {
-        qInfo() << "starting " << key;
+        qInfo() << "starting broadcast on " << key << " of " << url;
         adThread->setUrl(url);
         adThread->start(QThread::LowestPriority);
     }
 
-    bcastInterfaceLineEdit->setEnabled(!enable);
-    bcastPortSpinbox->setEnabled(!enable);
-    netAdvertiseContent->setEnabled(!enable);
+    ui->bcastInterfaceLineEdit->setEnabled(!enable);
+    ui->bcastPortSpinbox->setEnabled(!enable);
+    ui->netAdvertiseContent->setEnabled(!enable);
 }
 
 void MainWindow::btDiscoveryCheckboxChanged(bool enabled) {

@@ -41,10 +41,6 @@ class MainWindow : public QMainWindow
     // TODO client sockets
 
     QList<NetworkInterfaceItem*> interfaces;
-    QLineEdit* bcastInterfaceLineEdit;
-    QSpinBox* bcastPortSpinbox;
-    QCheckBox* netBroadcastEnableCheckbox;
-    QLineEdit* netAdvertiseContent;
     QMap<QString, AdvertiserThread*> urlAdvertisers;
     QList<ConnectionItem*> connectionItems;
 
