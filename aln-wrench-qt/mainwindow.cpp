@@ -78,6 +78,7 @@ void MainWindow::init() {
     } else {
         QString interfaceName = interfaces.at(0)->broadcastAddress();
         ui->bcastInterfaceLineEdit->setText(interfaceName);
+        ui->networkDiscoveryLineEdit->setText(interfaceName);
     }
 
     connect(ui->netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),

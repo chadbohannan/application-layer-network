@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>953</width>
-    <height>643</height>
+    <height>651</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -60,6 +60,13 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout">
          <item>
+          <widget class="QLineEdit" name="netAdvertiseContent">
+           <property name="placeholderText">
+            <string>scheme://host:port</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <layout class="QHBoxLayout" name="horizontalLayout_5">
            <item>
             <widget class="QLineEdit" name="bcastInterfaceLineEdit">
@@ -93,13 +100,6 @@
            </item>
           </layout>
          </item>
-         <item>
-          <widget class="QLineEdit" name="netAdvertiseContent">
-           <property name="placeholderText">
-            <string>scheme://host:port</string>
-           </property>
-          </widget>
-         </item>
         </layout>
        </widget>
       </item>
@@ -112,7 +112,7 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
-            <widget class="QLineEdit" name="networkDiscoverylineEdit"/>
+            <widget class="QLineEdit" name="networkDiscoveryLineEdit"/>
            </item>
            <item>
             <widget class="QSpinBox" name="networkDiscoveryPortSpinBox">
@@ -156,7 +156,7 @@
               <x>0</x>
               <y>0</y>
               <width>437</width>
-              <height>60</height>
+              <height>68</height>
              </rect>
             </property>
            </widget>
@@ -301,7 +301,7 @@
               <x>0</x>
               <y>0</y>
               <width>440</width>
-              <height>136</height>
+              <height>144</height>
              </rect>
             </property>
            </widget>
