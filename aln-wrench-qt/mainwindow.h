@@ -38,6 +38,7 @@ class MainWindow : public QMainWindow
     NetworkInterfacesItemModel *niim;
     QMap<QString, QTcpServer*> tcpServers;
     QMap<QString, QUdpSocket*> udpSockets;
+    QMap<QString, bool> udpAdverts;
     // TODO client sockets
 
     QList<NetworkInterfaceItem*> interfaces;
@@ -68,7 +69,7 @@ public:
 private:
     void selfTest();
     void populateNetworkInterfaces();
-
+    void onNetworkDiscoveryChanged();
 
 public slots:
     void addLogLine(QString msg);
@@ -82,7 +83,7 @@ public slots:
     void onUdpBroadcastRx();
 
     void onBroadcastAdvertRequest(int checkState);
-    void onBroadcastListenRequest(QString addr, short port, bool enable); // TODO
+    void onBroadcastListenRequest(int checkState); // TODO
 
     void btDiscoveryCheckboxChanged(bool);
     void deviceDiscovered(QBluetoothDeviceInfo);

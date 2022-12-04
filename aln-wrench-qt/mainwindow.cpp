@@ -84,6 +84,9 @@ void MainWindow::init() {
     connect(ui->netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
             this, SLOT(onBroadcastAdvertRequest(int)));
 
+    connect(ui->broadcastListenCheckBox, SIGNAL(stateChanged(int)),
+            this, SLOT(onBroadcastListenRequest(int)));
+
     // bluetooth discovery
     btDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
     connect(btDiscoveryAgent, SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)),
@@ -93,7 +96,7 @@ void MainWindow::init() {
     connect(&btConnectButtonGroup, SIGNAL(idClicked(int)),
             this, SLOT(onBtConnectButtonClicked(int)));
 
-    this->statusBar()->showMessage("Application Layer Network Node Address: " + alnRouter->address());
+    this->statusBar()->showMessage("This node's Application Layer Network address: " + alnRouter->address());
 
     serviceUuidToNameMap.insert("94f39d29-7d6d-437d-973b-fba39e49d4ee", "rfcomm-client");
     serviceUuidToNameMap.insert("00001101-0000-1000-8000-10ca10ddba11", "blinky-bt");
@@ -185,25 +188,28 @@ void MainWindow::selfTest() {
 void MainWindow::populateNetworkInterfaces() {
     QStringList networkInterfaces, types, bcastAddresses;
     QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
+    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
     foreach(QNetworkInterface iFace, allInterfaces) {
         QList<QNetworkAddressEntry> entries = iFace.addressEntries();
-        if (entries.isEmpty()) continue;
-        QNetworkAddressEntry entry = entries.first();
-        QHostAddress address = entry.ip();
-        switch(iFace.type()){
-        case QNetworkInterface::InterfaceType::Ethernet:
-            networkInterfaces << address.toString();
-            types << "eth";
-            bcastAddresses << entry.broadcast().toString();
-            break;
-        case QNetworkInterface::InterfaceType::Wifi:
-            networkInterfaces << address.toString();
-            types << "wifi";
-            bcastAddresses << entry.broadcast().toString();
-            break;
-        default:
-            break;
-        }
+            foreach(QNetworkAddressEntry entry, entries) {
+                QHostAddress address = entry.ip();
+                if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
+                    switch(iFace.type()){
+                    case QNetworkInterface::InterfaceType::Ethernet:
+                        networkInterfaces << address.toString();
+                        types << "eth";
+                        bcastAddresses << entry.broadcast().toString();
+                        break;
+                    case QNetworkInterface::InterfaceType::Wifi:
+                        networkInterfaces << address.toString();
+                        types << "wifi";
+                        bcastAddresses << entry.broadcast().toString();
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
     }
 
     for(int i = 0; i < networkInterfaces.count(); i++) {
@@ -217,7 +223,6 @@ void MainWindow::populateNetworkInterfaces() {
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Listen, QHeaderView::ResizeToContents);
-
 }
 
 void MainWindow::onAddChannelButtonClicked() {
@@ -301,8 +306,11 @@ void MainWindow::onTcpListenPending() {
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
 }
 
-void MainWindow::onBroadcastListenRequest(QString addr, short port, bool enable) {
+void MainWindow::onBroadcastListenRequest(int checkState) {
+    bool enable = checkState == Qt::Checked;
     qInfo() << "Enable BroadcastListen:" << (enable ? "true" : "false");
+    QString addr = ui->networkDiscoveryLineEdit->text();
+    int port = ui->networkDiscoveryPortSpinBox->value();
     QString key = QString("%1:%2").arg(addr).arg(port);
 
     if (urlAdvertisers.contains(key)) {
@@ -320,19 +328,49 @@ void MainWindow::onBroadcastListenRequest(QString addr, short port, bool enable)
     }
     if (enable && !udpSocket->isOpen()) {
         udpSocket->bind(port, QUdpSocket::ShareAddress);
-        udpSocket->connectToHost(addr, port);
     }
-    if (!enable && udpSocket->isOpen()) {
-        udpSocket->disconnectFromHost();
+    if (!enable){
+        if (udpSocket->isOpen())
+            udpSocket->disconnectFromHost();
+        if (udpSockets.contains(key))
+            udpSockets.remove(key);
+        delete udpSocket;
     }
 }
 
 void MainWindow::onUdpBroadcastRx() {
-    qInfo() << "TODO MainWindow::onUdpBroadcastRx()";
+    foreach(QUdpSocket* socket, udpSockets) {
+        QByteArray datagram;
+        while (socket->hasPendingDatagrams()) {
+            datagram.resize(int(socket->pendingDatagramSize()));
+            socket->readDatagram(datagram.data(), datagram.size());
+            if (!udpAdverts.contains(datagram.constData())) {
+                udpAdverts[datagram.constData()] = true;
+                onNetworkDiscoveryChanged();
+            }
+            qDebug() << "bcast recvd:" << datagram.constData();
+        }
+    }
+}
+
+void MainWindow::onNetworkDiscoveryChanged() {
+    QVBoxLayout* layout = new QVBoxLayout();
+    foreach(QString advert, udpAdverts.keys()) {
+        QHBoxLayout* rowLayout = new QHBoxLayout();
+        rowLayout->addWidget(new QLabel(advert));
+        layout->addLayout(rowLayout);
+    }
+    layout->addStretch();
+    QWidget* widget = new QWidget();
+    if (ui->netDiscoveryScrollArea->widget()) {
+        ui->netDiscoveryScrollArea->takeWidget()->deleteLater();
+    }
+    widget->setLayout(layout);
+    ui->netDiscoveryScrollArea->setWidget(widget);
+    widget->show();
 }
 
 void MainWindow::onNetStateChanged() {
-    QVBoxLayout* layout = new QVBoxLayout();
 
     QMap<QString, QStringList> nodeMap = alnRouter->nodeServices();
 
@@ -342,6 +380,7 @@ void MainWindow::onNetStateChanged() {
     }
     buttonIdMap.clear();
 
+    QVBoxLayout* layout = new QVBoxLayout();
     foreach(QString nodeAddress, nodeMap.keys()) {
         QFrame* serviceRow = new QFrame;
         serviceRow->setLineWidth(1);

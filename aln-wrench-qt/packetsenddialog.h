@@ -5,19 +5,20 @@
 #include <QDialog>
 #include <QTextEdit>
 #include <QLineEdit>
+#include <QLabel>
 
 class PacketSendDialog : public QDialog
 {
     Q_OBJECT
 
     Router* router;
-    short contextID;
+    unsigned short contextID;
     QString response;
 
     QLineEdit* destLineEdit;
     QLineEdit* serviceLineEdit;
     QLineEdit* dataLineEdit;
-    QLineEdit* responseLineEdit;
+    QLabel *responseLabel;
 
 public:
     PacketSendDialog(Router* alnRouter, QWidget *parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
