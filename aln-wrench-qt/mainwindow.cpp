@@ -87,6 +87,9 @@ void MainWindow::init() {
     connect(ui->broadcastListenCheckBox, SIGNAL(stateChanged(int)),
             this, SLOT(onBroadcastListenRequest(int)));
 
+    connect(&connectToHostButtonGroup, SIGNAL(idClicked(int)),
+            this, SLOT(onNetworkHostConnectButtonClicked(int)));
+
     // bluetooth discovery
     btDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
     connect(btDiscoveryAgent, SIGNAL(deviceDiscovered(QBluetoothDeviceInfo)),
@@ -136,12 +139,12 @@ void MainWindow::onDebugMessage(QtMsgType type, const QMessageLogContext &contex
         break;
     case QtWarningMsg:
         if (ui->logErrorCheckBox->isChecked())
-            emit logLineReady(QString("%0 WARNING %1 (%2:%3, %4)").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady(QString("%0 WARNING %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
         fprintf(stderr, "Warning: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtCriticalMsg:
         if (ui->logErrorCheckBox->isChecked())
-            emit logLineReady(QString("%0 CRITICAL %1 (%2:%3, %4)").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady(QString("%0 CRITICAL %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
         fprintf(stderr, "Critical: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtFatalMsg:
@@ -246,6 +249,12 @@ void MainWindow::onChannelClosing(Channel* ch)
 
 void MainWindow::onConnectRequest(QString urlString) {
     QUrl url = QUrl::fromEncoded(urlString.toUtf8());
+    foreach(ConnectionItem* item, connectionItems) {
+        if (item->info() == urlString) {
+            qInfo() << "already connected to " << urlString;
+            return;
+        }
+    }
     TcpChannel* channel;
     if (url.scheme().startsWith("tls")) {
         QSslSocket* socket = new QSslSocket(this);
@@ -265,6 +274,15 @@ void MainWindow::onConnectRequest(QString urlString) {
     connectionItems.append(new ConnectionItem(channel, urlString));
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
     connect(channel, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
+}
+
+void MainWindow::onDisconnectRequest(QString url) {
+    foreach(ConnectionItem *item, connectionItems) {
+        if (item->info() == url)  {
+            item->channel()->disconnect();
+            break;
+        }
+    }
 }
 
 void MainWindow::onListenRequest(QString scheme, QString interface, short port, bool enable) {
@@ -287,8 +305,14 @@ void MainWindow::onListenRequest(QString scheme, QString interface, short port, 
         srvr->close();
     }
 
-    if (ui->netAdvertiseContent->isEnabled())
+    if (ui->netAdvertiseContent->isEnabled()) {
         ui->netAdvertiseContent->setText(QString("%1://%2:%3").arg(scheme).arg(interface).arg(port));
+        foreach(NetworkInterfaceItem* item, interfaces){
+            if (item->listenAddress() == interface) {
+                ui->bcastInterfaceLineEdit->setText(item->broadcastAddress());
+            }
+        };
+    }
 }
 
 void MainWindow::onTcpListenPending() {
@@ -354,12 +378,28 @@ void MainWindow::onUdpBroadcastRx() {
 }
 
 void MainWindow::onNetworkDiscoveryChanged() {
+    // clear QButtonGroup
+    foreach(QAbstractButton* button, connectToHostButtonGroup.buttons()) {
+        connectToHostButtonGroup.removeButton(button);
+    }
+    connectToHostButtonIdMap.clear();
+
     QVBoxLayout* layout = new QVBoxLayout();
     foreach(QString advert, udpAdverts.keys()) {
         QHBoxLayout* rowLayout = new QHBoxLayout();
         rowLayout->addWidget(new QLabel(advert));
+        rowLayout->addStretch();
         layout->addLayout(rowLayout);
+
+        // TODO look up connection state first
+        QPushButton* connectButton = new QPushButton(hasConnection(advert) ? "disconnect" : "connect");
+        rowLayout->addWidget(connectButton);
+
+        int buttonID = connectToHostButtonIdMap.size();
+        connectToHostButtonIdMap.insert(buttonID, advert);
+        connectToHostButtonGroup.addButton(connectButton, buttonID);
     }
+
     layout->addStretch();
     QWidget* widget = new QWidget();
     if (ui->netDiscoveryScrollArea->widget()) {
@@ -370,6 +410,26 @@ void MainWindow::onNetworkDiscoveryChanged() {
     widget->show();
 }
 
+bool MainWindow::hasConnection(QString url) {
+    bool connected = false;
+    foreach(ConnectionItem *item, connectionItems) {
+        if (item->info() == url)  {
+            connected = true;
+            break;
+        }
+    }
+    return connected;
+}
+
+void MainWindow::onNetworkHostConnectButtonClicked(int id) {
+    QString url = connectToHostButtonIdMap.value(id);
+    if (hasConnection(url)) {
+        onDisconnectRequest(url);
+    } else {
+        onConnectRequest(url);
+    }
+}
+
 void MainWindow::onNetStateChanged() {
 
     QMap<QString, QStringList> nodeMap = alnRouter->nodeServices();
@@ -378,7 +438,7 @@ void MainWindow::onNetStateChanged() {
     foreach(QAbstractButton* button, serviceButtonGroup.buttons()) {
         serviceButtonGroup.removeButton(button);
     }
-    buttonIdMap.clear();
+    serviceButtonIdMap.clear();
 
     QVBoxLayout* layout = new QVBoxLayout();
     foreach(QString nodeAddress, nodeMap.keys()) {
@@ -396,8 +456,8 @@ void MainWindow::onNetStateChanged() {
         } else {
             foreach(QString service, services) {
                 QPushButton* serviceButton = new QPushButton(service);
-                int buttonID = buttonIdMap.size();
-                buttonIdMap.insert(buttonID, QPair<QString, QString>(nodeAddress, service));
+                int buttonID = serviceButtonIdMap.size();
+                serviceButtonIdMap.insert(buttonID, QPair<QString, QString>(nodeAddress, service));
                 serviceButtonGroup.addButton(serviceButton, buttonID);
                 buttonLayout->addWidget(serviceButton);
             }
@@ -417,13 +477,15 @@ void MainWindow::onNetStateChanged() {
     widget->setLayout(layout);
     ui->scrollArea->setWidget(widget);
     widget->show();
+
+    // update discovery button text
+    onNetworkDiscoveryChanged();
 }
 
 void MainWindow::onServiceButtonClicked(int id) {
-    QPair<QString, QString> data = buttonIdMap.value(id);
+    QPair<QString, QString> data = serviceButtonIdMap.value(id);
     QString nodeAddress = data.first;
     QString service = data.second;
-    // TODO create dialog
     PacketSendDialog* dialog = new PacketSendDialog(alnRouter, this);
     dialog->setDest(nodeAddress);
     dialog->setService(service);
@@ -467,7 +529,6 @@ void MainWindow::btDiscoveryCheckboxChanged(bool enabled) {
         btDiscoveryAgent->stop();
     }
 }
-
 
 void MainWindow::deviceDiscovered(QBluetoothDeviceInfo device) {
     foreach(QBluetoothUuid serviceUUID, device.serviceUuids()) {

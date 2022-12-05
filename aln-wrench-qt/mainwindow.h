@@ -45,8 +45,11 @@ class MainWindow : public QMainWindow
     QMap<QString, AdvertiserThread*> urlAdvertisers;
     QList<ConnectionItem*> connectionItems;
 
+    QButtonGroup connectToHostButtonGroup;
+    QMap<int, QString> connectToHostButtonIdMap;
+
     QButtonGroup serviceButtonGroup;
-    QMap<int, QPair<QString, QString>> buttonIdMap;
+    QMap<int, QPair<QString, QString>> serviceButtonIdMap;
 
     QBluetoothDeviceDiscoveryAgent* btDiscoveryAgent;
     QMap<QString, QString> serviceUuidToNameMap;
@@ -70,6 +73,7 @@ private:
     void selfTest();
     void populateNetworkInterfaces();
     void onNetworkDiscoveryChanged();
+    bool hasConnection(QString url);
 
 public slots:
     void addLogLine(QString msg);
@@ -78,6 +82,7 @@ public slots:
     void onAddChannelButtonClicked();
     void onChannelClosing(Channel*);
     void onConnectRequest(QString url);
+    void onDisconnectRequest(QString url);
     void onListenRequest(QString scheme, QString interface, short port, bool enable);
     void onTcpListenPending();
     void onUdpBroadcastRx();
@@ -94,6 +99,8 @@ public slots:
     void logServicePacketHandler(Packet* packet);
 
     void onServiceButtonClicked(int id);
+    void onNetworkHostConnectButtonClicked(int id);
+
 signals:
     void logLineReady(QString);
     void connectionAdded(QString url);
