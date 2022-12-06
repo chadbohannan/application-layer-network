@@ -53,9 +53,13 @@ void MainWindow::init() {
             this, SLOT(onAddChannelButtonClicked()));
 
     alnRouter = new Router();
-    PacketSignaler* signaler = new PacketSignaler();
-    connect(signaler, SIGNAL(packetReceived(Packet*)), this, SLOT(logServicePacketHandler(Packet*)));
-    alnRouter->registerService("log", signaler);
+    PacketSignaler* logSignaler = new PacketSignaler();
+    connect(logSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(logServicePacketHandler(Packet*)));
+    alnRouter->registerService("log", logSignaler);
+
+    PacketSignaler* echoSignaler = new PacketSignaler();
+    connect(echoSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(echoServicePacketHandler(Packet*)));
+    alnRouter->registerService("echo", echoSignaler );
 
     connect(alnRouter, SIGNAL(netStateChanged()),
             this, SLOT(onNetStateChanged()));
@@ -99,6 +103,8 @@ void MainWindow::init() {
     connect(&btConnectButtonGroup, SIGNAL(idClicked(int)),
             this, SLOT(onBtConnectButtonClicked(int)));
 
+    ui->btDiscoveryGroupBox->setVisible(false);
+
     this->statusBar()->showMessage("This node's Application Layer Network address: " + alnRouter->address());
 
     serviceUuidToNameMap.insert("94f39d29-7d6d-437d-973b-fba39e49d4ee", "rfcomm-client");
@@ -112,6 +118,22 @@ void MainWindow::logServicePacketHandler(Packet* packet) {
         logServiceBufferList.removeFirst();
     logServiceBufferList.append(QString("%0 - %1").arg(packet->srcAddress).arg(packet->data));
     ui->logServiceListView->setModel(new QStringListModel(logServiceBufferList));
+}
+
+void MainWindow::echoServicePacketHandler(Packet* packet) {
+    if (packet->srcAddress.length() == 0) {
+        qWarning() << "echo service cannot respond to an empty address";
+        return;
+    }
+    if (packet->ctx == 0) {
+        qWarning() << "echo service cannot respond to null context (context id is zero)";
+        return;
+    }
+    qDebug() << "echo service returning " << packet->data << " to " << packet->srcAddress << ":" << packet->ctx;
+    packet->destAddress = packet->srcAddress;
+    packet->srcAddress = alnRouter->address();
+    packet->srv.clear();
+    alnRouter->send(packet);
 }
 
 void MainWindow::addLogLine(QString msg) {
@@ -332,13 +354,12 @@ void MainWindow::onTcpListenPending() {
 
 void MainWindow::onBroadcastListenRequest(int checkState) {
     bool enable = checkState == Qt::Checked;
-    qInfo() << "Enable BroadcastListen:" << (enable ? "true" : "false");
     QString addr = ui->networkDiscoveryLineEdit->text();
     int port = ui->networkDiscoveryPortSpinBox->value();
     QString key = QString("%1:%2").arg(addr).arg(port);
 
     if (urlAdvertisers.contains(key)) {
-        qInfo() << "cannot listen on advertising port";
+        qWarning() << "cannot listen on advertising port";
         return;
     }
 
@@ -534,7 +555,7 @@ void MainWindow::deviceDiscovered(QBluetoothDeviceInfo device) {
     foreach(QBluetoothUuid serviceUUID, device.serviceUuids()) {
         qDebug() << "inspecting " <<serviceUUID.toString(QBluetoothUuid::WithoutBraces);
         if( serviceUuidToNameMap.contains(serviceUUID.toString(QBluetoothUuid::WithoutBraces))) {
-            qInfo() << "discovered bt device: " << device.name();
+            qDebug() << "discovered BT device: " << device.name();
             auto pair = QPair<QBluetoothDeviceInfo, QBluetoothUuid>(device, serviceUUID);
             btAddressToDeviceInfoMap.insert(device.address().toString(), pair);
             btDiscoveryStateChanged();

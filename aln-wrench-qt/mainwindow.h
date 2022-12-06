@@ -97,6 +97,7 @@ public slots:
 
     void onNetStateChanged();
     void logServicePacketHandler(Packet* packet);
+    void echoServicePacketHandler(Packet* packet);
 
     void onServiceButtonClicked(int id);
     void onNetworkHostConnectButtonClicked(int id);

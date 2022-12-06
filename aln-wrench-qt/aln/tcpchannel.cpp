@@ -45,7 +45,7 @@ bool TcpChannel::send(Packet* p) {
         qDebug() << "TCPChannel::send err:"<< err << ", " << peerName();
         return false;
     }
-
+    delete p;
     return true;
 }
 
