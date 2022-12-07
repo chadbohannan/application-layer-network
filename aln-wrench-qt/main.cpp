@@ -4,8 +4,15 @@
 #include <QLocale>
 #include <QTranslator>
 
+MainWindow* w = 0;
+void myMessageOutput(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+    if (w) w->onDebugMessage(type, context, msg);
+}
+
 int main(int argc, char *argv[])
 {
+    qInstallMessageHandler(myMessageOutput);
     QApplication a(argc, argv);
 
     QTranslator translator;
@@ -17,8 +24,9 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    MainWindow w;
-    w.setWindowTitle("ALN Wrench Qt");
-    w.show();
+    w = new MainWindow();
+    w->init();
+    w->setWindowTitle("ALN Wrench Qt");
+    w->show();
     return a.exec();
 }

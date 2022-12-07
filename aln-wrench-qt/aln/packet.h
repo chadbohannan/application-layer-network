@@ -60,6 +60,7 @@ public:
     Packet(QString dest, QString service, INT16U contextID, QByteArray content);
     void init(QByteArray);
     void clear();
+    QString toString();
 
     INT16U controlField();
     QByteArray toByteArray();

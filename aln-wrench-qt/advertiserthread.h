@@ -12,6 +12,7 @@ class AdvertiserThread : public QThread
     int mPort;
 public:
     AdvertiserThread(QString url, QString addr, int port, QObject* parent = nullptr);
+    void setUrl(QString);
     void stop();
 
     // QThread interface

@@ -1,5 +1,6 @@
 #include "packetsenddialog.h"
 
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 
@@ -35,7 +36,7 @@ void PacketSendDialog::setData(QString data) {
 }
 
 void PacketSendDialog::setResponse(QString resp) {
-    responseLineEdit->setText(resp);
+    responseLabel->setText(resp);
 }
 
 void PacketSendDialog::onClose() {
@@ -46,7 +47,9 @@ void PacketSendDialog::onSendClicked() {
     QString dst = destLineEdit->text();
     QString srv = serviceLineEdit->text();
     QString data = dataLineEdit->text();
-    router->send(new Packet(dst, srv, contextID, data.toUtf8()));
+    Packet* packet = new Packet(dst, srv, contextID, data.toUtf8());
+    qDebug() << "Sending packet:" << data << "to: " << dst;
+    router->send(packet);
 }
 
 void PacketSendDialog::onCloseClicked() {
@@ -75,10 +78,11 @@ QLayout* PacketSendDialog::createLayout() {
     dataLayout->addWidget(dataLineEdit);
 
     QHBoxLayout* responseLayout = new QHBoxLayout;
-    responseLineEdit = new QLineEdit;
-    responseLineEdit ->setReadOnly(true);
-    responseLayout->addWidget(new QLabel("resp"));
-    responseLayout->addWidget(responseLineEdit );
+    responseLayout->addWidget(responseLabel = new QLabel());
+
+    QGroupBox* responseGroupBox = new QGroupBox("Response");
+    responseGroupBox->setLayout(responseLayout);
+
 
     QPushButton* sendButton = new QPushButton("Send");
     connect(sendButton, SIGNAL(clicked()), this, SLOT(onSendClicked()));
@@ -88,15 +92,15 @@ QLayout* PacketSendDialog::createLayout() {
 
     QHBoxLayout* buttonLayout = new QHBoxLayout;
     buttonLayout->addStretch();
-    buttonLayout->addWidget(closeButton);
     buttonLayout->addWidget(sendButton);
+    buttonLayout->addWidget(closeButton);
 
     QVBoxLayout* layout = new QVBoxLayout;
     layout->addLayout(destLayout);
     layout->addLayout(serviceLayout);
     layout->addLayout(contextLayout);
     layout->addLayout(dataLayout);
-    layout->addLayout(responseLayout);
+    layout->addWidget(responseGroupBox);
     layout->addLayout(buttonLayout);
     return layout;
 }

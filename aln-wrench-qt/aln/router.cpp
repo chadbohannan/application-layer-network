@@ -57,6 +57,7 @@ QString Router::send(Packet* p) {
         } else {
             return QString("service '%1' not registered\n").arg(p->srv);
         }
+        delete p;
     } else if (p->nxtAddress.length() == 0 || p->nxtAddress == mAddress) {
         if (remoteNodeMap.contains(p->destAddress)) {
             RemoteNodeInfo* rni = remoteNodeMap[p->destAddress];

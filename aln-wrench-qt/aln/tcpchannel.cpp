@@ -26,10 +26,15 @@ QString TcpChannel::lastError() {
     return err;
 }
 
+QString TcpChannel::peerName() {
+    return this->socket->peerAddress().toString();
+}
+
 bool TcpChannel::send(Packet* p) {
     if (!socket->isOpen()) {
         packetQueue.append(p);
         err = "Socket not open; packet queued";
+        qDebug() << err;
         return false;
     }
 
@@ -37,16 +42,17 @@ bool TcpChannel::send(Packet* p) {
         socket->write(toAx25Buffer(p->toByteArray()));
     } catch (...) {
         err = QString("socket write err:%1").arg(socket->errorString());
+        qDebug() << "TCPChannel::send err:"<< err << ", " << peerName();
         return false;
     }
-
+    delete p;
     return true;
 }
 
 void TcpChannel::onConnected() {
-    qDebug() << "TcpChannel::onConnected";
+    qDebug() << "TcpChannel connected";
     foreach(Packet* p, packetQueue) {
-        qDebug() << "sending queued packet";
+        qDebug() << "TcpChannel sending queued packet";
         send(p);
     }
     packetQueue.clear();
@@ -55,9 +61,9 @@ void TcpChannel::onConnected() {
 bool TcpChannel::listen() {
     if (!socket-> isOpen()) {
         err = "Socket read error: socket is not open";
+        qDebug() << "TcpChannel:" << err;
         return false;
     }
-
     return true;
 }
 
@@ -69,7 +75,7 @@ void TcpChannel::disconnect() {
 }
 
 void TcpChannel::onSocketError(QAbstractSocket::SocketError errCode) {
-    qDebug() << "socket error code:" << errCode;
+    qInfo() << "socket closed: " << errCode;
     disconnect();
 }
 
@@ -80,4 +86,3 @@ void TcpChannel::onSocketDataReady() {
 void TcpChannel::onSocketClose() {
     disconnect();
 }
-
