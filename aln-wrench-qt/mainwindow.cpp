@@ -130,10 +130,7 @@ void MainWindow::echoServicePacketHandler(Packet* packet) {
         return;
     }
     qDebug() << "echo service returning " << packet->data << " to " << packet->srcAddress << ":" << packet->ctx;
-    packet->destAddress = packet->srcAddress;
-    packet->srcAddress = alnRouter->address();
-    packet->srv.clear();
-    alnRouter->send(packet);
+    alnRouter->send(new Packet(packet->srcAddress, packet->ctx, packet->data));
 }
 
 void MainWindow::addLogLine(QString msg) {
