@@ -77,6 +77,7 @@ private:
 
 public slots:
     void addLogLine(QString msg);
+    void clearLog();
     void onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 
     void onAddChannelButtonClicked();

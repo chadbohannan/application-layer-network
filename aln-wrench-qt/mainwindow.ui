@@ -301,7 +301,7 @@
               <x>0</x>
               <y>0</y>
               <width>440</width>
-              <height>144</height>
+              <height>142</height>
              </rect>
             </property>
            </widget>
@@ -396,6 +396,19 @@
              </property>
              <property name="checked">
               <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="clearLogButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>Clear</string>
              </property>
             </widget>
            </item>

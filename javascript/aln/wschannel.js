@@ -38,7 +38,6 @@ export class WebSocketChannel {
   }
 
   send(packet) {
-    // console.log('sending:', packet.toJson())
     this.ws.send(packet.toJson())
   }
 }

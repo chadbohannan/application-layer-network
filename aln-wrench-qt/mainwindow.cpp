@@ -56,6 +56,7 @@ void MainWindow::init() {
     PacketSignaler* logSignaler = new PacketSignaler();
     connect(logSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(logServicePacketHandler(Packet*)));
     alnRouter->registerService("log", logSignaler);
+    connect(ui->clearLogButton, SIGNAL(clicked()), this, SLOT(clearLog()));
 
     PacketSignaler* echoSignaler = new PacketSignaler();
     connect(echoSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(echoServicePacketHandler(Packet*)));
@@ -138,7 +139,11 @@ void MainWindow::addLogLine(QString msg) {
         debugBufferList.removeFirst();
     debugBufferList.append(msg);
     ui->statusLogListView->setModel(new QStringListModel(debugBufferList));
+}
 
+void MainWindow::clearLog() {
+    debugBufferList.clear();
+    ui->statusLogListView->setModel(new QStringListModel(debugBufferList));
 }
 
 void MainWindow::onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
@@ -264,6 +269,7 @@ void MainWindow::onChannelClosing(Channel* ch)
     QItemSelectionModel *m = ui->channelsListView->selectionModel();
     ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
     if (m) delete m;
+    onNetworkDiscoveryChanged();
 }
 
 void MainWindow::onConnectRequest(QString urlString) {
@@ -405,17 +411,16 @@ void MainWindow::onNetworkDiscoveryChanged() {
     QVBoxLayout* layout = new QVBoxLayout();
     foreach(QString advert, udpAdverts.keys()) {
         QHBoxLayout* rowLayout = new QHBoxLayout();
-        rowLayout->addWidget(new QLabel(advert));
-        rowLayout->addStretch();
-        layout->addLayout(rowLayout);
-
-        // TODO look up connection state first
         QPushButton* connectButton = new QPushButton(hasConnection(advert) ? "disconnect" : "connect");
-        rowLayout->addWidget(connectButton);
 
         int buttonID = connectToHostButtonIdMap.size();
         connectToHostButtonIdMap.insert(buttonID, advert);
         connectToHostButtonGroup.addButton(connectButton, buttonID);
+
+        rowLayout->addWidget(connectButton);
+        rowLayout->addStretch();
+        rowLayout->addWidget(new QLabel(advert));
+        layout->addLayout(rowLayout);
     }
 
     layout->addStretch();
