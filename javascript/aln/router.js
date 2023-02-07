@@ -1,3 +1,4 @@
+import { Packet } from './packet'
 import {
     makeNetQueryPacket,
     makeNetworkRouteSharePacket,
@@ -53,15 +54,19 @@ import {
     }
 
     summary() {
+      const res = []
       if (this.remoteNodeMap.size > 0) {
-        const x = []
+        const srvSum = this.serviceSummary()
+        
         this.remoteNodeMap.forEach( (value, address) => {
-          x.push(`address:${address} cost:${value.cost}`)
+          res.push({
+            address:address,
+            cost:value.cost,
+            services: srvSum.filter(service => service.address == address),
+          })
         })
-        return x
-      } else {
-        return ['n/a']
       }
+      return res
     }
 
     selectService (serviceID) {
@@ -161,7 +166,7 @@ import {
             if (cost === 0) {
               this.remoteNodeMap.delete(remoteAddress)
               this.serviceLoadMap.forEach((loadMap, serviceID) => {
-                loadMap.delete(address)
+                loadMap.delete(remoteAddress)
               })
               p = makeNetworkRouteSharePacket(this.address, remoteAddress, 0)
             } else if (cost <= remoteNode.cost) {
@@ -261,6 +266,19 @@ import {
       return dump
     }
   
+    serviceSummary() {
+      const dump = []
+      this.serviceMap.forEach((_, serviceID) => {
+        dump.push({address:this.address, service:serviceID, load: 0})
+      })
+      this.serviceLoadMap.forEach((loadMap, serviceID) => {
+        loadMap.forEach((nodeLoad, address) => {
+          dump.push({address:address, name:serviceID, load: nodeLoad.load})
+        })
+      })
+      return dump
+    }
+
     shareNetState () {
       const routes = this.exportRouteTable()
       const services = this.exportServiceTable()
