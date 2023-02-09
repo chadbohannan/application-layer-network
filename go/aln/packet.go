@@ -77,6 +77,7 @@ const (
 	NET_ROUTE   = byte(0x01) // packet contains route entry
 	NET_SERVICE = byte(0x02) // packet contains service entry
 	NET_QUERY   = byte(0x03) // packet is a request for content
+	NET_ERROR   = byte(0xFF) // packet is an peer error message
 )
 
 type Packet struct {

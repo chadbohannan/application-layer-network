@@ -79,3 +79,40 @@ func TestRoute2Hop(t *testing.T) {
 		t.Fatal("packet not recieved")
 	}
 }
+
+func TestRoute1LimitedHop(t *testing.T) {
+	packetRecieved := false
+	rtr1 := NewRouter("1")
+	rtr2 := NewRouter("2")
+
+	rtr1.RegisterService("ping", func(*Packet) { packetRecieved = true })
+
+	localChannel := NewLocalChannel()
+
+	count := 0
+	canSend := func(router *Router, packet *Packet) (bool, error) {
+		count += 1
+		return true, nil
+	}
+
+	limitedChannel := NewLimitedChannel(localChannel, rtr1, canSend)
+
+	rtr1.AddChannel(limitedChannel)
+	rtr2.AddChannel(localChannel.FlippedChannel())
+
+	time.Sleep(time.Millisecond)
+
+	pkt := NewPacket()
+	pkt.DestAddr = "1"
+	pkt.Service = "ping"
+	if err := rtr2.Send(pkt); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond) // let async operation settle
+	if !packetRecieved {
+		t.Fatal("packet not recieved")
+	}
+	if count != 5 { // routing + data packets
+		t.Fatalf("expected count == 5, not %d", count)
+	}
+}

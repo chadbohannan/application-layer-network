@@ -62,6 +62,10 @@ func NewRouter(address AddressType) *Router {
 	}
 }
 
+func (r *Router) Address() AddressType {
+	return r.address
+}
+
 // SelectService returns the address of the service with the lowest load, or zero
 func (r *Router) SelectService(service string) AddressType {
 	if _, ok := r.serviceMap[service]; ok {
@@ -81,9 +85,9 @@ func (r *Router) SelectService(service string) AddressType {
 }
 
 // Send is the core routing function of Router. A packet is either expected
-//  locally by a registered Node, or on a multi-hop route to it's destination.
+//
+//	locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
-
 	handler := func(p *Packet) {}
 	packetCallback := func(p *Packet) { handler(p) }
 	defer packetCallback(p)
@@ -294,6 +298,8 @@ func (r *Router) AddChannel(channel Channel) {
 			for _, servicePacket := range r.ExportServiceTable() {
 				channel.Send(servicePacket)
 			}
+		case NET_ERROR:
+			log.Printf("NET_ERROR 255 %s", string(packet.Data))
 		default:
 			r.Send(packet)
 		}
