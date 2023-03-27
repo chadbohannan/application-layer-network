@@ -12,12 +12,12 @@ import (
 
 func main() {
 	// create first router
-	r1Address := aln.AddressType("1")
-	r2Address := aln.AddressType("2")
+	r1Address := aln.AddressType("r1")
+	r2Address := aln.AddressType("r2")
 
 	// setup the first node to host a ping service
 	r1 := aln.NewRouter(r1Address)
-	tcpHost := aln.NewTcpChannelHost("localhost", 8181)
+	tcpHost := aln.NewTcpChannelHost("localhost", 8081)
 	go tcpHost.Listen(func(newChannel aln.Channel) {
 		r1.AddChannel(newChannel)
 	})
@@ -32,28 +32,31 @@ func main() {
 		})
 	})
 
-	time.Sleep(10 * time.Millisecond) // let the new server open port 8000
+	time.Sleep(10 * time.Millisecond) // let the new server open port 8081
 
-	// setup the second node to connect to the first using TCP
-	r2 := aln.NewRouter(r2Address)
-	conn, err := net.Dial("tcp", "localhost:8181")
+	// connect to the first node using TCP
+	conn, err := net.Dial("tcp", "localhost:8081")
 	if err != nil {
 		fmt.Println("dial failed:" + err.Error())
 		os.Exit(-1)
 	}
 
+	// create the second router and add the new channel to it; TcpChannelHost will handle the other side
+	r2 := aln.NewRouter(r2Address)
 	r2.AddChannel(aln.NewTCPChannel(conn))
 
-	time.Sleep(10 * time.Millisecond) // let the routing tables synchronize
+	// both routers are now connected
+	time.Sleep(10 * time.Millisecond) // let the route and service synchronization finish
 
 	// Setup our ping reply handler
 	var wg sync.WaitGroup
 	wg.Add(1)
-	ctx := r2.RegisterContextHandler(func(response *aln.Packet) {
-		fmt.Println(string(response.Data)) // pong!
-		wg.Done()
+	var ctx uint16
+	ctx = r2.RegisterContextHandler(func(response *aln.Packet) {
+		fmt.Println(string(response.Data)) // should say "pong!"
+		r2.ReleaseContext(ctx)             // release the memory associated with this packet handler
+		wg.Done()                          // the ping response unclocks our waitgroup and the program can exit
 	})
-	defer r2.ReleaseContext(ctx)
 
 	fmt.Println("ping") // the journey begins
 	r2.Send(&aln.Packet{
@@ -61,5 +64,5 @@ func main() {
 		ContextID: ctx,
 	})
 
-	wg.Wait()
+	wg.Wait() // blocks until the ping finishes it's round-trip
 }

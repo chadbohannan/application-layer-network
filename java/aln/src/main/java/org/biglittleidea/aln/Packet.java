@@ -114,6 +114,10 @@ public class Packet {
         init(pData);
     }
 
+    public Packet copy() {
+        return new Packet(this);
+    }
+
     public static short readUINT16(byte[] pData, int offset) {
         short value = (short)((pData[offset] << 8) & 0xFF00);
         value |= (pData[offset + 1] & (short)0x00FF);

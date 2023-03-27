@@ -109,11 +109,15 @@ public class Packet {
         AcknowledgeBlock = p.AcknowledgeBlock;
         ContextID = p.ContextID;
         DataType = p.DataType;
-        Data = p.Data;
+        Data = p.Data; // TODO fix
     }
 
     public Packet(byte[] pData) {
         init(pData);
+    }
+
+    public Packet copy() {
+        return new Packet(this);
     }
 
     public static short readUINT16(byte[] pData, int offset) {
@@ -144,21 +148,6 @@ public class Packet {
         bytes[2] = (byte) (value >> 8 & 0x00FF);
         bytes[3] = (byte) (value & 0x00FF);
         return bytes;
-    }
-
-    public static int headerLength(short controlFlags, byte[] buffer) {
-        int len = 2; // control flag bytes
-        if ((controlFlags & ControlFlag.netState) != 0) len += 1;
-        if ((controlFlags & ControlFlag.service) != 0) len += 2;
-        if ((controlFlags & ControlFlag.scrAddr) != 0) len += 1 + buffer[len];
-        if ((controlFlags & ControlFlag.destAddr) != 0) len += 1 + buffer[len];
-        if ((controlFlags & ControlFlag.nextAddr) != 0) len += 1 + buffer[len];
-        if ((controlFlags & ControlFlag.seqNum) != 0) len += 2;
-        if ((controlFlags & ControlFlag.ackBlock) != 0) len += 4;
-        if ((controlFlags & ControlFlag.contextID) != 0) len += 2;
-        if ((controlFlags & ControlFlag.dataType) != 0) len += 1;
-        if ((controlFlags & ControlFlag.data) != 0) len += 2;
-        return len;
     }
 
     public void init(byte[] pData) {
@@ -231,16 +220,6 @@ public class Packet {
                 CRC = crcPacket;
             }
         }
-    }
-
-    public void clear() {
-        Net = 0;
-        SourceAddress = null;
-        DestAddress = null;
-        NextAddress = null;
-        SequenceNum = 0;
-        AcknowledgeBlock = 0;
-        Data = new byte[] {};
     }
 
     // returns the hamming encoded Control Field

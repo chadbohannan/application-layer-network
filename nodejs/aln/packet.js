@@ -84,6 +84,10 @@ class Packet {
     const ret = buf.reset().toBinary(0, offset)
     return ret
   }
+
+  copy () {
+    return new Packet(this.toBinary())
+  }
 }
 
 function intXOR (n) {

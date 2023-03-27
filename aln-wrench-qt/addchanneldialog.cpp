@@ -14,7 +14,7 @@ AddChannelDialog::AddChannelDialog(QWidget *parent) : QDialog(parent) {
         margins.bottom ();
     textEdit->setMaximumHeight(nHeight*2);
     if (textEdit->toPlainText().length() == 0)
-        textEdit->setPlainText("tcp+aln://localhost:8181"); // dev convenience
+        textEdit->setPlainText("tcp+aln://192.168.0.118:8081"); // dev convenience
     errorLabel = new QLabel;
     okButton = new QPushButton(tr("Ok"));
     QHBoxLayout* bottomLayout = new QHBoxLayout;

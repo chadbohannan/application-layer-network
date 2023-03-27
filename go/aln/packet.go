@@ -244,6 +244,14 @@ func HeaderFieldOffset(controlFlags uint16, field uint16, frame []byte) uint16 {
 	return offset
 }
 
+func (p *Packet) Copy() (*Packet, error) {
+	byts, err := p.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+	return ParsePacket(byts)
+}
+
 func (p *Packet) SetControlFlags() {
 	controlFlags := uint16(0)
 	p.DataSize = uint16(len(p.Data))

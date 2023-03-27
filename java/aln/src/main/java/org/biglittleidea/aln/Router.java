@@ -50,49 +50,61 @@ public class Router {
     // Router manages a set of channels and packet handlers
     protected String address = "";
     ArrayList<IChannel> channels = new ArrayList<>();
-    HashMap<String, ArrayList<Packet>> serviceQueue = new HashMap<String, ArrayList<Packet>>(); // packets waiting for
-                                                                                                // services during
-                                                                                                // warmup
 
     public String selectService(String service) {
-        if (serviceHandlerMap.containsKey(service))
-            return this.address;
-
-        short minLoad = 0;
         String remoteAddress = "";
-        if (serviceLoadMap.containsKey(service)) {
-            HashMap<String, NodeLoad> addressToLoadMap = serviceLoadMap.get(service);
-            for (String address : addressToLoadMap.keySet()) {
-                NodeLoad nodeLoad = addressToLoadMap.get(address);
-                if (minLoad == 0 || minLoad > nodeLoad.Load) {
-                    remoteAddress = address;
-                    minLoad = nodeLoad.Load;
+        synchronized(this){
+            if (serviceHandlerMap.containsKey(service))
+                return this.address;
+
+            short minLoad = 0;
+            if (serviceLoadMap.containsKey(service)) {
+                HashMap<String, NodeLoad> addressToLoadMap = serviceLoadMap.get(service);
+                for (String address : addressToLoadMap.keySet()) {
+                    NodeLoad nodeLoad = addressToLoadMap.get(address);
+                    if (minLoad == 0 || minLoad > nodeLoad.Load) {
+                        remoteAddress = address;
+                        minLoad = nodeLoad.Load;
+                    }
                 }
             }
         }
         return remoteAddress;
     }
 
+    ArrayList<String> serviceAddresses(String service) {
+        ArrayList<String> addressList = new ArrayList<>();
+        synchronized(this) {
+            if (serviceHandlerMap.containsKey(service))
+                addressList.add(this.address);
+
+            if (serviceLoadMap.containsKey(service)) {
+                HashMap<String, NodeLoad> addressToLoadMap = serviceLoadMap.get(service);
+                for (String address : addressToLoadMap.keySet()) {
+                    addressList.add(address);
+                }
+            }
+        }
+        return addressList;
+    }
+
     // TODO normal java behavior is to throw exceptions, not return error messages
     public String send(Packet p) {
-        synchronized (this) {
-            if (p.SourceAddress == null || p.SourceAddress.length() == 0) {
-                p.SourceAddress = this.address;
-            }
-            if ((p.DestAddress == null || p.DestAddress.length() == 0) &&
-                    (p.Service != null && p.Service.length() > 0)) {
-                p.DestAddress = selectService(p.Service);
-                if (p.DestAddress.length() == 0) {
-                    ArrayList<Packet> packets;
-                    if (!serviceQueue.containsKey(p.Service)) {
-                        packets = new ArrayList<>();
-                        serviceQueue.put(p.Service, packets);
-                    } else {
-                        packets = serviceQueue.get(p.Service);
-                    }
-                    packets.add(p);
-                    System.out.println("service unavailable, packet queued");
+        if (p.SourceAddress == null || p.SourceAddress.length() == 0) {
+            p.SourceAddress = this.address;
+        }
+        if ((p.DestAddress == null || p.DestAddress.length() == 0) &&
+                (p.Service != null && p.Service.length() > 0)) {
+            ArrayList<String> addresses = this.serviceAddresses(p.Service);
+            if (addresses.size() > 0) {
+                for (int i = 1; i < addresses.size(); i++) {
+                    Packet pc = p.copy();
+                    pc.DestAddress = addresses.get(i);
+                    this.send(pc);
                 }
+                p.DestAddress = addresses.get(0);
+            } else {
+                return String.format("no services of type %s yet discovered on the network", p.Service);
             }
         }
 
@@ -294,6 +306,9 @@ public class Router {
                     System.out.printf("error parsing net service: %s\n", serviceInfo.err);
                     return;
                 }
+                if (serviceInfo.address == this.address) {
+                    break;
+                }
                 synchronized (this) {
                     NodeLoad nodeLoad = new NodeLoad();
                     nodeLoad.Load = serviceInfo.load;
@@ -311,22 +326,6 @@ public class Router {
                     }
 
                     loadMap.put(serviceInfo.address, nodeLoad);
-
-                    if (serviceQueue.containsKey(serviceInfo.service)) {
-                        ArrayList<Packet> sq = serviceQueue.get(serviceInfo.service);
-                        System.out.printf("sending %d packet(s) to '%s'\n", sq.size(), serviceInfo.address);
-                        if (remoteNodeMap.containsKey(serviceInfo.address)) {
-                            RemoteNodeInfo routeInfo = remoteNodeMap.get(serviceInfo.address);
-                            for (Packet p : sq) {
-                                p.DestAddress = serviceInfo.address;
-                                p.NextAddress = routeInfo.nextHop;
-                                routeInfo.channel.send(p);
-                            }
-                            serviceQueue.remove(serviceInfo.service);
-                        } else {
-                            System.out.printf("no route to discovered service %s\n", serviceInfo.service);
-                        }
-                    }
                 }
                 // forward the service load
                 for (IChannel ch : channels) {

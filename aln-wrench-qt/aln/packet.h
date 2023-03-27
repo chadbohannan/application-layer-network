@@ -61,6 +61,7 @@ public:
     void init(QByteArray);
     void clear();
     QString toString();
+    Packet* copy();
 
     INT16U controlField();
     QByteArray toByteArray();

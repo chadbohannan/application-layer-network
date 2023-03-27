@@ -116,6 +116,10 @@ QString Packet::toString() {
     if (data.size()) buff += QString("data: %0").arg(data);
 }
 
+Packet* Packet::copy() {
+    return new Packet(toByteArray());
+}
+
 INT16U Packet::controlField() {
     INT16U controlField = 0;
     if (net != 0) controlField |= CF_NETSTATE;

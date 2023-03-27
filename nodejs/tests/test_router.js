@@ -36,8 +36,17 @@ describe('# Test Router', function () {
   it('# route to a neighboring service (1 hop)', async function () {
     const r1 = new Router('1')
     const r2 = new Router('2')
-    let recievedPacket = null
-    r2.registerService('test', (packet) => { recievedPacket = packet })
+    let recievedPacket1 = null
+    r1.registerService('test', (packet) => {
+      assert.isNull(recievedPacket1)
+      recievedPacket1 = packet
+    })
+
+    let recievedPacket2 = null
+    r2.registerService('test', (packet) => {
+      assert.isNull(recievedPacket2)
+      recievedPacket2 = packet
+    })
 
     const ch = new LocalChannel()
     r1.addChannel(ch)
@@ -49,7 +58,8 @@ describe('# Test Router', function () {
     r1.send(p)
     await new Promise(resolve => setTimeout(resolve, 1))
 
-    assert.isNotNull(recievedPacket)
+    assert.isNotNull(recievedPacket1)
+    assert.isNotNull(recievedPacket2)
   })
 
   it('# route to a non-neighboring service (2 hops)', async function () {

@@ -1,6 +1,7 @@
 #include "tcpchannel.h"
 #include "ax25frame.h"
 #include <QDebug>
+#include <QThread>
 
 TcpChannel::TcpChannel(QTcpSocket* s, QObject* parent)
     : Channel(parent), socket(s)

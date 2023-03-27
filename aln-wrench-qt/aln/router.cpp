@@ -7,6 +7,21 @@ Router::Router(QString address) {
     }
 }
 
+QStringList Router::selectServiceAddresses(QString service) {
+    QStringList remoteAddresses;
+    if (serviceHandlerMap.contains(service)) {
+        remoteAddresses.append(mAddress);
+    }
+    if (serviceLoadMap.contains(service)) {
+        QMap<QString, NodeLoad*> addressToLoadMap = serviceLoadMap[service];
+        foreach (QString address, addressToLoadMap.keys()) {
+            remoteAddresses.append(address);
+        }
+    }
+    return remoteAddresses;
+}
+
+
 QString Router::selectServiceAddress(QString service) {
     if (serviceHandlerMap.contains(service))
         return mAddress;
@@ -32,16 +47,15 @@ QString Router::send(Packet* p) {
         p->srcAddress = mAddress;
     }
     if (p->destAddress.length() == 0 && p->srv.length() > 0) {
-        // TODO send packet to all matching services
-        p->destAddress = selectServiceAddress(p->srv);
-        if (p->destAddress.length() == 0) {
-            QList<Packet*> packets;
-            if (serviceQueue.contains(p->srv)) {
-                packets = serviceQueue[p->srv];
+        // send packet to any/all instances of the service
+        QStringList addresses = selectServiceAddresses(p->srv);
+        if (addresses.length() > 0) {
+            for (int i = 1; i < addresses.length(); i++) {
+                Packet* pc = p->copy();
+                pc->destAddress = addresses.at(i);
+                send(pc);
             }
-            packets.append(p);
-            serviceQueue.insert(p->srv, packets);
-            return "service unavailable, packet queued";
+            p->destAddress = addresses.at(0);
         }
     }
     lock.unlock();
@@ -287,22 +301,6 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
             loadMap.insert(serviceInfo.address, nodeLoad);
             serviceLoadMap.insert(serviceInfo.service, loadMap);
             stateChanged = true;
-
-            if (serviceQueue.contains(serviceInfo.service)) {
-                QList<Packet*> sq = serviceQueue[serviceInfo.service];
-                qDebug() << QString("sending %1 queued packet(s) to '%2'").arg(sq.size()).arg(serviceInfo.address);
-                if (remoteNodeMap.contains(serviceInfo.address)) {
-                    RemoteNodeInfo* routeInfo = remoteNodeMap[serviceInfo.address];
-                    for (Packet* p : sq) {
-                        p->destAddress = serviceInfo.address;
-                        p->nxtAddress = routeInfo->nextHop;
-                        routeInfo->channel->send(p);
-                    }
-                    serviceQueue.remove(serviceInfo.service);
-                } else {
-                    qDebug() << QString("no route to discovered service %1").arg(serviceInfo.service);
-                }
-            }
         }
         // forward the service load
         for (Channel* ch : channels) {

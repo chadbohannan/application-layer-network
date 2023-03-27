@@ -87,6 +87,10 @@ export class Packet {
   }
 }
 
+function copy() {
+  return new Packet(toBinary());
+}
+
 function intXOR (n) {
   let cnt = 0
   while (n) { // This loop will only execute the number times equal to the number of ones. */

@@ -185,89 +185,6 @@ class Packet:
 
         if body: self.parsePacketBytes(body)
 
-    @staticmethod
-    def headerLength(controlFlags, buffer):
-        len = 2  # length of controlFlags
-        if(controlFlags & Packet.CF_NETSTATE):
-            len += Packet.NETSTATE_FIELD_SIZE
-        if(controlFlags & Packet.CF_SERVICE):
-            len += buffer[len]
-        if(controlFlags & Packet.CF_SRCADDR):
-            len += buffer[len]
-        if(controlFlags & Packet.CF_DESTADDR):
-            len += buffer[len]
-        if(controlFlags & Packet.CF_NEXTADDR):
-            len += buffer[len]
-        if(controlFlags & Packet.CF_SEQNUM):
-            len += Packet.SEQNUM_FIELD_SIZE
-        if(controlFlags & Packet.CF_ACKBLOCK):
-            len += Packet.ACKBLOCK_FIELD_SIZE
-        if(controlFlags & Packet.CF_CONTEXTID):
-            len += Packet.CONTEXTID_FIELD_SIZE
-        if(controlFlags & Packet.CF_DATATYPE):
-            len += Packet.DATATYPE_FIELD_SIZE
-        if(controlFlags & Packet.CF_DATA):
-            len += Packet.DATALENGTH_FIELD_SIZE
-        return len
-
-    @staticmethod
-    def headerFieldOffset(controlFlags, field, buffer):
-        offset = 2
-
-        if (field == Packet.CF_NETSTATE):
-            return offset
-        if (controlFlags & Packet.CF_NETSTATE):
-            offset += Packet.NETSTATE_FIELD_SIZE
-
-        if (field == Packet.CF_SERVICE):
-            return offset
-        if (controlFlags & Packet.CF_SERVICE):
-            offset += buffer[offset]
-
-        if (field == Packet.CF_SRCADDR):
-            return offset
-        if (controlFlags & Packet.CF_SRCADDR):
-            offset += buffer[offset]
-
-        if (field == Packet.CF_DESTADDR):
-            return offset
-        if (controlFlags & Packet.CF_DESTADDR):
-            offset += buffer[offset]
-
-        if (field == Packet.CF_NEXTADDR):
-            return offset
-        if (controlFlags & Packet.CF_NEXTADDR):
-            offset += buffer[offset]
-
-        if (field == Packet.CF_SEQNUM):
-            return offset
-        if (controlFlags & Packet.CF_SEQNUM):
-            offset += Packet.SEQNUM_FIELD_SIZE
-
-        if (field == Packet.CF_ACKBLOCK):
-            return offset
-        if (controlFlags & Packet.CF_ACKBLOCK):
-            offset += Packet.ACKBLOCK_FIELD_SIZE
-
-        if (field == Packet.CF_CONTEXTID):
-            return offset
-        if (controlFlags & Packet.CF_CONTEXTID):
-            offset += Packet.CONTEXTID_FIELD_SIZE
-
-        if (field == Packet.CF_DATATYPE):
-            return offset
-        if (controlFlags & Packet.CF_DATATYPE):
-            offset += Packet.DATATYPE_FIELD_SIZE
-
-        if (field == Packet.CF_DATA):
-            return offset
-        if (controlFlags & Packet.CF_DATATYPE):
-            offset += buffer[offset]
-
-        return None  # TODO enumerate errors
-
-    
-
     def toPacketBuffer(self):  # returns a un-framed array
         # establish packet structure
         if isinstance(self.data, str):
@@ -347,6 +264,9 @@ class Packet:
             packetBuffer.extend(crcBytes)
 
         return packetBuffer
+
+    def copy(self):
+        return Packet(self.toPacketBuffer());
 
     # unpacks a recieved packet into local variables
     def parsePacketBytes(self, packetBuffer):

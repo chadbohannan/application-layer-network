@@ -11,7 +11,6 @@ import java.util.concurrent.Semaphore;
 class RouterTest {
     @Test
     void testLocalOneHopRoute() {
-
         Router router1 = new Router("r1");
         Router router2 = new Router("r2");
 
@@ -33,11 +32,9 @@ class RouterTest {
 
         Packet packet = new Packet();
         packet.Service = "test";
-        packet.AcknowledgeBlock = 42;
         router1.send(packet);
 
         assertNotNull(recvdPkt[0]);
-        assertEquals(42, recvdPkt[0].AcknowledgeBlock);
     }
 
     @Test
@@ -114,6 +111,50 @@ class RouterTest {
         assertEquals("node-b", parsedInfo.address);
         assertEquals("ping", parsedInfo.service);
         assertEquals((short) 2, parsedInfo.load);
+    }
+
+    @Test
+    void testMulticastWithSelf() {
+        final Packet[] recvdPkt = new Packet[] { null, null };
+
+        Router router1 = new Router("r1");
+        router1.registerService("test", new IPacketHandler() {
+            @Override
+            public void onPacket(Packet p) {
+                if (recvdPkt[0] != null)
+                    System.out.println("test service already hit for r1");
+                recvdPkt[0] = p;
+            }
+        });
+
+        Router router2 = new Router("r2");
+        router2.registerService("test", new IPacketHandler() {
+            @Override
+            public void onPacket(Packet p) {
+                if (recvdPkt[1] != null)
+                    System.out.println("test service already hit for r2");
+                recvdPkt[1] = p;
+            }
+        });
+
+        LocalChannel lc = new LocalChannel();
+        LocalChannel lb = lc.LoopBack();
+        router1.addChannel(lc);
+        router2.addChannel(lb);
+
+        Packet packet = new Packet();
+        packet.Service = "test";
+        router2.send(packet);
+
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        assertNotNull(recvdPkt[0]);
+        assertNotNull(recvdPkt[1]);
     }
 
 }

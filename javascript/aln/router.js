@@ -49,7 +49,6 @@ import {
       this.contextMap = new Map() // map[uint16]func(packet)
       this.remoteNodeMap = new Map() // map[address]RemoteNodes[]
       this.serviceLoadMap = new Map()// map[serviceID][address]NodeLoad
-      this.serviceQueue = new Map() // map[uint16]packet[] packets waiting for services during warmup
       this.onNetStateChanged = () => { [console.log(`onNetStateChange ${this.remoteNodeMap.size} nodes`)]}
     }
 
@@ -87,6 +86,21 @@ import {
       }
       return remoteAddress
     }
+
+    serviceAddresses(serviceID) {
+      const addresses = [];
+      if (this.serviceMap.has(serviceID)) {
+        addresses.push(this.address);
+      }
+  
+      if (this.serviceLoadMap.has(serviceID)) {
+        const loadMap = this.serviceLoadMap.get(serviceID)
+        loadMap.forEach((nodeLoad, address) => {
+          addresses.push(address);
+        })
+      }
+      return addresses;
+    }
   
     // send() is the core routing function of Router. A packet is either expected
     //  locally by a registered Node, or on a multi-hop route to it's destination.
@@ -97,18 +111,17 @@ import {
   
       // An ALN feature is to automatically send to a network node advertising the requested service
       if (!packet.dst && packet.srv) { // if destination is not set but a service is
-        // use the service load cache to select a service host node address
-        packet.dst = this.selectService(packet.srv)
-        if (!packet.dst) { // didn't find a service
-          // best effort local caching to give network discovery a chance
-          // TODO cache expiration+cleanup
-          let q = []
-          if (this.serviceQueue.has(packet.srv)) {
-            q = this.serviceQueue.get(packet.srv)
+        const addresses = this.serviceAddresses(packet.srv);
+        if (addresses.length > 0) {
+          for(let i = 1; i < addresses.length; i++) {
+            const pc = packet.copy();
+            pc.dst = addresses[i];
+            this.send(pc)
           }
-          q.push(packet)
-          this.serviceQueue.set(packet.srv, q)
-          return 'no route for service, packet queued'
+          packet.dst = addresses[0];
+        }
+        if (!packet.dst) { // didn't find a service
+          return 'no service of type ' + packet.srv + ' yet discovered';
         }
       }
       if (packet.dst === this.address) {

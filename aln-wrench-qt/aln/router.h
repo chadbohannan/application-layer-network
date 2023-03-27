@@ -58,7 +58,6 @@ class Router : public QObject
     QMap<QString, QMap<QString, NodeLoad*>> serviceLoadMap;
 
     QVector<Channel*> channels;
-    QMap<QString, QVector<Packet*>> serviceQueue;
 
 public:
     Router(QString address = QString());
@@ -67,7 +66,9 @@ public:
     void addChannel(Channel*);
     void removeChannel(Channel*);
 
-    QString selectServiceAddress(QString); // returns the least load node with service
+
+    QStringList selectServiceAddresses(QString);
+    QString selectServiceAddress(QString service);  // returns the least load node with service
     QString send(Packet* p);
     void registerService(QString service, PacketHandler* handler);
     void unregisterService(QString service);

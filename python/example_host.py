@@ -7,7 +7,7 @@ from threading import Lock
 
 def main():
     sel = selectors.DefaultSelector() # application event loop
-    router = Router(sel, "python-host-1") # TODO dynamic address allocation protocol
+    router = Router(sel, "python-host-1")
     router.start()
 
     def ping_handler(packet):
@@ -25,7 +25,7 @@ def main():
         router.add_channel(tcpChannel)
 
     tcpHost = TcpHost()
-    tcpHost.listen(sel, 'localhost', 8181, on_connect)
+    tcpHost.listen(sel, 'localhost', 8081, on_connect)
     
     def signal_handler(signal, frame): # listen for ^C
         router.close()

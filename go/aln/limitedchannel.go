@@ -25,8 +25,7 @@ func (lc *LimitedChannel) Send(packet *Packet) error {
 		lc.wrapped.Send(packet)
 	}
 	if err != nil {
-		fmt.Printf("LimitedChannel closing on CanSend err")
-		lc.wrapped.Close()
+		fmt.Printf("LimitedChannel CanSend err:%s", err.Error())
 	}
 	return err
 }

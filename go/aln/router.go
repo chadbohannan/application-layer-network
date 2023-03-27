@@ -46,7 +46,6 @@ type Router struct {
 	contextMap     contextHandlerMap
 	remoteNodeMap  RemoteNodeMap // map[address][]RemoteNodes
 	serviceLoadMap ServiceLoadMap
-	serviceQueue   map[string][]*Packet // packets waiting for services during warmup
 }
 
 // NewRouter instantiates an applications ELP Router
@@ -58,7 +57,6 @@ func NewRouter(address AddressType) *Router {
 		contextMap:     make(contextHandlerMap),
 		remoteNodeMap:  make(RemoteNodeMap),
 		serviceLoadMap: make(ServiceLoadMap),
-		serviceQueue:   make(map[string][]*Packet),
 	}
 }
 
@@ -66,8 +64,28 @@ func (r *Router) Address() AddressType {
 	return r.address
 }
 
+// ServiceAddresses returns all the addresses that advertise a specific service
+func (r *Router) ServiceAddresses(service string) []AddressType {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	addresses := []AddressType{}
+	if _, ok := r.serviceMap[service]; ok {
+		addresses = append(addresses, r.address)
+	}
+	if loadMap, ok := r.serviceLoadMap[service]; ok {
+		for address, _ := range loadMap {
+			addresses = append(addresses, address)
+		}
+	}
+	return addresses
+}
+
 // SelectService returns the address of the service with the lowest load, or zero
 func (r *Router) SelectService(service string) AddressType {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	if _, ok := r.serviceMap[service]; ok {
 		return r.address
 	}
@@ -92,23 +110,25 @@ func (r *Router) Send(p *Packet) error {
 	packetCallback := func(p *Packet) { handler(p) }
 	defer packetCallback(p)
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
 	if len(p.SrcAddr) == 0 {
 		p.SrcAddr = r.address
 	}
 	if len(p.DestAddr) == 0 && len(p.Service) != 0 {
-		p.DestAddr = r.SelectService(p.Service)
-		if len(p.DestAddr) == 0 {
-			if _, ok := r.serviceQueue[p.Service]; !ok {
-				r.serviceQueue[p.Service] = []*Packet{p}
-			} else {
-				r.serviceQueue[p.Service] = append(r.serviceQueue[p.Service], p)
+		// service multicast; send to all service instances
+		serviceAddresses := r.ServiceAddresses(p.Service)
+		if len(serviceAddresses) > 0 {
+			for i := 1; i < len(serviceAddresses); i++ {
+				if pc, err := p.Copy(); err == nil {
+					pc.DestAddr = serviceAddresses[i]
+					r.Send(pc)
+				}
 			}
-			return fmt.Errorf("service '%s' unavailable, packet queued", p.Service)
+			p.DestAddr = serviceAddresses[0]
 		}
 	}
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
 	if p.DestAddr == r.address {
 		if onPacket, ok := r.serviceMap[p.Service]; ok {
 			handler = onPacket
@@ -253,6 +273,9 @@ func (r *Router) AddChannel(channel Channel) {
 
 		case NET_SERVICE:
 			if address, service, serviceLoad, err := parseNetworkServiceSharePacket(packet); err == nil {
+				if address == r.address {
+					break
+				}
 				// log.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
 				r.mutex.Lock()
 				defer r.mutex.Unlock()
@@ -272,20 +295,6 @@ func (r *Router) AddChannel(channel Channel) {
 					if c != channel {
 						c.Send(packet)
 					}
-				}
-				if packetList, ok := r.serviceQueue[service]; ok {
-					// log.Printf("sending %d packet(s) to '%s'", len(packetList), address)
-					if route, ok := r.remoteNodeMap[address]; ok {
-						for _, p := range packetList {
-							p.DestAddr = address
-							p.NextAddr = route.NextHop
-							channel.Send(p)
-						}
-						delete(r.serviceQueue, service)
-					} else {
-						log.Printf("no route to discovered service: %s", service)
-					}
-
 				}
 			} else {
 				log.Printf("error parsing NET_SERVICE: %s\n", err.Error())

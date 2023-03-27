@@ -47,7 +47,6 @@ func TestRoute1Hop(t *testing.T) {
 }
 
 func TestRoute2Hop(t *testing.T) {
-
 	packetRecieved := false
 	rtr1 := NewRouter("1")
 	rtr1.RegisterService("ping", func(*Packet) {
@@ -77,6 +76,64 @@ func TestRoute2Hop(t *testing.T) {
 	time.Sleep(200 * time.Millisecond) // let async operation settle
 	if !packetRecieved {
 		t.Fatal("packet not recieved")
+	}
+}
+
+func TestMulticastWithSelf(t *testing.T) {
+	receivedPacket1 := false
+	rtr1 := NewRouter("1")
+	rtr1.RegisterService("ping", func(*Packet) {
+		if receivedPacket1 {
+			t.Error("packet1 already received")
+		}
+		receivedPacket1 = true
+	})
+
+	receivedPacket2 := false
+	rtr2 := NewRouter("2")
+	rtr2.RegisterService("ping", func(*Packet) {
+		if receivedPacket2 {
+			t.Error("packet2 already received")
+		}
+		receivedPacket2 = true
+	})
+
+	receivedPacket3 := false
+	rtr3 := NewRouter("3")
+	rtr3.RegisterService("ping", func(*Packet) {
+		if receivedPacket3 {
+			t.Error("packet3 already received")
+		}
+		receivedPacket3 = true
+	})
+
+	channelA := NewLocalChannel()
+	rtr1.AddChannel(channelA)
+	rtr2.AddChannel(channelA.FlippedChannel())
+
+	time.Sleep(100 * time.Millisecond) // allow route and service table to sync
+
+	channelB := NewLocalChannel()
+	rtr2.AddChannel(channelB)
+	rtr3.AddChannel(channelB.FlippedChannel())
+
+	time.Sleep(200 * time.Millisecond) // allow route and service table to sync
+
+	pkt := NewPacket()
+	pkt.Service = "ping"
+	if err := rtr1.Send(pkt); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(200 * time.Millisecond) // let async operation settle
+	if !receivedPacket1 {
+		t.Fatal("!receivedPacket1")
+	}
+	if !receivedPacket2 {
+		t.Fatal("!receivedPacket2")
+	}
+	if !receivedPacket3 {
+		t.Fatal("!receivedPacket3")
 	}
 }
 
