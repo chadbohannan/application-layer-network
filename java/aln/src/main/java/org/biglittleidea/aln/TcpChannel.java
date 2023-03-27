@@ -15,15 +15,19 @@ public class TcpChannel implements IChannel {
             socket = AsynchronousSocketChannel.open();
             socket.connect(hostAddress).get(); // block until connection is made
         } catch (Exception e) {
-            System.out.println(e.getLocalizedMessage());
+            System.out.println("TcpChannel():" + e.getLocalizedMessage());
         }
+    }
+
+    public TcpChannel(AsynchronousSocketChannel socket) {
+        this.socket = socket;
     }
 
     public void send(Packet p) {
         try {
             socket.write(ByteBuffer.wrap(p.toFrameBuffer())).get();
         } catch (Exception e) {
-            System.out.println(e.getLocalizedMessage());
+            System.out.println("TcpChannel.send():" + e.getLocalizedMessage());
         }
     }
 
@@ -52,7 +56,7 @@ public class TcpChannel implements IChannel {
                 };
                 socket.read(buffer, 0, 1, timeout, TimeUnit.MILLISECONDS, 42, completionHandler);
             } catch (Exception e) {
-                System.out.println(e.getLocalizedMessage());
+                System.out.println("TcpChannel.recieve():" + e.getLocalizedMessage());
                 e.printStackTrace();
             }
         }
@@ -65,7 +69,7 @@ public class TcpChannel implements IChannel {
         try {
             socket.close();
         } catch (Exception e) {
-            System.out.println(e.getLocalizedMessage());
+            System.out.println("TcpChannel.close()" + e.getLocalizedMessage());
         }
     }
 }

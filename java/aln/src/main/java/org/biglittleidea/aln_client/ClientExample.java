@@ -16,9 +16,11 @@ public final class ClientExample {
             Semaphore lock = new Semaphore(1);
             Router alnRouter = new Router("java-client-1");
             // start the application layer network
-            TcpChannel ch = new TcpChannel("localhost", 8181);
+            TcpChannel ch = new TcpChannel("localhost", 8081);
             alnRouter.addChannel(ch);
-            
+
+            Thread.sleep(200, 0);
+
             short ctx = alnRouter.registerContextHandler(new IPacketHandler() {
                 @Override
                 public void onPacket(Packet p) {

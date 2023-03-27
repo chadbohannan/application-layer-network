@@ -240,7 +240,7 @@ public class Router {
     protected void handleNetState(IChannel channel, Packet packet) {
         switch (packet.Net) {
             case Packet.NetState.ROUTE:
-                System.out.printf("router '%s' recv'd ROUTE update\n", address);
+                // System.out.printf("router '%s' recv'd ROUTE update\n", address);
                 // neighbor is sharing it's routing table
                 RemoteNodeInfo info = parseNetRouteShare(packet);
                 if (info.err != null) {
@@ -300,7 +300,7 @@ public class Router {
                 break;
 
             case Packet.NetState.SERVICE:
-                System.out.printf("router '%s' recv'd SERVICE update\n", address);
+                // System.out.printf("router '%s' recv'd SERVICE update\n", address);
                 ServiceNodeInfo serviceInfo = parseNetServiceShare(packet);
                 if (serviceInfo.err != null) {
                     System.out.printf("error parsing net service: %s\n", serviceInfo.err);
@@ -336,7 +336,7 @@ public class Router {
                 break;
 
             case Packet.NetState.QUERY:
-                System.out.printf("router '%s' recv'd QUERY\n", address);
+                // System.out.printf("router '%s' recv'd QUERY\n", address);
                 for (Packet p : exportRouteTable())
                     channel.send(p);
                 for (Packet p : exportServiceTable())
@@ -365,18 +365,17 @@ public class Router {
                 removeChannel(ch);
             }
         });
-        System.out.printf("router '%s' sending QUERY\n", address);
+        // System.out.printf("router '%s' sending QUERY\n", address);
 
         channel.send(composeNetQuery()); // immediately query the new connection
     }
 
     public void removeChannel(IChannel ch) {
-        System.out.println("router:RemoveChannel");
         synchronized (this) {
             channels.remove(ch);
             // bcast the loss of routes through the channel
             for (String address : remoteNodeMap.keySet()) {
-                System.out.printf("router:RemoveChannel address '%s'\n", address);
+                // System.out.printf("router:RemoveChannel address '%s'\n", address);
                 RemoteNodeInfo nodeInfo = remoteNodeMap.get(address);
                 if (nodeInfo.channel == ch) {
                     removeAddress(address);
