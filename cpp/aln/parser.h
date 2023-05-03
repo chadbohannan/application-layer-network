@@ -5,17 +5,22 @@
 
 #define MAX_PACKET_SZ 1024
 
+const uint8 STATE_BUFFERING = 0;
+const uint8 STATE_ESCAPED = 1;
+
 class Parser {
 private:
-    char buff[MAX_PACKET_SZ];
+    uint8 packetBuffer[MAX_PACKET_SZ];
+    uint8 pBuffIdx;
     Packet packet;
-    void (*onPacket)(*Packet);
+    uint8 state;
+    void (*onPacket)(Packet*);
 
 public:
-    Parser(void (*handler)(*Packet));
-    char ingestBytes(char* in, int sz);
-    char acceptPacket();
-    char parsePacket
-}
+    Parser(void (*handler)(Packet*));
+    void ingestBytes(char* in, int sz);
+    void acceptPacket();
+    void parsePacket();
+};
 
 #endif

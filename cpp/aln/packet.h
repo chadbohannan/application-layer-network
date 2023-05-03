@@ -1,12 +1,14 @@
 #ifndef ALN_PACKET_H
 #define ALN_PACKET_H
 
+#include "alntypes.h"
+
 // Packet framing
 #define FRAME_CF_LENGTH = 2
-#define FRAME_END       = 0xC0
-#define FRAME_ESC       = 0xDB
-#define FRAME_END_T     = 0xDC
-#define FRAME_ESC_T     = 0xDD
+#define FRAME_END       = 0xC0;
+#define FRAME_ESC       = 0xDB;
+#define FRAME_END_T     = 0xDC;
+#define FRAME_ESC_T     = 0xDD;
 
 // Control Flag bits (Hamming encoding consumes 5 bits, leaving 11)
 #define CF_HAMMING1  = 0x8000
@@ -25,21 +27,21 @@
 #define CF_DATATYPE  = 0x0004
 #define CF_DATA      = 0x0002
 #define CF_CRC       = 0x0001
-)
+
 
 // Packet header field sizes
-#define CF_FIELD_SIZE           = 2   // INT16U
-#define NETSTATE_FIELD_SIZE     = 1   // INT08U enumerated
+#define CF_FIELD_SIZE           = 2   // uint16
+#define NETSTATE_FIELD_SIZE     = 1   // uint8 enumerated
 #define SERVICE_FIELD_SIZE_MAX  = 256 // string
 #define SRCADDR_FIELD_SIZE_MAX  = 256 // string
 #define DESTADDR_FIELD_SIZE_MAX = 256 // string
 #define NEXTADDR_FIELD_SIZE_MAX = 256 // string
-#define SEQNUM_FIELD_SIZE       = 2   // INT16U
-#define ACKBLOCK_FIELD_SIZE     = 4   // INT32U
-#define CONTEXTID_FIELD_SIZE    = 2   // INT16U
-#define DATATYPE_FIELD_SIZE     = 1   // INT08U
-#define DATALENGTH_FIELD_SIZE   = 2   // INT16U
-#define CRC_FIELD_SIZE          = 4   // INT32U
+#define SEQNUM_FIELD_SIZE       = 2   // uint16
+#define ACKBLOCK_FIELD_SIZE     = 4   // uint32
+#define CONTEXTID_FIELD_SIZE    = 2   // uint16
+#define DATATYPE_FIELD_SIZE     = 1   // uint8
+#define DATALENGTH_FIELD_SIZE   = 2   // uint16
+#define CRC_FIELD_SIZE          = 4   // uint32
 
 // LinkState value enumerations (TODO support mesh routing)
 #define NET_ROUTE   = byte(0x01) // packet contains route entry
@@ -47,9 +49,6 @@
 #define NET_QUERY   = byte(0x03) // packet is a request for content
 #define NET_ERROR   = byte(0xFF) // packet is an peer error message
 
-#define uint8  unsigned char
-#define uint16 unsigned short
-#define uint32 unsigned int
 
 struct Packet {
     uint16 cf;
@@ -68,6 +67,11 @@ struct Packet {
     uint8 typ;
     char* data;
     uint8 dataSz;
-}
+};
+
+
+uint8 intXOR(uint32 n);
+uint16 CFHamEncode(uint16 value);
+uint16 cfHamDecode(uint16 value);
 
 #endif
