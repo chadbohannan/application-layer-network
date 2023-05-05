@@ -1,5 +1,28 @@
 #import "packet.h"
 
+void Packet::clear() {
+  cf = 0;
+  net = 0;
+  srv = 0;
+  srvSz = 0;
+  src = 0;
+  srcSz = 0;
+  dst = 0;
+  dstSz = 0;
+  nxt = 0;
+  nxtSz = 0;
+  seq = 0;
+  ack = 0;
+  ctx = 0;
+  typ = 0;
+  data = 0;
+  dataSz = 0;
+}
+
+void Packet::write(void (*out)(uint8*,int)) {
+  uint16 cf = 0;
+}
+
 uint8 intXOR(uint32 n)
 {
   uint8 cnt = 0x0;

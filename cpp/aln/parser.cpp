@@ -27,9 +27,9 @@ void Parser::ingestBytes(char* in, int sz) {
 }
 
 void Parser::acceptPacket() {
-	// TODO defer p.Clear()
 	parsePacket();
 	onPacket(&packet);
+	reset();
 }
 
 
@@ -81,4 +81,10 @@ void Parser::parsePacket() {
 		pkt.Data = packetBuffer+offset;
 	}
 	return pkt, nil
+}
+
+void Parser::reset() {
+	packet.clear();
+	pBuffIdx = 0;
+	state = STATE_BUFFERING;
 }

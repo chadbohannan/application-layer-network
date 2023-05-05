@@ -67,8 +67,9 @@ struct Packet {
     uint8 typ;
     char* data;
     uint8 dataSz;
+    void clear();
+    void write(void (*out)(uint8*,int));
 };
-
 
 uint8 intXOR(uint32 n);
 uint16 CFHamEncode(uint16 value);

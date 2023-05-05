@@ -21,6 +21,7 @@ public:
     void ingestBytes(char* in, int sz);
     void acceptPacket();
     void parsePacket();
+    void reset();
 };
 
 #endif
