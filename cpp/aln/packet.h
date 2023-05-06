@@ -16,26 +16,26 @@
 #define CONTEXTID_FIELD_SIZE    2   // uint16
 #define DATATYPE_FIELD_SIZE     1   // uint8
 #define DATALENGTH_FIELD_SIZE   2   // uint16
-#define CRC_FIELD_SIZE          4   // uint32
 
 
 struct Packet {
-    uint16 cf;
     uint8 net;
-    uint8* srv;
     uint8 srvSz;
-    uint8* src;
     uint8 srcSz;
-    uint8* dst;
     uint8 dstSz;
-    uint8* nxt;
     uint8 nxtSz;
-    uint16 seq;
-    uint32 ack;
-    uint16 ctx;
     uint8 typ;
-    uint8* data;
+    uint16 cf;
+    uint16 seq;
+    uint16 ctx;
     uint16 dataSz;
+    uint32 ack;
+    uint8* srv;
+    uint8* src;
+    uint8* dst;
+    uint8* nxt;
+    uint8* data;
+    
     void clear();
     void write(Framer*);
     void evalCF();
