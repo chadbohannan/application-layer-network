@@ -1,4 +1,4 @@
-#include "ax25frame.h"
+#include "frame.h"
 
 QByteArray toFrameBuffer(QByteArray content) {
     return toFrameBuffer(content.data(), content.size());

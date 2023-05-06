@@ -2,11 +2,13 @@
 #define ALN_PARSER_H
 
 #include "packet.h"
+#include "framer.h"
 
 #define MAX_PACKET_SZ 1024
 
 const uint8 STATE_BUFFERING = 0;
 const uint8 STATE_ESCAPED = 1;
+
 
 class Parser {
 private:
@@ -18,7 +20,7 @@ private:
 
 public:
     Parser(void (*handler)(Packet*));
-    void ingestBytes(char* in, int sz);
+    void ingestFrameBytes(uint8* in, int sz);
     void acceptPacket();
     void parsePacket();
     void reset();

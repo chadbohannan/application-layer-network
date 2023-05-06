@@ -1,11 +1,12 @@
+#include <stdio.h>
 #include "parser.h"
 
 Parser::Parser(void (*handler)(Packet*)) {
-    state = STATE_BUFFERING;
-	onPacket = handler;
+    onPacket = handler;
+	reset();
 }
 
-void Parser::ingestBytes(char* in, int sz) {
+void Parser::ingestFrameBytes(uint8* in, int sz) {
     for (int i = 0; i < sz; i++) {
 		if (in[i] == FRAME_END) {
 			acceptPacket();
@@ -23,7 +24,6 @@ void Parser::ingestBytes(char* in, int sz) {
 			packetBuffer[pBuffIdx++] = in[i];
 		}
 	}
-    return 
 }
 
 void Parser::acceptPacket() {
@@ -37,50 +37,62 @@ void Parser::acceptPacket() {
 void Parser::parsePacket() {
 	packet.cf = cfHamDecode(readUint16(packetBuffer));
 	uint8 offset = CF_FIELD_SIZE; // length of controlFlags
-	if (packet.cf&CF_NETSTATE != 0) {
+	if (packet.cf&CF_NETSTATE) {
+		printf("net\n");
 		packet.net = packetBuffer[offset++];
 	}
-	if (packet.cf&CF_SERVICE != 0) {
-		uint8 srvSize = packetBuffer[offset++];
-		packet.srv := packetBuffer+offset;
-		offset += srvSize;
+	if (packet.cf&CF_SERVICE) {
+		printf("srv\n");
+		packet.srvSz = packetBuffer[offset++];
+		packet.srv = packetBuffer+offset;
+		offset += packet.srvSz;
 	}
-	if (packet.cf&CF_SRCADDR != 0) {
+	if (packet.cf&CF_SRCADDR) {
+		printf("src\n");
 		uint8 addrSize = packetBuffer[offset++];
-		packet.src := packetBuffer+offset;
+		packet.src = packetBuffer+offset;
 		offset += addrSize;
 	}
-	if (packet.cf&CF_DESTADDR != 0) {
-		uint8 addrSize = packetBuffer[offset++];
+	if (packet.cf&CF_DESTADDR) {
+		printf("dst, offset:%d\n", offset);
+		packet.dstSz = packetBuffer[offset++];
+		printf("dst, addrSize:%d\n", packet.dstSz);
 		packet.dst = packetBuffer+offset;
-		offset += addrSize;
+		printf("dst:%.*s\n", packet.dstSz, packet.dst);
+		offset += packet.dstSz;
+		printf("offset:%d\n", offset);
 	}
-	if (packet.cf&CF_NEXTADDR != 0) {
-		uint addrsize = packetBuffer[offset++];
+	if (packet.cf&CF_NEXTADDR) {
+		printf("nxt\n");
+		packet.nxtSz = packetBuffer[offset++];
 		packet.nxt = packetBuffer+offset;
-		offset += addrSize;
+		offset += packet.nxtSz;
 	}
-	if (packet.cf&CF_SEQNUM != 0) {
+	if (packet.cf&CF_SEQNUM) {
+		printf("seq\n");
 		packet.seq = readUint16(packetBuffer+offset);
-		offset += SEQNUM_FIELD_SIZE];
+		offset += SEQNUM_FIELD_SIZE;
 	}
-	if (packet.cf&CF_ACKBLOCK != 0) {
+	if (packet.cf&CF_ACKBLOCK) {
+		printf("ack\n");
 		packet.ack = readUint32(packetBuffer+offset);
-		offset += ACKBLOCK_FIELD_SIZE];
+		offset += ACKBLOCK_FIELD_SIZE;
 	}
-	if (packet.cf&CF_CONTEXTID != 0) {
+	if (packet.cf&CF_CONTEXTID) {
+		printf("ctx\n");
 		packet.ctx = readUint16(packetBuffer+offset);
-		offset += CONTEXTID_FIELD_SIZE
+		offset += CONTEXTID_FIELD_SIZE;
 	}
-	if (packet.cf&CF_DATATYPE != 0) {
+	if (packet.cf&CF_DATATYPE) {
+		printf("typ\n");
 		packet.typ = packetBuffer[offset++];
 	}
-	if (packet.cf&CF_DATA != 0) {
-		uint16 dataLen = readUint16(packetBuffer+offset);
-		offset += DATALENGTH_FIELD_SIZE
-		pkt.Data = packetBuffer+offset;
+	if (packet.cf&CF_DATA) {
+		printf("data\n");
+		packet.dataSz = readUint16(packetBuffer+offset);
+		offset += DATALENGTH_FIELD_SIZE;
+		packet.data = packetBuffer+offset;
 	}
-	return pkt, nil
 }
 
 void Parser::reset() {

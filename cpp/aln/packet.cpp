@@ -1,4 +1,4 @@
-#import "packet.h"
+#include "packet.h"
 
 void Packet::clear() {
   cf = 0;
@@ -19,8 +19,82 @@ void Packet::clear() {
   dataSz = 0;
 }
 
-void Packet::write(void (*out)(uint8*,int)) {
-  uint16 cf = 0;
+void Packet::evalCF() {
+  cf = 0;
+  if (net != 0)
+    cf |= CF_NETSTATE;
+  if (srv != 0 && srvSz > 0)
+    cf |= CF_SERVICE;
+  if (src != 0 && srcSz > 0)
+    cf |= CF_SRCADDR;
+  if (dst != 0 && dstSz > 0)
+    cf |= CF_DESTADDR;
+  if (nxt != 0 && nxtSz > 0)
+    cf |= CF_NEXTADDR;
+  if (seq != 0)
+    cf |= CF_SEQNUM;
+  if (ack != 0)
+    cf |= CF_ACKBLOCK;
+  if (ctx != 0)
+    cf |= CF_CONTEXTID;
+  if (typ != 0)
+    cf |= CF_DATATYPE;
+  if (data != 0 && dataSz > 0)
+    cf |= CF_DATA;
+  cf = cfHamEncode(cf);
+}
+
+
+void Packet::write(Framer* f) {
+  uint8 byteBuff[4];
+  evalCF();
+  writeUint16(byteBuff, cf);
+  writeOut(f, byteBuff, 2);
+  if (cf & CF_NETSTATE)
+    f->out(net);
+
+  if (cf & CF_SERVICE) {
+    f->out(srvSz);
+    writeOut(f, srv, srvSz);
+  }
+  if (cf & CF_SRCADDR) {
+    f->out(srcSz);
+    writeOut(f, src, srcSz);
+  }
+  if (cf & CF_DESTADDR) {
+    f->out(dstSz);
+    writeOut(f, dst, dstSz);
+  }
+  if (cf & CF_NEXTADDR) {
+    f->out(nxtSz);
+    writeOut(f, nxt, nxtSz);
+  }
+  if (cf & CF_SEQNUM) {
+    writeUint16(byteBuff, seq);
+    writeOut(f, byteBuff, 2);
+  }
+  if (cf & CF_ACKBLOCK) {
+    writeUint32(byteBuff, ack);
+    writeOut(f, byteBuff, 4);
+  }
+  if (cf & CF_CONTEXTID) {
+    writeUint16(byteBuff, ctx);
+    writeOut(f, byteBuff, 2);
+  }
+  if (cf & CF_DATATYPE) {
+    f->out(typ);
+  }
+  if (cf & CF_DATA) {
+    writeUint16(byteBuff, dataSz);
+    writeOut(f, data, dataSz);
+  }
+}
+
+
+void writeOut(Framer* f, uint8* buff, int len) {
+  for(int i = 0; i < len; i++) {
+    f->out(buff[i]);
+  }
 }
 
 uint8 intXOR(uint32 n)
@@ -34,7 +108,7 @@ uint8 intXOR(uint32 n)
   return cnt;
 }
 
-uint16 CFHamEncode(uint16 value)
+uint16 cfHamEncode(uint16 value)
 {
   /* perform G matrix */
   return (value & 0x07FF)
