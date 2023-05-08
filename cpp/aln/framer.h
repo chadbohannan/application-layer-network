@@ -9,7 +9,7 @@ public:
     void write(uint8 data);
     void end();
 
-    void (*out)(uint8) = 0;
+    void (*out)(uint8);
 };
 
 #endif

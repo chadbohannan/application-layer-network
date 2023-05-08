@@ -9,10 +9,12 @@ void bufferWriter(uint8 data) {
     frameBuffer[idx++] = data;
 }
 
+bool received = false;
 void handler(Packet* p) {
     printf("packet recieved, dst: %d %.*s\n",
         p->dstSz, p->dstSz, p->dst
     );
+    received = true;
 }
 
 
@@ -30,8 +32,16 @@ int main() {
     packet.write(&f);
     f.end();
 
+    printf("received %d\n", received);
+
+    // create a parser that gives us packets from a byte stream
     Parser parser(handler);
+
+    // feed the frameBuffer into the parser 
+    // and expect the packet handler to be called
     parser.ingestFrameBytes(frameBuffer, idx+1);
+
+    printf("received %d\n", received);
 
     return 0;
 }
