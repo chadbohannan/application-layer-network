@@ -1,5 +1,5 @@
 #include "tcpchannel.h"
-#include "ax25frame.h"
+#include "frame.h"
 #include <QDebug>
 #include <QThread>
 
@@ -40,7 +40,7 @@ bool TcpChannel::send(Packet* p) {
     }
 
     try {
-        socket->write(toAx25Buffer(p->toByteArray()));
+        socket->write(toFrameBuffer(p->toByteArray()));
     } catch (...) {
         err = QString("socket write err:%1").arg(socket->errorString());
         qDebug() << "TCPChannel::send err:"<< err << ", " << peerName();
