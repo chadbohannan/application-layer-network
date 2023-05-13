@@ -11,6 +11,7 @@ products from Adafruit!
 #include <Wire.h>
 #include "Adafruit_MCP9808.h"
 #include "parser.h"
+#include "framer.h"
 
 #include <WiFiUdp.h>
 
@@ -29,6 +30,12 @@ products from Adafruit!
 #define GPIO_D10  1  // TX
 #define GPIO_D11  9  // SD2
 #define GPIO_D12  10 // SD3
+
+#define LED_PIN GPIO_D6
+
+
+char nodeAddress[] = "ESP8266-09";
+char nodeRouteData[] = " ESP8266-09  ";
 
 
 // Replace with your network credentials (STATION)
@@ -56,6 +63,47 @@ char data;
 //  3    0.0625°C    250 ms
 const int sensorResolution = 3;
 
+// measure elapsed time
+int timerMark = 0;
+void markTime() {
+  timerMark = millis();
+}
+int elapsed() {
+  return millis() - timerMark;
+}
+
+void outputWriter(uint8 data) {
+  if(client.connected()) {
+    client.write(data);
+  }
+}
+
+void sendPacket(Packet* p) {
+  Framer f(outputWriter);
+  p->write(&f);
+  f.end();
+}
+
+void handler(Packet* p) {
+  if (p->net == NET_QUERY) {
+    char buffer[14];
+    // finishing composing router packetdata
+    nodeRouteData[0] = 10; // size of address
+    nodeRouteData[11] = 0; // first byte of cost
+    nodeRouteData[12] = 1; // second byte of cost
+
+    p->clear();
+    p->net = NET_ROUTE;
+    p->src = (uint8*)nodeAddress;
+    p->srcSz = 10;
+    p->data = (uint8*)nodeRouteData;  
+    p->dataSz = 13;
+
+    sendPacket(p);
+  }
+}
+
+Parser parser(handler);
 
 void setup() {
   //  init serial
@@ -64,8 +112,8 @@ void setup() {
   while(Serial.available() > 0) {
     data = Serial.read();     // Clear the buffer, we can proceed.
   }
-  delay(1);
-  Serial.println("");
+  delay(250);
+  Serial.println("\n");
   
   // init sensor
   if (!tempsensor.begin(0x18)) {
@@ -74,7 +122,7 @@ void setup() {
     Serial.println("Found MCP9808");
     tempsensor.setResolution(sensorResolution);
   }
-  delay(1);
+  delay(250);
 
   // init wifi
   WiFi.begin(ssid, password);
@@ -89,24 +137,24 @@ void setup() {
   Udp.begin(udpBroadcastListenPort);
   delay(250);
 
-  pinMode(GPIO_D6,OUTPUT);
+  pinMode(LED_PIN,OUTPUT);
+  digitalWrite(LED_PIN, LOW);
 }
 
-void readSensor() {
-  Serial.println("wake up MCP9808.... "); // wake up MCP9808 - power consumption ~200 micro Ampere
+float readSensor() {
+  // Serial.println("wake up MCP9808.... "); // wake up MCP9808 - power consumption ~200 micro Ampere
   tempsensor.wake();   // wake up, ready to read!
 
   // Read and print out the temperature, also shows the resolution mode used for reading.
-//  Serial.print("Resolution in mode: ");
-  Serial.println (tempsensor.getResolution());
-  float c = tempsensor.readTempC();
-  float f = tempsensor.readTempF();
-  Serial.print("Temp: "); 
-//  Serial.print(c, 4); Serial.print("*C\t and ");
-  Serial.print(f, 4); Serial.println("*F");
-  
-//  Serial.println("Shutdown MCP9808.... \n");
+  // Serial.println (tempsensor.getResolution());
+
+  float tempF = tempsensor.readTempF();
   tempsensor.shutdown_wake(1); // shutdown MSP9808 - power consumption ~0.1 micro Ampere, stops temperature sampling 
+
+  char buff[20];
+  sprintf(buff, "Measured: %f*F", tempF);
+  Serial.println(buff);
+  return tempF;
 }
 
 int readUdp(){
@@ -129,9 +177,8 @@ int readUdp(){
     Serial.print("Contents:");
     Serial.println(udpBuffer);
 
-    char* protocol = strtok(udpBuffer, "://");
-    char* rest = strtok(NULL, "//");
-    char* host = strtok(rest, ":");
+    char* protocol = strtok(udpBuffer, ":");
+    char* host = strtok(NULL, ":/");
     String port = strtok(NULL, ":");
     
     Serial.println(protocol);
@@ -149,25 +196,43 @@ int readUdp(){
 int connectTCP(char* host, int port) {
   if (!client.connect(host, port)) {
     Serial.println("connection failed");
-    delay(5000);
     return 1;
   }
   Serial.println("connection successful"); 
   return 0;
 }
 
+
 void loop() {
-  if (readUdp()) {
-    readSensor();
-    // TODO pull LOW, then set a timer to release LED
-    digitalWrite(GPIO_D6, !digitalRead(GPIO_D6));
-    
-   
-  }
   if(client.connected()) {
       while (client.available()) {
-        char ch = static_cast<char>(client.read());
-        Serial.print(ch);
+        uint8 ch = static_cast<uint8>(client.read());
+        parser.ingestFrameBytes(&ch, 1);
       }
+      if (elapsed() > 5000) {
+        Serial.println("timer elapsed");
+        char srv[] = "log";
+        char data[16];
+        int dataSz = sprintf(data, "%0.3fF", readSensor());
+        Packet p;
+        p.clear();
+        p.srv = (uint8*)srv;
+        p.srvSz = 3;
+        p.src = (uint8*)nodeAddress;
+        p.srcSz = 10;
+        p.data = (uint8*)data;
+        p.dataSz = dataSz;
+        sendPacket(&p);
+        markTime();
+      } else if (elapsed() < 0) {
+        Serial.println("timer rollover detected, reseting timer");
+        markTime();
+      }
+  } else if (readUdp()) {
+    digitalWrite(LED_PIN, HIGH);
+    markTime();
+  }
+  if (elapsed() > 1000) {
+    digitalWrite(LED_PIN, LOW);
   }
 }

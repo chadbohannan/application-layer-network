@@ -1,5 +1,5 @@
 #include "parser.h"
-#include "ax25frame.h"
+#include "frame.h"
 
 Parser::Parser()
 {

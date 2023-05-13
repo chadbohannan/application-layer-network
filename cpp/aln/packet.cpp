@@ -86,6 +86,7 @@ void Packet::write(Framer* f) {
   }
   if (cf & CF_DATA) {
     writeUint16(byteBuff, dataSz);
+    writeOut(f, byteBuff, 2);
     writeOut(f, data, dataSz);
   }
 }
