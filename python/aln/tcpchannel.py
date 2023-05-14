@@ -5,7 +5,7 @@ class TcpChannel():
     def __init__(self, sock):
         self.sock = sock
         self.sock.setblocking(False)
-        self.on_close = None
+        self.on_close_callbacks = []
 
     def packet_handler(self, packet):
         self.on_packet_callback(self, packet)
@@ -19,24 +19,24 @@ class TcpChannel():
     def close(self):
         self.selector.unregister(self.sock)
         self.sock.close()
-        if self.on_close:
-            self.on_close(self)
+        for callback in self.on_close_callbacks:
+            try:
+                callback(self)
+            except Exception as e:
+                print(e)
+
+    def on_close(self, callback):
+        self.on_close_callbacks.append(callback)
 
     def send(self, packet):
         frame = packet.toFrameBytes()
         try:
             self.sock.send(frame)
         except Exception as e:
-            print('tcpchannel send exception', e)
+            print('send exception', e)
             return False
         return True
 
     def recv(self, sock, mask):
         data = sock.recv(1024)
-        if data:
-            self.parser.readBytes(data)
-        else:
-            self.selector.unregister(sock)
-            sock.close()
-            if self.on_close:
-                self.on_close(self)
+        self.parser.readBytes(data) if data else self.close()

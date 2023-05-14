@@ -472,6 +472,8 @@ void MainWindow::onNetStateChanged() {
         serviceRow->setLayout(new QVBoxLayout);
         serviceRow->layout()->addWidget(new QLabel(nodeAddress));
         QHBoxLayout* buttonLayout = new QHBoxLayout;
+        buttonLayout->setSpacing(5);
+        buttonLayout->setContentsMargins(0, 0, 0, 0);
 
         QStringList services = nodeMap.value(nodeAddress);
         if (services.length() == 0) {
@@ -484,12 +486,18 @@ void MainWindow::onNetStateChanged() {
                 serviceButtonGroup.addButton(serviceButton, buttonID);
                 buttonLayout->addWidget(serviceButton);
             }
+            buttonLayout->addStretch(1);
         }
 
         QWidget* buttonWidget = new QWidget;
         buttonWidget->setLayout(buttonLayout);
         serviceRow->layout()->addWidget(buttonWidget);
+        serviceRow->layout()->setSpacing(5);
+        serviceRow->layout()->setContentsMargins(5, 5, 5, 0);
+
         layout->addWidget(serviceRow);
+        layout->setSpacing(0);
+        layout->setContentsMargins(0, 0, 0, 0);
     }
 
     layout->addStretch();
