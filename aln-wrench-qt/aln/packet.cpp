@@ -114,6 +114,7 @@ QString Packet::toString() {
     if (destAddress.size()) buff += QString("dst: %0, ").arg(destAddress);
     if (nxtAddress.size()) buff += QString("nxt: %0, ").arg(nxtAddress);
     if (data.size()) buff += QString("data: %0").arg(data);
+    return buff;
 }
 
 Packet* Packet::copy() {

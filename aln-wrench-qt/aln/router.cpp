@@ -42,13 +42,15 @@ QString Router::selectServiceAddress(QString service) {
 }
 
 QString Router::send(Packet* p) {
-    QMutexLocker lock = QMutexLocker(&mMutex);
     if (p->srcAddress.length() == 0) {
         p->srcAddress = mAddress;
     }
     if (p->destAddress.length() == 0 && p->srv.length() > 0) {
         // send packet to any/all instances of the service
+        QMutexLocker lock = QMutexLocker(&mMutex);
         QStringList addresses = selectServiceAddresses(p->srv);
+        lock.unlock();
+
         if (addresses.length() > 0) {
             for (int i = 1; i < addresses.length(); i++) {
                 Packet* pc = p->copy();
@@ -58,19 +60,20 @@ QString Router::send(Packet* p) {
             p->destAddress = addresses.at(0);
         }
     }
-    lock.unlock();
 
     if (p->destAddress == mAddress) {
         PacketHandler* handler;
+        QMutexLocker lock = QMutexLocker(&mMutex);
         if (serviceHandlerMap.contains(p->srv)) {
             handler = serviceHandlerMap[p->srv];
-            handler->onPacket(p);
         } else if (contextHandlerMap.contains(p->ctx)) {
             handler = contextHandlerMap[p->ctx];
-            handler->onPacket(p);
         } else {
             return QString("service '%1' not registered\n").arg(p->srv);
         }
+        if (handler)
+            handler->onPacket(p);
+        lock.unlock();
         delete p;
     } else if (p->nxtAddress.length() == 0 || p->nxtAddress == mAddress) {
         if (remoteNodeMap.contains(p->destAddress)) {
