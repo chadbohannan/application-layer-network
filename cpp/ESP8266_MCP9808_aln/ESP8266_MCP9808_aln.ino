@@ -34,13 +34,11 @@ products from Adafruit!
 #define LED_PIN GPIO_D6
 
 
-char nodeAddress[] = "ESP8266-09";
-char nodeRouteData[] = " ESP8266-09  ";
-
 
 // Replace with your network credentials (STATION)
 #define ssid "moonraker"
 #define password "nickisadick"
+
 
 WiFiClient client; // TCP client
 WiFiUDP Udp;       // UDP client
@@ -51,9 +49,14 @@ char udpBuffer[udpBufferSize]; //buffer to hold incoming packet
 
 char pinOut = 0;
 
+char nodeAddress[] = "ESP8266-09";
+char nodeRouteData[] = "\x0A" "ESP8266-09\x0001";
+
+
 // Create the MCP9808 temperature sensor object
-Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 char data;
+
+Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
 
 // Mode Resolution SampleTime
@@ -87,17 +90,11 @@ void sendPacket(Packet* p) {
 void handler(Packet* p) {
   if (p->net == NET_QUERY) {
     char buffer[14];
-    // finishing composing router packetdata
-    nodeRouteData[0] = 10; // size of address
-    nodeRouteData[11] = 0; // first byte of cost
-    nodeRouteData[12] = 1; // second byte of cost
 
     p->clear();
     p->net = NET_ROUTE;
-    p->src = (uint8*)nodeAddress;
-    p->srcSz = 10;
-    p->data = (uint8*)nodeRouteData;  
-    p->dataSz = 13;
+    p->setSource((uint8*)nodeAddress, 10);
+    p->setData((uint8*)nodeRouteData, 13);
 
     sendPacket(p);
   }
@@ -131,14 +128,8 @@ void setup() {
     Serial.print('.');
     delay(500);
   }
-  delay(250);
   Serial.println(WiFi.localIP());
-  delay(250);
   Udp.begin(udpBroadcastListenPort);
-  delay(250);
-
-  pinMode(LED_PIN,OUTPUT);
-  digitalWrite(LED_PIN, LOW);
 }
 
 float readSensor() {
@@ -162,28 +153,16 @@ int readUdp(){
   if (packetSize) {
     IPAddress remoteIp = Udp.remoteIP();
 
-    Serial.print("Received packet of size ");
-    Serial.println(packetSize);
-    Serial.print("From ");
-    Serial.print(remoteIp);
-    Serial.print(", port ");
-    Serial.println(Udp.remotePort());
-
     // read the packet into packetBufffer
     int len = Udp.read(udpBuffer, udpBufferSize);
     if (len > 0) {
       udpBuffer[len] = 0;
     }
-    Serial.print("Contents:");
-    Serial.println(udpBuffer);
 
     char* protocol = strtok(udpBuffer, ":");
     char* host = strtok(NULL, ":/");
     String port = strtok(NULL, ":");
-    
-    Serial.println(protocol);
-    Serial.println(host);
-    Serial.println(port);
+
     if (!client.connected()) {
       connectTCP(host, port.toInt());
     }
@@ -210,29 +189,24 @@ void loop() {
         parser.ingestFrameBytes(&ch, 1);
       }
       if (elapsed() > 5000) {
-        Serial.println("timer elapsed");
-        char srv[] = "log";
+        markTime();
+
         char data[16];
         int dataSz = sprintf(data, "%0.3fF", readSensor());
+        Serial.println(data);
+        
         Packet p;
         p.clear();
-        p.srv = (uint8*)srv;
-        p.srvSz = 3;
-        p.src = (uint8*)nodeAddress;
-        p.srcSz = 10;
-        p.data = (uint8*)data;
-        p.dataSz = dataSz;
-        sendPacket(&p);
-        markTime();
+        char srv[] = "log";
+        p.setService((uint8*)srv, 3);
+        p.setSource((uint8*)nodeAddress, 10);
+        p.setData((uint8*)data, dataSz);
+        sendPacket(&p);        
       } else if (elapsed() < 0) {
         Serial.println("timer rollover detected, reseting timer");
         markTime();
       }
-  } else if (readUdp()) {
-    digitalWrite(LED_PIN, HIGH);
-    markTime();
-  }
-  if (elapsed() > 1000) {
-    digitalWrite(LED_PIN, LOW);
+  } else {
+    readUdp();
   }
 }

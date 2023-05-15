@@ -39,6 +39,11 @@ struct Packet {
     void clear();
     void write(Framer*);
     void evalCF();
+    void setService(uint8* p, int sz);
+    void setSource(uint8* p, int sz);
+    void setDest(uint8* p, int sz);
+    void setNext(uint8* p, int sz);
+    void setData(uint8* p, int sz);
 };
 
 
