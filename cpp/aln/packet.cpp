@@ -91,6 +91,31 @@ void Packet::write(Framer* f) {
   }
 }
 
+void Packet::setService(uint8* p, int sz) {
+  srv = p;
+  srvSz = sz;
+}
+
+void Packet::setSource(uint8* p, int sz) {
+  src = p;
+  srcSz = sz;
+}
+
+void Packet::setDest(uint8* p, int sz) {
+  dst = p;
+  dstSz = sz;
+}
+
+void Packet::setNext(uint8* p, int sz) {
+  nxt = p;
+  nxtSz = sz;
+}
+
+void Packet::setData(uint8* p, int sz) {
+  data = p;
+  dataSz = sz;
+}
+
 
 void writeOut(Framer* f, uint8* buff, int len) {
   for(int i = 0; i < len; i++) {
