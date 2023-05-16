@@ -1,10 +1,10 @@
-#include "ax25frame.h"
+#include "frame.h"
 
-QByteArray toAx25Buffer(QByteArray content) {
-    return toAx25Buffer(content.data(), content.size());
+QByteArray toFrameBuffer(QByteArray content) {
+    return toFrameBuffer(content.data(), content.size());
 }
 
-QByteArray toAx25Buffer(const char* content, int len) {
+QByteArray toFrameBuffer(const char* content, int len) {
     QByteArray ary;
     QBuffer buffer(&ary);
     buffer.open(QIODevice::Append);

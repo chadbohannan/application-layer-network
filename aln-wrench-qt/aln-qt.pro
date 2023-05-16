@@ -12,7 +12,7 @@ SOURCES += \
     addchanneldialog.cpp \
     advertiserthread.cpp \
     aln/alntypes.cpp \
-    aln/ax25frame.cpp \
+    aln/frame.cpp \
     aln/channel.cpp \
     aln/localchannel.cpp \
     aln/packet.cpp \
@@ -29,7 +29,7 @@ HEADERS += \
     addchanneldialog.h \
     advertiserthread.h \
     aln/alntypes.h \
-    aln/ax25frame.h \
+    aln/frame.h \
     aln/channel.h \
     aln/localchannel.h \
     aln/packet.h \
