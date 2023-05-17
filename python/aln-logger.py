@@ -9,9 +9,16 @@ from aln.packet import Packet
 
 from urllib.parse import urlparse
 
+# This example listens for a host advertisment to be broadcast by UDP
+# on port 8082 and expects a well-formed url like:
+# tcp+aln://192.168.0.2:8080
+# The url is parsed and the scheme, host, and port used to make a TCP
+# connection with the advertised host and the new connection is added
+# to the Router
+
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, "python-logger-01") # TODO dynamic address allocation protocol
+    router = Router(sel, "python-logger-01") # TODO use UUID
     router.start()
 
     def on_log(packet):
