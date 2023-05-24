@@ -65,8 +65,9 @@ class ArduinoBLESerial {
     void poll();
     void end();
     size_t available();
-    int read(uin8_t* buff, int sz);
+    int read(uint8_t* buff, int sz);
     size_t write(uint8_t byte);
+    size_t write(uint8_t* buff, int sz);
     void flush();
 
     operator bool();

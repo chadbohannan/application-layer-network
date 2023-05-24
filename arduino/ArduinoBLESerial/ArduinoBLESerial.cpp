@@ -41,11 +41,11 @@ size_t ArduinoBLESerial::available() {
   return this->receiveBuffer.getLength();
 }
 
-int ArduinoBLESerial::read(uin8_t* buff, int sz) {
+int ArduinoBLESerial::read(uint8_t* buff, int sz) {
   if (available() < sz)
-    sz = available()
+    sz = available();
   for(int i=0; i< sz; i++)
-    buff[i] = this->receiveBuffer.pop()
+    buff[i] = this->receiveBuffer.pop();
   return sz;
 }
 
@@ -59,6 +59,17 @@ size_t ArduinoBLESerial::write(uint8_t byte) {
       flush();
   }
   return 1;
+}
+
+size_t ArduinoBLESerial::write(uint8_t* buff, int sz) {
+  int nxt = 0;
+  int len = BLE_ATTRIBUTE_MAX_VALUE_LENGTH;
+  while (nxt < sz) {
+    if ((sz-nxt) < len)
+      len = sz-nxt;
+    this->transmitCharacteristic.setValue(buff+nxt, len);
+    nxt += len;
+  }
 }
 
 void ArduinoBLESerial::flush() {
