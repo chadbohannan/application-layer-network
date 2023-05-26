@@ -62,14 +62,9 @@ size_t ArduinoBLESerial::write(uint8_t byte) {
 }
 
 size_t ArduinoBLESerial::write(uint8_t* buff, int sz) {
-  int nxt = 0;
-  int len = BLE_ATTRIBUTE_MAX_VALUE_LENGTH;
-  while (nxt < sz) {
-    if ((sz-nxt) < len)
-      len = sz-nxt;
-    this->transmitCharacteristic.setValue(buff+nxt, len);
-    nxt += len;
-  }
+  for(int i =0; i <sz; i++)
+    write(buff[i]);
+  return sz;
 }
 
 void ArduinoBLESerial::flush() {
@@ -79,6 +74,10 @@ void ArduinoBLESerial::flush() {
   }
   this->lastFlushTime = millis();
   BLE.poll();
+}
+
+bool ArduinoBLESerial::connected() {
+  return BLE.connected();
 }
 
 ArduinoBLESerial::operator bool() {

@@ -69,7 +69,7 @@ class ArduinoBLESerial {
     size_t write(uint8_t byte);
     size_t write(uint8_t* buff, int sz);
     void flush();
-
+    bool connected();
     operator bool();
   private:
     ArduinoBLESerial();

@@ -2,7 +2,6 @@
  * https://github.com/Uberi/Arduino-HardwareBLESerial
  */
 
-
 #include <ArduinoBLESerial.h>
 
 ArduinoBLESerial &bleSerial = ArduinoBLESerial::getInstance();
@@ -24,10 +23,9 @@ void loop() {
   bleSerial.poll();
 
   while (bleSerial.available() > 0) {
-    uint8_t buff[20];
+    Serial.println(bleSerial.available());
     int n = bleSerial.read(buff, 20);
+    Serial.write(buff, n);
     bleSerial.write(buff, n);
-//    Serial.print(byte);
   }
-//  delay();
 }
