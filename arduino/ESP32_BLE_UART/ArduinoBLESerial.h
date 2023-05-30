@@ -57,11 +57,7 @@ class ArduinoBLESerial {
       return instance;
     }
 
-    // similar to begin(), but also sets up ArduinoBLE for you, which you otherwise have to do manually
-    // use this for simplicity, use begin() for flexibility (e.g., more than one service)
-    bool beginAndSetupBLE(const char *name);
-
-    void begin();
+    bool start(const char *name);
     void poll();
     void end();
     size_t available();
@@ -71,9 +67,11 @@ class ArduinoBLESerial {
     void flush();
     bool connected();
     operator bool();
+
   private:
     ArduinoBLESerial();
     ArduinoBLESerial(ArduinoBLESerial const &other) = delete;  // disable copy constructor
+    void addService();
     void operator=(ArduinoBLESerial const &other) = delete;  // disable assign constructor
 
     ByteRingBuffer<BLE_SERIAL_RECEIVE_BUFFER_SIZE> receiveBuffer;

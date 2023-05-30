@@ -7,7 +7,7 @@ from threading import Lock
 
 def main():
     sel = selectors.DefaultSelector() # application event loop
-    router = Router(sel, "python-host-1")
+    router = Router(sel, "python-localhost-host-1")
     router.start()
 
     def ping_handler(packet):

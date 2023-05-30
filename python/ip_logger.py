@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 # This example listens for a host advertisment to be broadcast by UDP
 # on port 8082 and expects a well-formed url like:
-# tcp+aln://192.168.0.2:8080
+# tcp+aln://192.168.0.2:8081
 # The url is parsed and the scheme, host, and port used to make a TCP
 # connection with the advertised host and the new connection is added
 # to the Router
@@ -39,21 +39,20 @@ def main():
         while True:
             m = s.recvfrom(4096)
             alnUrl = m[0].decode('utf-8')
+            url = urlparse(alnUrl)
+            protocol = url.scheme.decode("utf-8")
+            host = url.hostname.decode("utf-8")
+            port = url.port
+            malnAddr = url.path.decode("utf-8")
+            supportedSchemes = ['tcp+aln', 'tcp+maln', 'tls+aln', 'tls+maln']
+            if protocol in supportedSchemes:
+                break
+            else:
+                print(protocol, "not supported. supported schemes are", supportedSchemes)
             break
-        s.close()
-
-    o = urlparse(alnUrl)
-    protocol = o.scheme
-    host = o.hostname
-    port = o.port
-    malnAddr = o.path
+        s.close()   
     
-    print('parsed url params:', protocol, host, port, malnAddr)
-
-    supportedSchemes = ['tcp+aln', 'tcp+maln', 'tls+aln', 'tls+maln']
-    if protocol not in supportedSchemes:
-        print(protocol, "not supported. supported schemes are", supportedSchemes)
-        return
+    print('parsed url params:', protocol, host, port, malnAddr)   
 
     # connect to an existing node in the network
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

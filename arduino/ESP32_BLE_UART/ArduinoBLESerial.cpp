@@ -6,16 +6,16 @@ ArduinoBLESerial::ArduinoBLESerial() {
   this->lastFlushTime = 0;
 }
 
-bool ArduinoBLESerial::beginAndSetupBLE(const char *name) {
+bool ArduinoBLESerial::start(const char *name) {
   if (!BLE.begin()) { return false; }
   BLE.setLocalName(name);
   BLE.setDeviceName(name);
-  this->begin();
+  this->addService();
   BLE.advertise();
   return true;
 }
 
-void ArduinoBLESerial::begin() {
+void ArduinoBLESerial::addService() {
   BLE.setAdvertisedService(uartService);
   uartService.addCharacteristic(receiveCharacteristic);
   uartService.addCharacteristic(transmitCharacteristic);
