@@ -3,8 +3,7 @@ from aln.parser import Parser
 
 class BLEChannel():
     def __init__(self, address, loop):
-        self.sock = sock
-        self.sock.setblocking(False)
+        # TODO create a BLESerial instance
         self.on_close_callbacks = []
 
     def packet_handler(self, packet):
@@ -14,6 +13,7 @@ class BLEChannel():
         self.on_packet_callback = on_packet
         self.selector = selector
         self.parser = Parser(self.packet_handler)
+        # TODO 
         self.selector.register(self.sock, selectors.EVENT_READ, self.recv)
 
     def close(self):
