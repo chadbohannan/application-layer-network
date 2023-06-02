@@ -13,7 +13,7 @@ class BLEChannel():
         self.on_packet_callback = on_packet
         self.selector = selector
         self.parser = Parser(self.packet_handler)
-        # TODO 
+        # TODO connect BLESerial output to file-like object to replace sock
         self.selector.register(self.sock, selectors.EVENT_READ, self.recv)
 
     def close(self):

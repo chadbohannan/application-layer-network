@@ -21,9 +21,9 @@ void setup() {
   }
 }
 
-
-int cnt = 0;
-char hi[] = "hello";
+int t0 = 0;
+char hi[] = "hello\n";
+bool wasConnected = false;
 
 void loop() {
   // this must be called regularly to perform BLE updates
@@ -35,7 +35,20 @@ void loop() {
     Serial.write(buff, n);
     bleSerial.write(buff, n);
   }
-  if(bleSerial.connected() & cnt++ < 1) {
-    bleSerial.write((uint8_t*)hi, 5);
+  int now = millis();
+  if(bleSerial.connected()) {
+    if(!wasConnected) {
+      Serial.println("connected");
+      wasConnected = false;
+    }
+    if (now-t0 > 5000 || t0 > now) {
+      wasConnected = true;
+      t0 = millis();
+      bleSerial.write((uint8_t*)hi, 6);
+      Serial.write((uint8_t*)hi, 6);
+    }
+  } else if(wasConnected) {
+    Serial.println("disconnected");
+    wasConnected = false;
   }
 }
