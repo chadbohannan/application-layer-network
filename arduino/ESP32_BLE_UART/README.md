@@ -1,4 +1,8 @@
-Build and upload to ESP32 with Arduino IDe
+Build and upload to ESP32 with Arduino IDE to deploy a BLE echo service.
+
+Run the python scripts from a PC to scan for and connect to the devices.
+
+OR
 
 Use mobile app to interact with devices.
 

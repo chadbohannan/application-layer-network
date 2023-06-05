@@ -5,15 +5,16 @@
  */
 
 #include "ArduinoBLESerial.h"
-
+#define BLE_FRAME_SZ 20
 ArduinoBLESerial &bleSerial = ArduinoBLESerial::getInstance();
-uint8_t buff[20];
+uint8_t buff[BLE_FRAME_SZ];
+bool wasConnected = false;
+char echo[] = "echo:";
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("hello world");
+  Serial.println("Starting echo-box-1...");
   if (!bleSerial.start("echo-box-1")) {
-    Serial.begin(115200);
     while (true) {
       Serial.println("failed to initialize ArduinoBLESerial!");
       delay(1000);
@@ -21,31 +22,25 @@ void setup() {
   }
 }
 
-int t0 = 0;
-char hi[] = "hello\n";
-bool wasConnected = false;
-
 void loop() {
-  // this must be called regularly to perform BLE updates
-  bleSerial.poll();
+  bleSerial.poll(); // must be called regularly to perform BLE updates
 
   while (bleSerial.available() > 0) {
-    Serial.println(bleSerial.available());
-    int n = bleSerial.read(buff, 20);
+    int n = bleSerial.read(buff, BLE_FRAME_SZ);
+    
+    // echo received content
+    Serial.write("echo:");
     Serial.write(buff, n);
+    bleSerial.write((uint8_t*)echo, 5);
     bleSerial.write(buff, n);
   }
+
+  // debugging
   int now = millis();
   if(bleSerial.connected()) {
     if(!wasConnected) {
       Serial.println("connected");
-      wasConnected = false;
-    }
-    if (now-t0 > 5000 || t0 > now) {
       wasConnected = true;
-      t0 = millis();
-      bleSerial.write((uint8_t*)hi, 6);
-      Serial.write((uint8_t*)hi, 6);
     }
   } else if(wasConnected) {
     Serial.println("disconnected");

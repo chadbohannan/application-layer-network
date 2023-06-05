@@ -1,33 +1,33 @@
 """
-Dependencies Bleak
-pip3 install bleak
+This is still a work in progress, but the intent is to map BLE IO with pythons async Stream IO.
+It is still a bit patchy.
+
+
+Dependencies
+pip3 install bleak, aiofiles
 """
 import os
-import platform
-import logging
 import asyncio
-import time
+import aiofiles
+
 from bleak import BleakClient
 from bleak import BleakClient
 from bleak import _logger as logger
 from bleak.uuids import uuid16_dict
+from ble_scan import BLEScanner
 
-UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-#UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for TX
-#UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for RX
+from select import select
 
-dataFlag = False #global flag to check for new data
+
+UART_NU_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for TX
+UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for RX
+BLE_FRAME_SZ = 20
 
 class BLESerial:
-    def __init__(self, address, loop):
-        self.address = address
-        self.loop = loop
-
-        # TODO wrap a Bleak instance
-        self.bleak_client = BleakClient(address, loop=loop)
-
-        r, w = os.pipe()
-        self.inbound_reader = os.fdopen(r, "rb")
+    def __init__(self):
+        self.r, w = os.pipe()
+        # self.inbound_reader = os.fdopen(r, "rb")
         self.inbound_writer = os.fdopen(w, "wb")
         
         # TODO set up the outbound selector
@@ -35,67 +35,81 @@ class BLESerial:
         self.outbound_reader = os.fdopen(r, "rb")
         self.outbound_writer = os.fdopen(w, "wb")
 
+        # prevent the file stream from hanging on read
+        # os.set_blocking(self.inbound_reader.fileno(), False)
+        os.set_blocking(self.outbound_reader.fileno(), False)
+
         self.stop = False
 
 
     def notification_handler(self, sender, data):
         """Simple notification handler which prints the data received."""
         # print("{0}: {1}".format(sender, data))
-        print(data.decode('utf-8'))
+        print("received:", data.decode('utf-8'))
         self.inbound_writer.write(data)
         self.inbound_writer.flush()
 
     def get_reader(self):
         return self.inbound_reader
 
-    def start(self):
-        self.bleak_client.start_notify(UART_RX_UUID, self.notification_handler)
+    def read(self):
+        return self.inbound_reader.read(block=False)
 
+    def send(self, data):
+        self.outbound_writer.write(data)
+        self.outbound_writer.flush()
 
     async def run(self, address, loop):
-
         async with BleakClient(address, loop=loop) as client:
 
             #wait for BLE client to be connected
-            x = client.is_connected
-            print("Connected: {0}".format(x))
+            if not client.is_connected:
+                print("Failed to connect to", addess)
+                return
+            print("Connected to", address)
 
-            #wait for data to be sent from client
+            #configure client to listen for data to be sent from client
             await client.start_notify(UART_RX_UUID, self.notification_handler)
 
-            while not self.stop:
+            # TODO repace select with loop.add_reader()
+            inputs = [self.outbound_reader]
+            while not self.stop:                
+                files_to_read, files_to_write, exceptions = select(inputs, [], inputs, .1)
+                if files_to_read:
+                    data = self.outbound_reader.read(BLE_FRAME_SZ)
+                    print("sending:", data)
+                    await client.write_gatt_char(UART_TX_UUID,data)
                 await asyncio.sleep(0.01)
 
-                # TODO configure selector to handle read an input pipe
-
-                # #check if we received data
-                # global dataFlag
-                # if dataFlag :
-                #     dataFlag = False
-
-                #     #echo our received data back to the BLE device
-                #     data = await client.read_gatt_char(UART_RX_UUID)
-                #     self.inbound_writer.write(datat)
-                #     self.inbound_writer.flush()
-                #     # await client.write_gatt_char(UART_TX_UUID,data)
+async def listen(bleSerial):
+    async with aiofiles.open(bleSerial.r, mode='rb') as f:
+        while True:
+            contents = await f.read()
+            print(contents)
 
 
 if __name__ == "__main__":
-
-    #this is MAC of our BLE device
-    address = (
-        # "C8:F0:9E:F6:DD:EA"
-        "B2981F23-EF39-2C81-808E-DA22D07D4E8F"
-    )
-
-    def on_data(data):
-        print("data:", data)
-
     loop = asyncio.get_event_loop()
-    bleSerial = BLESerial(address, loop)
 
-    print("Scanning BLE...")
-    try:
-        asyncio.run(bleSerial.run(address, loop))
-    except:
-        pass
+    scanner = BLEScanner(service_uuid=UART_NU_UUID)
+    device_map = scanner.scan()
+    if len(device_map) == 0:
+        print("No Nordic UART Serial devices found")
+        exit(0)
+    elif len(device_map) == 1:
+        for key in device_map.keys():
+            ble_address = key
+    else:
+        print(len(device_map), "devices found, TODO: device selection")
+        exit(0)
+
+    bleSerial = BLESerial()
+    loop.create_task(bleSerial.run(ble_address, loop))
+    loop.create_task(listen(bleSerial))
+
+    print("tasks started, sending message")
+    bleSerial.send("hakuna matata".encode("utf-8"))
+    print("message sent")    
+    loop.run_forever()
+    print("Exiting...")
+

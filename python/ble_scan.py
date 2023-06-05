@@ -1,24 +1,35 @@
+"""
+Bluetooth Low Energy (BLE) device scanner.
+Provide a service_uuid to filter devices advertised services.
+"""
 import asyncio
 from bleak import BleakScanner
 
-UART_NU_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS service ID
-UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for TX
-UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for RX
+class BLEScanner():
+    def __init__(self, service_uuid=None):
+        self.service_uuid = service_uuid
+        self.uart_devices = None
 
-uart_devices = dict()
+    def scan(self):
+        self.uart_devices = dict()
+        return asyncio.run(self._scan())
 
-def detection_callback(device, advertisement_data):
-    if UART_NU_UUID in advertisement_data.service_uuids:
-        uart_devices[device.address] = advertisement_data
+    def _detection_callback(self, device, advertisement_data):
+        if not self.service_uuid or self.service_uuid in advertisement_data.service_uuids:
+            self.uart_devices[device.address] = advertisement_data.local_name
+    
+    async def _scan(self, duration=3.0):
+        scanner = BleakScanner(detection_callback=self._detection_callback)
+        await scanner.start()
+        await asyncio.sleep(duration)
+        await scanner.stop()
+        return self.uart_devices
 
-async def scan():
-    scanner = BleakScanner(
-        filters={"UUIDs":[UART_NU_UUID], "DuplicateData":False},
-        detection_callback=detection_callback
-    )
-    await scanner.start()
-    await asyncio.sleep(3.0)
-    await scanner.stop()
-    print(uart_devices)
 
-asyncio.run(scan())
+if __name__ == "__main__":
+    print("Scanning for BLE services...")
+    scanner = BLEScanner()
+    devices = scanner.scan()
+    for key in devices.keys():
+        print(key, "-", devices[key])
+    print("Exiting...")
