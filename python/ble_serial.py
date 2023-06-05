@@ -13,8 +13,8 @@ from bleak import _logger as logger
 from bleak.uuids import uuid16_dict
 
 UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for TX
-UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for RX
+#UART_TX_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for TX
+#UART_RX_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e" #Nordic NUS characteristic for RX
 
 dataFlag = False #global flag to check for new data
 
@@ -24,29 +24,34 @@ class BLESerial:
         self.loop = loop
 
         # TODO wrap a Bleak instance
-        # self.bleak_client = BleakClient(address, loop=loop)
+        self.bleak_client = BleakClient(address, loop=loop)
 
         r, w = os.pipe()
-
         self.inbound_reader = os.fdopen(r, "rb")
         self.inbound_writer = os.fdopen(w, "wb")
+        
+        # TODO set up the outbound selector
+        r, w = os.pipe()
+        self.outbound_reader = os.fdopen(r, "rb")
+        self.outbound_writer = os.fdopen(w, "wb")
 
         self.stop = False
-        
-        
-        # TODO outbound pipe
+
 
     def notification_handler(self, sender, data):
         """Simple notification handler which prints the data received."""
-        print("{0}: {1}".format(sender, data))
-        print(data)
+        # print("{0}: {1}".format(sender, data))
+        print(data.decode('utf-8'))
         self.inbound_writer.write(data)
         self.inbound_writer.flush()
 
     def get_reader(self):
         return self.inbound_reader
 
-    
+    def start(self):
+        self.bleak_client.start_notify(UART_RX_UUID, self.notification_handler)
+
+
     async def run(self, address, loop):
 
         async with BleakClient(address, loop=loop) as client:
@@ -79,19 +84,18 @@ if __name__ == "__main__":
 
     #this is MAC of our BLE device
     address = (
-        "C8:F0:9E:F6:DD:EA"
+        # "C8:F0:9E:F6:DD:EA"
+        "B2981F23-EF39-2C81-808E-DA22D07D4E8F"
     )
 
     def on_data(data):
         print("data:", data)
 
     loop = asyncio.get_event_loop()
-
     bleSerial = BLESerial(address, loop)
 
+    print("Scanning BLE...")
     try:
-        loop.run_until_complete(bleSerial.run(address, loop))
-    finally:
-        bleSerial.stop = True
-        time.sleep(0.5);
-    
+        asyncio.run(bleSerial.run(address, loop))
+    except:
+        pass
