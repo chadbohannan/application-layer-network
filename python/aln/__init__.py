@@ -1,1 +1,1 @@
-__all__ = ["btchannel", "packet", "parser", "router", "tcpchannel", "tcphost"]
+__all__ = ["bt_channel", "packet", "parser", "router", "tcp_channel", "tcp_host"]

@@ -1,6 +1,6 @@
 import selectors, signal, socket, sched, time
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 

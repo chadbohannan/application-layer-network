@@ -7,7 +7,7 @@ import selectors, signal, socket, time
 from urllib.parse import urlparse
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 
@@ -26,11 +26,9 @@ def main():
         m=s.recvfrom(4096)
         print("UDP:", m[0])
         url = urlparse(m[0])
-        if url.scheme == "tcp+aln".encode("utf-8"):
-            print(url.scheme, "==", "tcp+aln")
+        protocol = url.scheme.decode("utf-8")
+        if protocol in ["tcp+aln", "tcp+maln"]:
             break
-        else:
-            print(url.scheme, "!=", "tcp+aln".encode("utf-8"))
     s.close()
     
     print('parsed host:', url.scheme, url.hostname, url.port, url.path)
@@ -41,7 +39,9 @@ def main():
 
     # join the network
     ch = TcpChannel(sock)
-    router.add_channel(TcpChannel(sock))  
+    router.add_channel(TcpChannel(sock))
+    if "maln" in protocol: # support multiplexed links
+        ch.send(Packet(destAddr=url.path))
 
     # listen for ^C
     lock = Lock()

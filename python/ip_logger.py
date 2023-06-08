@@ -3,7 +3,7 @@ from math import remainder
 import selectors, signal, socket, time
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 
@@ -40,27 +40,24 @@ def main():
             m = s.recvfrom(4096)
             alnUrl = m[0].decode('utf-8')
             url = urlparse(alnUrl)
-            protocol = url.scheme.decode("utf-8")
-            host = url.hostname.decode("utf-8")
-            port = url.port
-            malnAddr = url.path.decode("utf-8")
+            malnAddr = url.path
             supportedSchemes = ['tcp+aln', 'tcp+maln', 'tls+aln', 'tls+maln']
-            if protocol in supportedSchemes:
+            if url.scheme in supportedSchemes:
                 break
             else:
-                print(protocol, "not supported. supported schemes are", supportedSchemes)
+                print(url.scheme, "not supported. supported schemes are", supportedSchemes)
             break
         s.close()   
     
-    print('parsed url params:', protocol, host, port, malnAddr)   
+    print('parsed url params:', url.scheme, url.hostname, url.port, malnAddr)   
 
     # connect to an existing node in the network
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((host, port))
+    sock.connect((url.hostname, url.port))
 
     # join the network
     ch = TcpChannel(sock)
-    if "maln" in protocol: # support multiplexed links
+    if "maln" in url.scheme: # support multiplexed links
         ch.send(Packet(destAddr=malnAddr))
     router.add_channel(ch)
     
