@@ -3,15 +3,22 @@ from math import remainder
 import selectors, signal, socket, time
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 
 from urllib.parse import urlparse
 
+# This example listens for a host advertisment to be broadcast by UDP
+# on port 8082 and expects a well-formed url like:
+# tcp+aln://192.168.0.2:8081
+# The url is parsed and the scheme, host, and port used to make a TCP
+# connection with the advertised host and the new connection is added
+# to the Router
+
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, "python-logger-01") # TODO dynamic address allocation protocol
+    router = Router(sel, "python-logger-01") # TODO use UUID
     router.start()
 
     def on_log(packet):
@@ -32,29 +39,25 @@ def main():
         while True:
             m = s.recvfrom(4096)
             alnUrl = m[0].decode('utf-8')
+            url = urlparse(alnUrl)
+            malnAddr = url.path
+            supportedSchemes = ['tcp+aln', 'tcp+maln', 'tls+aln', 'tls+maln']
+            if url.scheme in supportedSchemes:
+                break
+            else:
+                print(url.scheme, "not supported. supported schemes are", supportedSchemes)
             break
-        s.close()
-
-    o = urlparse(alnUrl)
-    protocol = o.scheme
-    host = o.hostname
-    port = o.port
-    malnAddr = o.path
+        s.close()   
     
-    print('parsed url params:', protocol, host, port, malnAddr)
-
-    supportedSchemes = ['tcp+aln', 'tcp+maln', 'tls+aln', 'tls+maln']
-    if protocol not in supportedSchemes:
-        print(protocol, "not supported. supported schemes are", supportedSchemes)
-        return
+    print('parsed url params:', url.scheme, url.hostname, url.port, malnAddr)   
 
     # connect to an existing node in the network
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((host, port))
+    sock.connect((url.hostname, url.port))
 
     # join the network
     ch = TcpChannel(sock)
-    if "maln" in protocol: # support multiplexed links
+    if "maln" in url.scheme: # support multiplexed links
         ch.send(Packet(destAddr=malnAddr))
     router.add_channel(ch)
     

@@ -1,13 +1,13 @@
 import selectors, signal, socket, sys, time
 from aln.parser import Packet
-from aln.tcphost import TcpHost
+from aln.tcp_host import TcpHost
 from aln.router import Router
 from threading import Lock
 
 
 def main():
     sel = selectors.DefaultSelector() # application event loop
-    router = Router(sel, "python-host-1")
+    router = Router(sel, "python-localhost-host-1")
     router.start()
 
     def ping_handler(packet):

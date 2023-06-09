@@ -35,6 +35,9 @@ char data[16];
 float value;
 int dataSz;
 
+void handler(Packet* p);
+Parser parser(handler);
+
 // measure elapsed time
 int timerMark = 0;
 void markTime() {
@@ -68,9 +71,6 @@ void handler(Packet* p) {
     sendPacket(p);
   }
 }
-
-Parser parser(handler);
-
 
 float readSensor() {
   uint8 sample = temprature_sens_read();

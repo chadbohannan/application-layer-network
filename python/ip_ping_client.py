@@ -1,13 +1,13 @@
 import selectors, signal, socket, sched, time
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 
 pong_count = 0
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, "python-client-1")
+    router = Router(sel, "python-localhost-client-1")
     router.start()
 
     def ping_handler(packet):
@@ -21,7 +21,7 @@ def main():
     router.register_service("ping", ping_handler)
 
 
-    # connect to an existing node in the network
+    # assume a localhost connection on port 8081; see ip_ping_host.py
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(('localhost', 8081))
 
@@ -45,7 +45,6 @@ def main():
             # no more packets expected for this context
             print('releasing context')
             router.release_context(packet.contextID)            
-
 
     ctxID = router.register_context_handler(on_pong)
     msg = router.send(Packet(service="ping", contextID=ctxID))

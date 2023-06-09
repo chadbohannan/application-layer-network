@@ -4,7 +4,7 @@ import sys
 import selectors
 import socket
 
-from .tcpchannel import TcpChannel
+from .tcp_channel import TcpChannel
 
 # TODO encapsulate into TcpHost class
 sel = selectors.DefaultSelector()

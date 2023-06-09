@@ -3,18 +3,22 @@ from math import remainder
 import selectors, signal, socket, time
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcpchannel import TcpChannel
+from aln.tcp_channel import TcpChannel
 from aln.packet import Packet
 import time
 from urllib.parse import urlparse
 
-# an edge node is one that cannot be expected to route messages
-# this example shows how an edge node can functionin without 
+# An edge node is one that does not route messages.
+# This example shows how an edge node can functionin without 
 # an instance of Router. This program connects to an ALN via
-# a TCPChannel and sends packets direclty from a loop in main.
+# a TCPChannel and sends packets and sends packets with that 
+# channel directly rather than by using a Router.
 # The srcAddr is set to prevent the next-hop router from confusing
 # the packet as its own and assign the srcAddr to itself.
-
+# 
+# This example probably isn't useful in a real sense but it
+# does emulate how some low-capability microcontrollers might
+# be implemented in a sensor network application.
 def main():    
     alnUrl = ""
 
