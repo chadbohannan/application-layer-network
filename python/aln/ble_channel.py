@@ -1,6 +1,6 @@
 import selectors
 from aln.parser import Parser
-import asyncio
+
 
 class BLEChannel():
     def __init__(self, bleSerial):
@@ -10,18 +10,18 @@ class BLEChannel():
     def packet_handler(self, packet):
         self.on_packet_callback(self, packet)
 
+    def on_inbound_data(self, data):
+        self.parser.readBytes(data)
+
     def listen(self, selector, on_packet):
         self.on_packet_callback = on_packet
         self.selector = selector
         self.parser = Parser(self.packet_handler)
-        # TODO connect BLESerial output to file-like object to replace sock
         self.selector.register(self.bleSerial.get_reader(), selectors.EVENT_READ, self.recv)
+        self.bleSerial.loop.create_task(self.bleSerial.run(self.on_inbound_data))
 
-        self.bleSerial.loop.create_task(self.bleSerial.run())
-
-    def snd(self, data):
-        print("BLEChannel.snd:", data)
-
+    def snd(self, packet):
+        self.bleSerial.send(packet)
 
     def close(self):
         fd = self.bleSerial.get_reader()

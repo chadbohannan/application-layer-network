@@ -1,6 +1,7 @@
 import selectors
 from .parser import Parser
 
+
 class BtChannel():
     def __init__(self, sock):
         self.sock = sock

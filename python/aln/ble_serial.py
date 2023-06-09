@@ -61,7 +61,7 @@ class BLESerial:
         self.outbound_writer.write(data)
         self.outbound_writer.flush()
 
-    async def run(self):
+    async def run(self, on_data):
         async with BleakClient(self.address, loop=self.loop) as client:
             #wait for BLE client to be connected
             if not client.is_connected:
@@ -83,6 +83,7 @@ class BLESerial:
                 if self.inbound_reader in files_to_read:
                     data = self.inbound_reader.read()
                     print("recieving:", data)
+                    on_data(data)
                     # TODO something
                 await asyncio.sleep(0.01)
 
