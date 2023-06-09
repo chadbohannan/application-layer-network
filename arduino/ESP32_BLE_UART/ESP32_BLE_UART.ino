@@ -26,7 +26,7 @@ char echo[] = "echo:";
 
 char nodeAddress[] = "ESP32-black-box";
 uint8 nodeAdressSize = 15;
-char nodeRouteData[] = "\x08" "ESP32-black-box\x0001";
+char nodeRouteData[] = "\x0f" "ESP32-black-box""\x0001";
 uint8 nodeRouteDataSz = 18;
 
 char srv[] = "log";

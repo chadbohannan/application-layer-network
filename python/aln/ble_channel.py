@@ -46,8 +46,5 @@ class BLEChannel():
         return True
 
     def recv(self, fd, mask):
-        # data = sock.recv(1024)
-        data = fd.read(block=False)
-        print("ble_channel recv:", data)
+        data = fd.read()
         self.parser.readBytes(data) if data else self.close()
-

@@ -9,13 +9,10 @@ pip3 install bleak, aiofiles
 import os
 import asyncio
 import aiofiles
-
 from bleak import BleakClient
 from bleak import BleakClient
 from bleak import _logger as logger
 from bleak.uuids import uuid16_dict
-from ble_scan import BLEScanner
-
 from select import select
 
 
@@ -32,7 +29,6 @@ class BLESerial:
         self.inbound_reader = os.fdopen(self.r, "rb")
         self.inbound_writer = os.fdopen(w, "wb")
         
-        # TODO set up the outbound selector
         r, w = os.pipe()
         self.outbound_reader = os.fdopen(r, "rb")
         self.outbound_writer = os.fdopen(w, "wb")
@@ -47,7 +43,7 @@ class BLESerial:
     def notification_handler(self, sender, data):
         """Simple notification handler which prints the data received."""
         # print("{0}: {1}".format(sender, data))
-        print("received:", data)
+        # print("received:", data)
         self.inbound_writer.write(data)
         self.inbound_writer.flush()
 
@@ -82,9 +78,7 @@ class BLESerial:
                     await client.write_gatt_char(UART_TX_UUID,data)
                 if self.inbound_reader in files_to_read:
                     data = self.inbound_reader.read()
-                    print("recieving:", data)
                     on_data(data)
-                    # TODO something
                 await asyncio.sleep(0.01)
 
 async def listen(bleSerial):
@@ -94,30 +88,4 @@ async def listen(bleSerial):
             await asyncio.sleep(0.01)
             if contents:
                 print("BLESerial listen:", contents)
-
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-
-    scanner = BLEScanner(service_uuid=UART_NU_UUID)
-    device_map = scanner.scan()
-    if len(device_map) == 0:
-        print("No Nordic UART Serial devices found")
-        exit(0)
-    elif len(device_map) == 1:
-        for key in device_map.keys():
-            ble_address = key
-    else:
-        print(len(device_map), "devices found, TODO: device selection")
-        exit(0)
-
-    bleSerial = BLESerial(ble_address, loop)
-    loop.create_task(bleSerial.run())
-    loop.create_task(listen(bleSerial))
-
-    print("tasks started, sending message")
-    bleSerial.send("hakuna matata".encode("utf-8"))
-    print("message sent")    
-    loop.run_forever()
-    print("Exiting...")
 

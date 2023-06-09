@@ -161,8 +161,8 @@ class Router(Thread):
         if packet.srcAddr == None:
             packet.srcAddr = self.address
 
-        # print("send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}".format(
-        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data))
+        # print("router.send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}, data:{6}".format(
+        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data), packet.data.decode("utf-8"))
         # )
 
         packetHandler = None
