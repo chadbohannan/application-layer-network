@@ -24,7 +24,7 @@ def main():
     loop = asyncio.get_event_loop()
 
     scanner = BLEScanner(service_uuid=UART_NU_UUID)
-    device_map = scanner.scan()
+    device_map = scanner.scan(duration=5.0)
     if len(device_map) == 0:
         print("No Nordic UART Serial devices found")
         exit(0)

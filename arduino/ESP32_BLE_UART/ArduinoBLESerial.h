@@ -81,9 +81,15 @@ class ArduinoBLESerial {
     size_t transmitBufferLength;
     uint8_t transmitBuffer[BLE_ATTRIBUTE_MAX_VALUE_LENGTH];
 
-    BLEService uartService = BLEService("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
-    BLECharacteristic receiveCharacteristic = BLECharacteristic("6E400002-B5A3-F393-E0A9-E50E24DCCA9E", BLEWriteWithoutResponse, BLE_ATTRIBUTE_MAX_VALUE_LENGTH);
-    BLECharacteristic transmitCharacteristic = BLECharacteristic("6E400003-B5A3-F393-E0A9-E50E24DCCA9E", BLENotify, BLE_ATTRIBUTE_MAX_VALUE_LENGTH);
+    const char* SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
+    const char* RX_CHAR_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E";
+    const char* TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E";
+    const char* TX_CHAR_CCCD = "00002902-0000-1000-8000-00805f9b34fb";
+
+    BLEService uartService = BLEService(SERVICE_UUID);
+    BLECharacteristic receiveCharacteristic = BLECharacteristic(RX_CHAR_UUID, BLEWriteWithoutResponse, BLE_ATTRIBUTE_MAX_VALUE_LENGTH);
+    BLECharacteristic transmitCharacteristic = BLECharacteristic(TX_CHAR_UUID, BLERead | BLENotify, BLE_ATTRIBUTE_MAX_VALUE_LENGTH);
+    BLEDescriptor txDescriptor = BLEDescriptor(TX_CHAR_CCCD, "aln");
 
     void onReceive(const uint8_t* data, size_t size);
     static void onBLEWritten(BLEDevice central, BLECharacteristic characteristic);

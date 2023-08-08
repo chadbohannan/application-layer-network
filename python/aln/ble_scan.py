@@ -10,9 +10,9 @@ class BLEScanner():
         self.service_uuid = service_uuid
         self.uart_devices = None
 
-    def scan(self):
+    def scan(self, duration=3.0):
         self.uart_devices = dict()
-        return asyncio.run(self._scan())
+        return asyncio.run(self._scan(duration))
 
     def _detection_callback(self, device, advertisement_data):
         if not self.service_uuid or self.service_uuid in advertisement_data.service_uuids:

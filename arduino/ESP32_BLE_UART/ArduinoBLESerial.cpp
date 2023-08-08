@@ -4,6 +4,9 @@ ArduinoBLESerial::ArduinoBLESerial() {
   this->numAvailableLines = 0;
   this->transmitBufferLength = 0;
   this->lastFlushTime = 0;
+
+
+  this->transmitCharacteristic.addDescriptor(txDescriptor);
 }
 
 bool ArduinoBLESerial::start(const char *name) {
