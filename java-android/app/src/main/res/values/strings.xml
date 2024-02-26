@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">ALN Wrench</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_services">Services</string>
+    <string name="title_home">Home</string>
+    <string name="title_wifi">TCP/IP</string>
+    <string name="title_bluetooth">Bluetooth</string>
+    <string name="title_mesh">Mesh Net</string>
+</resources>

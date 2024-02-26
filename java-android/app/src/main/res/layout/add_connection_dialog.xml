@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="300dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/custom_border">
+
+    <EditText android:id="@+id/titleEdit"
+        android:hint="untitled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <EditText android:id="@+id/contentEdit"
+            android:hint="tcp+maln://host:port/node"
+            android:lines="2"
+            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <ImageView android:id="@+id/scan_qr_button"
+            android:layout_width="40dp"
+            android:layout_weight="0"
+            android:padding="5dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:src="@drawable/scan_qr">
+        </ImageView>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button android:id="@+id/cancel_button"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="10dp"
+            android:text="Cancel"/>
+
+        <Button android:id="@+id/ok_button"
+            android:layout_width="180dp"
+            android:layout_height="match_parent"
+            android:layout_margin="10dp"
+            android:text="Ok"/>
+    </LinearLayout>
+
+</LinearLayout>

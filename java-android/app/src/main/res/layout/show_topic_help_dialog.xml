@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="40px"
+    android:orientation="vertical">
+
+    <TextView android:id="@+id/titleLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center|left"
+        android:layout_margin="12dp"
+        android:textSize="10pt"
+        android:text="Help"/>
+
+    <WebView android:id="@+id/contentLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center|right"
+        android:layout_margin="10dp"
+        android:textSize="8pt"
+        android:text="listen on port"/>
+
+    <Button android:id="@+id/ok_button"
+        android:layout_width="100dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+
+        android:text="Ok"/>
+
+</LinearLayout>
