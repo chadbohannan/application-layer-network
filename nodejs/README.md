@@ -1,3 +1,15 @@
+## Getting Started
+```
+$ npm install
+```
+
+### Run a host node
+Host nodes listen for connections and act as hubs for data flows.
+```
+$ node server.js
+```
+
+
 ## Running the server
 
 ```

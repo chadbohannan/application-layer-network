@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/navigation_mesh">
+
+    <fragment
+        android:id="@+id/navigation_mesh"
+        android:name="biglittleidea.alnn.ui.mesh.MeshFragment"
+        android:label="@string/title_mesh"
+        tools:layout="@layout/fragment_mesh" />
+
+    <fragment
+        android:id="@+id/navigation_services"
+        android:name="biglittleidea.alnn.ui.service.ServiceFragment"
+        android:label="@string/title_services"
+        tools:layout="@layout/fragment_service" />
+
+    <fragment
+        android:id="@+id/navigation_wifi"
+        android:name="biglittleidea.alnn.ui.wifi.WifiFragment"
+        android:label="@string/title_wifi"
+        tools:layout="@layout/fragment_wifi" />
+
+    <fragment
+        android:id="@+id/navigation_bluetooth"
+        android:name="biglittleidea.alnn.ui.bluetooth.BluetoothFragment"
+        android:label="@string/title_bluetooth"
+        tools:layout="@layout/fragment_bluetooth" />
+
+</navigation>

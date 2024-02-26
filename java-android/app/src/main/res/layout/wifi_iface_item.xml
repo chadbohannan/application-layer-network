@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/iface_identity_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/icon"
+            android:paddingStart="@dimen/button_margin"
+            android:layout_width="58dp"
+            android:layout_height="50dp"
+            android:src="@drawable/network_card" />
+
+        <TextView
+            android:id="@+id/iface_name_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:paddingStart="@dimen/activity_horizontal_margin"
+            android:textColor="@color/black"
+            android:textSize="10pt"
+            android:layout_weight="1"
+            android:text="wlan0" />
+
+        <TextView
+            android:id="@+id/iface_address_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:paddingStart="@dimen/activity_horizontal_margin"
+            android:paddingEnd="@dimen/activity_horizontal_margin"
+            android:textColor="@color/black"
+            android:textSize="10pt"
+            android:layout_weight="0"
+            android:text="/10.0.2.16" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/bcast_listen_label_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:paddingStart="4dp"
+            android:textColor="@color/black"
+            android:textSize="8pt"
+            android:layout_weight="1"
+            android:text="Broadcast address:" />
+
+        <TextView
+            android:id="@+id/bcast_listen_address_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:paddingStart="@dimen/activity_horizontal_margin"
+            android:paddingEnd="@dimen/activity_horizontal_margin"
+            android:textColor="@color/black"
+            android:textSize="10pt"
+            android:layout_weight="0"
+            android:text="/10.0.2.255" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/actAsTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="4dp"
+            android:textColor="@color/black"
+            android:textSize="8pt"
+            android:text="Act as:"
+            android:layout_weight="0"/>
+
+        <View
+            android:layout_width="wrap_content"
+            android:layout_height="1px"
+            android:layout_weight="1">
+        </View>
+
+        <TextView
+            android:id="@+id/clientTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="10pt"
+            android:text="client"
+            android:layout_weight="0"/>
+
+        <Switch
+            android:id="@+id/act_as_host_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10pt"
+            android:padding="8dp"
+            android:switchMinWidth="76dp"
+            android:textColor="@color/black"
+            android:text=""
+            android:layout_weight="0"/>
+
+        <TextView
+            android:id="@+id/hostTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="10pt"
+            android:text="host"
+            android:layout_weight="0"/>
+        <View
+            android:layout_width="wrap_content"
+            android:layout_height="1px"
+            android:layout_weight="1">
+        </View>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/udp_bcast_listen_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10px">
+
+        <TextView
+            android:id="@+id/help_udp_listen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="4dp"
+            android:text="?"
+            android:textColor="@color/purple_700"
+            android:textStyle="bold"
+            android:textSize="12pt"/>
+
+        <View
+            android:layout_width="wrap_content"
+            android:layout_height="1px"
+            android:layout_weight="1">
+
+        </View>
+
+        <Switch
+            android:id="@+id/udp_listen_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="8pt"
+            android:padding="4dp"
+            android:switchMinWidth="76dp"
+            android:textColor="@color/black"
+            android:text="Broadcast Listen"
+            android:layout_weight="0"/>
+
+        <TextView
+            android:id="@+id/udp_listen_port_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/custom_border"
+            android:textColor="@color/black"
+            android:textSize="8pt"
+            android:text="port 8082"
+            android:layout_weight="0"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/tcp_host_listen_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10px">
+
+        <TextView
+            android:id="@+id/help_tcp_listen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="4dp"
+            android:text="?"
+            android:textColor="@color/purple_700"
+            android:textStyle="bold"
+            android:textSize="12pt"/>
+
+        <View
+            android:layout_width="wrap_content"
+            android:layout_height="1px"
+            android:layout_weight="1">
+
+        </View>
+
+        <Switch
+            android:id="@+id/tcp_listen_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="8pt"
+            android:padding="4dp"
+            android:switchMinWidth="76dp"
+            android:textColor="@color/black"
+            android:text="Listen/Serve"
+            android:layout_weight="0"/>
+
+        <TextView
+            android:id="@+id/tcp_port_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/custom_border"
+            android:textColor="@color/black"
+            android:textSize="8pt"
+            android:text="port 8081"
+            android:layout_weight="0"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/udp_advertise_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10px">
+
+        <TextView
+            android:id="@+id/help_udp_advertise"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="4dp"
+            android:text="?"
+            android:textColor="@color/purple_700"
+            android:textStyle="bold"
+            android:textSize="12pt"/>
+
+        <View
+            android:layout_width="wrap_content"
+            android:layout_height="1px"
+            android:layout_weight="1">
+
+        </View>
+
+        <Switch
+            android:id="@+id/udp_advertise_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="8pt"
+            android:padding="4dp"
+            android:switchMinWidth="76dp"
+            android:textColor="@color/black"
+            android:text="Broadcast Advertise"
+            android:layout_weight="0"/>
+
+        <TextView
+            android:id="@+id/udp_advertise_port_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/custom_border"
+            android:textColor="@color/black"
+            android:textSize="8pt"
+            android:text="port 8082"
+            android:layout_weight="0"/>
+    </LinearLayout>
+
+</LinearLayout>
