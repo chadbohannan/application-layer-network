@@ -31,14 +31,14 @@ import {
   
   // type RemoteNodeMap map[AddressType]*RemoteNodeInfo
   
-  export class NodeLoad {
-    constructor (load, lastSeen) {
-      this.load = load
+  export class NodeCapacity {
+    constructor (capacity, lastSeen) {
+      this.capacity = capacity
       this.lastSeen = lastSeen
     }
   }
-  // type NodeLoadMap map[AddressType]NodeLoad  // map[adress]NodeLoad
-  // type ServiceLoadMap map[uint16]NodeLoadMap // map[serviceID][address]NodeLoad
+  // type NodeCapacityMap map[AddressType]NodeCapacity  // map[adress]NodeCapacity
+  // type ServiceCapacityMap map[uint16]NodeCapacityMap // map[serviceID][address]NodeCapacity
   
   // Router manages a set of channels and packet handlers
   export class Router {
@@ -48,7 +48,7 @@ import {
       this.serviceMap = new Map() // map[address]callback registered local node packet handlers
       this.contextMap = new Map() // map[uint16]func(packet)
       this.remoteNodeMap = new Map() // map[address]RemoteNodes[]
-      this.serviceLoadMap = new Map()// map[serviceID][address]NodeLoad
+      this.serviceCapacityMap = new Map()// map[serviceID][address]NodeCapacity
       this.onNetStateChanged = () => { [console.log(`onNetStateChange ${this.remoteNodeMap.size} nodes`)]}
     }
 
@@ -73,33 +73,18 @@ import {
         return this.address
       }
   
-      let minLoad = 0
+      let maxCapacity = 0
       let remoteAddress = ''
-      if (this.serviceLoadMap.has(serviceID)) {
-        const loadMap = this.serviceLoadMap.get(serviceID)
-        loadMap.forEach((nodeLoad, address) => {
-          if (minLoad === 0 || minLoad > nodeLoad.load) {
+      if (this.serviceCapacityMap.has(serviceID)) {
+        const capacityMap = this.serviceCapacityMap.get(serviceID)
+        capacityMap.forEach((nodeCapacity, address) => {
+          if (maxCapacity < nodeCapacity.capacity) {
+            maxCapacity = nodeCapacity.capacity
             remoteAddress = address
-            minLoad = nodeLoad.load
           }
         })
       }
       return remoteAddress
-    }
-
-    serviceAddresses(serviceID) {
-      const addresses = [];
-      if (this.serviceMap.has(serviceID)) {
-        addresses.push(this.address);
-      }
-  
-      if (this.serviceLoadMap.has(serviceID)) {
-        const loadMap = this.serviceLoadMap.get(serviceID)
-        loadMap.forEach((nodeLoad, address) => {
-          addresses.push(address);
-        })
-      }
-      return addresses;
     }
   
     // send() is the core routing function of Router. A packet is either expected
@@ -111,17 +96,10 @@ import {
   
       // An ALN feature is to automatically send to a network node advertising the requested service
       if (!packet.dst && packet.srv) { // if destination is not set but a service is
-        const addresses = this.serviceAddresses(packet.srv);
-        if (addresses.length > 0) {
-          for(let i = 1; i < addresses.length; i++) {
-            const pc = packet.copy();
-            pc.dst = addresses[i];
-            this.send(pc)
-          }
-          packet.dst = addresses[0];
-        }
+        // use the service capacity cache to select a service host node address
+        packet.dst = this.selectService(packet.srv)
         if (!packet.dst) { // didn't find a service
-          return 'no service of type ' + packet.srv + ' yet discovered';
+          return 'no node for for service'
         }
       }
       if (packet.dst === this.address) {
@@ -178,8 +156,8 @@ import {
             var p
             if (cost === 0) {
               this.remoteNodeMap.delete(remoteAddress)
-              this.serviceLoadMap.forEach((loadMap, serviceID) => {
-                loadMap.delete(remoteAddress)
+              this.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+                capacityMap.delete(remoteAddress)
               })
               p = makeNetworkRouteSharePacket(this.address, remoteAddress, 0)
             } else if (cost <= remoteNode.cost) {
@@ -197,25 +175,14 @@ import {
         this.onNetStateChanged()
         break
         case NET_SERVICE: {
-          const [address, serviceID, serviceLoad, serviceErr] = parseNetworkServiceSharePacket(packet)
+          const [address, serviceID, serviceCapacity, serviceErr] = parseNetworkServiceSharePacket(packet)
           if (serviceErr === null) {
-            if (!this.serviceLoadMap.has(serviceID)) {
-              this.serviceLoadMap.set(serviceID, new Map())
+            // TODO if capacity is zero then remove the service from the serviceCapacityMap
+            if (!this.serviceCapacityMap.has(serviceID)) {
+              this.serviceCapacityMap.set(serviceID, new Map())
             }
-            this.serviceLoadMap.get(serviceID).set(address, new NodeLoad(serviceLoad, Date.now()))
+            this.serviceCapacityMap.get(serviceID).set(address, new NodeCapacity(serviceCapacity, Date.now()))
             this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
-            if (this.serviceQueue.has(serviceID)) {
-              const packetList = this.serviceQueue.get(serviceID)
-              if (this.remoteNodeMap.has(address)) {
-                const route = this.remoteNodeMap.get(address)
-                packetList.forEach((p) => {
-                  p.dst = address
-                  p.nxt = route.nextHop
-                  channel.send(p)
-                })
-                this.serviceQueue.delete(serviceID)
-              }
-            }
             this.onNetStateChanged()
           } else {
             console.log(`error parsing NET_SERVICE: ${serviceErr}`)
@@ -263,17 +230,17 @@ import {
       return dump
     }
   
-    // generate a list of packets that capture a snapshot of the service load table
+    // generate a list of packets that capture a snapshot of the service capacity table
     exportServiceTable () {
       const dump = []
       this.serviceMap.forEach((_, serviceID) => {
-        dump.push(makeNetworkServiceSharePacket(this.address, serviceID, 0))
+        dump.push(makeNetworkServiceSharePacket(this.address, serviceID, 1))
       })
-      this.serviceLoadMap.forEach((loadMap, serviceID) => {
-        loadMap.forEach((nodeLoad, address) => {
-          // TODO sort by increasing load (first tx'd is lowest load)
+      this.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+        capacityMap.forEach((nodeCapacity, address) => {
+          // TODO sort by decreasing capacity (first tx'd is highest capacity)
           // TODO filter expired or unroutable entries
-          dump.push(makeNetworkServiceSharePacket(address, serviceID, nodeLoad.load))
+          dump.push(makeNetworkServiceSharePacket(address, serviceID, nodeCapacity.capacity))
         })
       })
       return dump
@@ -282,11 +249,11 @@ import {
     serviceSummary() {
       const dump = []
       this.serviceMap.forEach((_, serviceID) => {
-        dump.push({address:this.address, service:serviceID, load: 0})
+        dump.push({address:this.address, service:serviceID, capacity: 1})
       })
-      this.serviceLoadMap.forEach((loadMap, serviceID) => {
-        loadMap.forEach((nodeLoad, address) => {
-          dump.push({address:address, name:serviceID, load: nodeLoad.load})
+      this.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+        capacityMap.forEach((nodeCapacity, address) => {
+          dump.push({address:address, name:serviceID, capacity: nodeCapacity.capacity})
         })
       })
       return dump

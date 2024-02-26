@@ -27,6 +27,10 @@ logger.info('sending ping')
 const ctx = alnRouter.registerContextHandler((p) => {
   console.log('ping response:', p.data)
 })
+
+// wait for protocol chatter to finish
+await new Promise(r => setTimeout(r, 1000));
+
 const pingPacket = new Packet()
 pingPacket.srv = 'ping'
 pingPacket.ctx = ctx

@@ -97,8 +97,8 @@ void loop() {
     parser.ingestFrameBytes(buff,  n);
 
     // echo received content
-    Serial.write("received:");
-    Serial.write(buff, n);
+    // Serial.write("received:");
+    // Serial.write(buff, n);
     // bleSerial.write((uint8_t*)echo, 5);
     // bleSerial.write(buff, n);
   }
@@ -112,7 +112,7 @@ void loop() {
     if (elapsed() > 2000) {
       value = readSensor();
       dataSz = sprintf(data, "%0.2f*F", value);
-      Serial.println(data); delay(10);
+      // Serial.println(data); delay(10);
       Packet p;
       p.clear();
       p.setService((uint8*)srv, 3);
