@@ -50,25 +50,6 @@ class Router {
     this.serviceCapacityMap = new Map()// map[serviceID][address]NodeCapacity
   }
 
-  selectService (serviceID) {
-    if (this.serviceMap.has(serviceID)) {
-      return this.address
-    }
-
-    let minCapacity = 0
-    let remoteAddress = ''
-    if (this.serviceCapacityMap.has(serviceID)) {
-      const capacityMap = this.serviceCapacityMap.get(serviceID)
-      capacityMap.forEach((nodeCapacity, address) => {
-        if (minCapacity === 0 || minCapacity > nodeCapacity.capacity) {
-          remoteAddress = address
-          minCapacity = nodeCapacity.capacity
-        }
-      })
-    }
-    return remoteAddress
-  }
-
   serviceAddresses (serviceID) {
     const addresses = []
     if (this.serviceMap.has(serviceID)) {

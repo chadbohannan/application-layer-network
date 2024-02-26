@@ -87,6 +87,20 @@ import {
       return remoteAddress
     }
   
+    serviceAddresses (serviceID) {
+      const addresses = [];
+      if (this.serviceMap.has(serviceID)) {
+        addresses.push(this.address)
+      }
+      if (this.serviceLoadMap.has(serviceID)) {
+        const loadMap = this.serviceLoadMap.get(serviceID)
+        loadMap.forEach((nodeLoad, address) => {
+          addresses.push(address)
+        })
+      }
+      return addresses
+    }
+
     // send() is the core routing function of Router. A packet is either expected
     //  locally by a registered Node, or on a multi-hop route to it's destination.
     send (packet) {
@@ -94,15 +108,18 @@ import {
         packet.src = this.address
       }
   
-      // An ALN feature is to automatically send to a network node advertising the requested service
-      if (!packet.dst && packet.srv) { // if destination is not set but a service is
-        // use the service capacity cache to select a service host node address
-        packet.dst = this.selectService(packet.srv)
-        if (!packet.dst) { // didn't find a service
-          return 'no node for for service'
+      // An ALN feature is to automatically send to any/all node(s) advertising the requested service
+      if (!packet.dst && packet.srv) { // if service is set but destination is not
+        const addresses = this.serviceAddresses(packet.srv)
+        if (addresses.length > 0) {
+          for (let i = 1; i < addresses.length; i++) {
+            const pc = packet.copy()
+            pc.dst = addresses[i]
+            this.send(pc)
+          }
+          packet.dst = addresses[0]
         }
-      }
-      if (packet.dst === this.address) {
+      } else if (packet.dst === this.address) {
         if (this.serviceMap.has(packet.srv)) {
           this.serviceMap.get(packet.srv)(packet)
         } else if (this.contextMap.has(packet.srv)) {

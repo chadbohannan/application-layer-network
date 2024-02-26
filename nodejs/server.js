@@ -19,6 +19,7 @@ alnRouter.registerService('ping', (packet) => {
   pongPacket.ctx = packet.ctx
   pongPacket.data = 'pong'
   alnRouter.send(pongPacket)
+  console.log('"pong" returned')
 })
 
 const tcpServer = net.createServer()
