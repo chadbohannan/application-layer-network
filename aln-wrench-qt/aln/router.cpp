@@ -12,34 +12,15 @@ QStringList Router::selectServiceAddresses(QString service) {
     if (serviceHandlerMap.contains(service)) {
         remoteAddresses.append(mAddress);
     }
-    if (serviceLoadMap.contains(service)) {
-        QMap<QString, NodeLoad*> addressToLoadMap = serviceLoadMap[service];
-        foreach (QString address, addressToLoadMap.keys()) {
+    if (serviceCapacityMap.contains(service)) {
+        QMap<QString, NodeCapacity*> addressToCapacityMap = serviceCapacityMap[service];
+        foreach (QString address, addressToCapacityMap.keys()) {
             remoteAddresses.append(address);
         }
     }
     return remoteAddresses;
 }
 
-
-QString Router::selectServiceAddress(QString service) {
-    if (serviceHandlerMap.contains(service))
-        return mAddress;
-
-    short minLoad = 0;
-    QString remoteAddress = "";
-    if (serviceLoadMap.contains(service)) {
-        QMap<QString, NodeLoad*> addressToLoadMap = serviceLoadMap[service];
-        foreach (QString address, addressToLoadMap.keys()) {
-            NodeLoad* nodeLoad = addressToLoadMap[address];
-            if (minLoad == 0 || minLoad > nodeLoad->load) {
-                remoteAddress = address;
-                minLoad = nodeLoad->load;
-            }
-        }
-    }
-    return remoteAddress;
-}
 
 QString Router::send(Packet* p) {
     if (p->srcAddress.length() == 0) {
@@ -106,9 +87,9 @@ void Router::releaseContext(short ctx) {
 QMap<QString, QStringList> Router::nodeServices() {
     QMap<QString, QStringList> nodeServiceMap;
     nodeServiceMap.insert(mAddress, serviceHandlerMap.keys());
-    foreach (QString service, serviceLoadMap.keys()) {
-        QMap<QString, NodeLoad*> loadMap = serviceLoadMap[service];
-        foreach (QString address, loadMap.keys()) {
+    foreach (QString service, serviceCapacityMap.keys()) {
+        QMap<QString, NodeCapacity*> capacityMap = serviceCapacityMap[service];
+        foreach (QString address, capacityMap.keys()) {
             QStringList services;
             if (nodeServiceMap.contains(address)) {
                 services = nodeServiceMap.value(address);
@@ -168,7 +149,7 @@ RemoteNodeInfo Router::parseNetRouteShare(Packet* p) {
     return info;
 }
 
-Packet* Router::composeNetServiceShare(QString address, QString service, short load) {
+Packet* Router::composeNetServiceShare(QString address, QString service, short capacity) {
     Packet* p = new Packet();
     p->net = Packet::NetState::SERVICE;
     p->srcAddress = mAddress;
@@ -179,7 +160,7 @@ Packet* Router::composeNetServiceShare(QString address, QString service, short l
     writeToBuffer(&buffer, address);
     writeToBuffer(&buffer, (INT08U)service.length());
     writeToBuffer(&buffer, service);
-    writeToBuffer(&buffer, (INT16U)load);
+    writeToBuffer(&buffer, (INT16U)capacity);
     buffer.close();
     return p;
 }
@@ -206,7 +187,7 @@ ServiceNodeInfo Router::parseNetServiceShare(Packet* p) {
     info.service = p->data.mid(offset, srvSize);
     offset += srvSize;
 
-    info.load = readINT16U((INT08U*)data);
+    info.capacity = readINT16U((INT08U*)data);
     return info;
 }
 
@@ -218,8 +199,8 @@ Packet* Router::composeNetQuery() {
 
 void Router::removeAddress(QString address) {
     remoteNodeMap.remove(address);
-    foreach(QString service, serviceLoadMap.keys())
-        serviceLoadMap[service].remove(address);
+    foreach(QString service, serviceCapacityMap.keys())
+        serviceCapacityMap[service].remove(address);
 }
 
 void Router::handleNetState(Channel* channel, Packet* packet) {
@@ -290,19 +271,27 @@ void Router::handleNetState(Channel* channel, Packet* packet) {
         }
         {
             QMutexLocker lock(&mMutex);
-            NodeLoad* nodeLoad = new NodeLoad();
-            nodeLoad->load = serviceInfo.load;
-            nodeLoad->lastSeen = QDate::currentDate();
-            QMap<QString, NodeLoad*> loadMap;
-            if (serviceLoadMap.contains(serviceInfo.service)) {
-                loadMap = serviceLoadMap[serviceInfo.service];
-                if (loadMap.contains(serviceInfo.address) &&
-                        loadMap[serviceInfo.address]->load == nodeLoad->load) {
-                    return; // drop redunant packet to avoid propagation loops
+            NodeCapacity* nodeCapacity = new NodeCapacity();
+            nodeCapacity->capacity = serviceInfo.capacity;
+            nodeCapacity->lastSeen = QDate::currentDate();
+
+
+            QMap<QString, NodeCapacity*> capcityMap;
+            if (serviceCapacityMap.contains(serviceInfo.service)) {
+                capcityMap = serviceCapacityMap[serviceInfo.service];
+                if (capcityMap.contains(serviceInfo.address)){
+                    if (nodeCapacity->capacity == 0) {
+                        capcityMap.remove(serviceInfo.address); // service
+                        return;
+                    } else if (capcityMap[serviceInfo.address]->capacity == nodeCapacity->capacity) {
+                        return; // drop redunant packet to avoid propagation loops
+                    }
                 }
-            }           
-            loadMap.insert(serviceInfo.address, nodeLoad);
-            serviceLoadMap.insert(serviceInfo.service, loadMap);
+            }
+            if (nodeCapacity->capacity > 0) {
+                capcityMap.insert(serviceInfo.address, nodeCapacity);
+                serviceCapacityMap.insert(serviceInfo.service, capcityMap);
+            }
             stateChanged = true;
         }
         // forward the service load
@@ -400,13 +389,13 @@ QList<Packet*> Router::exportRouteTable() {
 QList<Packet*> Router::exportServiceTable() {
     QList<Packet*> services;
     foreach (QString service, serviceHandlerMap.keys()) {
-        services.append(composeNetServiceShare(mAddress, service, (short) 0));
+        services.append(composeNetServiceShare(mAddress, service, (short) 1));
     }
-    foreach (QString service, serviceLoadMap.keys()) {
-        QMap<QString, NodeLoad*> loadMap = serviceLoadMap[service];
+    foreach (QString service, serviceCapacityMap.keys()) {
+        QMap<QString, NodeCapacity*> loadMap = serviceCapacityMap[service];
         foreach (QString address, loadMap.keys()) {
-            NodeLoad* loadInfo = loadMap[address];
-            services.append(composeNetServiceShare(address, service, loadInfo->load));
+            NodeCapacity* loadInfo = loadMap[address];
+            services.append(composeNetServiceShare(address, service, loadInfo->capacity));
         }
     }
     return services;

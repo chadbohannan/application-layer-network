@@ -23,13 +23,13 @@ public:
     QString service; // name of the service
     QString address; // host of the service
     QString nextHop; // next routing node for address
-    short load; // remote service load factor
+    short capacity; // remote service capacity (must be gte 1)
     QString err; // parser error
 };
 
-class NodeLoad {
+class NodeCapacity {
 public:
-    short load;
+    short capacity;
     QDate lastSeen;
 };
 
@@ -55,7 +55,7 @@ class Router : public QObject
     QMap<QString, RemoteNodeInfo*> remoteNodeMap;
 
     // map[service][address]NodeLoad
-    QMap<QString, QMap<QString, NodeLoad*>> serviceLoadMap;
+    QMap<QString, QMap<QString, NodeCapacity*>> serviceCapacityMap;
 
     QVector<Channel*> channels;
 
