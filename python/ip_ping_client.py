@@ -4,6 +4,9 @@ from aln.tcp_channel import TcpChannel
 from aln.router import Router
 from aln.packet import Packet
 
+TCP_HOST = "layer7node.net"
+TCP_PORT = 8000
+
 pong_count = 0
 def main():
     sel = selectors.DefaultSelector()
@@ -23,7 +26,7 @@ def main():
 
     # assume a localhost connection on port 8081; see ip_ping_host.py
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(('localhost', 8081))
+    sock.connect((TCP_HOST, TCP_PORT))
 
     # join the network
     router.add_channel(TcpChannel(sock))

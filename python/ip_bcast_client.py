@@ -39,9 +39,9 @@ def main():
 
     # join the network
     ch = TcpChannel(sock)
-    router.add_channel(TcpChannel(sock))
     if "maln" in protocol: # support multiplexed links
         ch.send(Packet(destAddr=url.path))
+    router.add_channel(TcpChannel(sock))
 
     # listen for ^C
     lock = Lock()
