@@ -2,7 +2,7 @@
 This example host implementation starts by initializing a new Router with address `go-host-3f99ea`.
 It is best to keep node addresses unique; if two nodes on the network have the same address the network will not reliably route packets.
 
-This example then opens a tcp host socket on `localhost:8081`.
+This example then opens a tcp host socket on `localhost:8000`.
 If you would like to make this host node accessible from other machines on your LAN, replace `localhost` with the IP address of your ethernet/wifi adapter.
 
 Next the `ping` service handler is defined and registered with the router. 

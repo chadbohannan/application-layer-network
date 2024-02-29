@@ -142,7 +142,7 @@ func (r *Router) Send(p *Packet) error {
 			p.NextAddr = route.NextHop
 			route.Channel.Send(p)
 		} else {
-			return fmt.Errorf("packet queued for delayed send t %s [%X]", p.DestAddr, p.DestAddr)
+			return fmt.Errorf("failed to find route for %s", p.DestAddr)
 		}
 	} else {
 		return fmt.Errorf("packet is unroutable; no action taken")

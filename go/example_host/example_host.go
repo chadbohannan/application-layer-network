@@ -11,7 +11,7 @@ import (
 func main() {
 	alnHostAddress := aln.AddressType("go-host-3f99ea")
 	router := aln.NewRouter(alnHostAddress)
-	tcpHost := aln.NewTcpChannelHost("localhost", 8081)
+	tcpHost := aln.NewTcpChannelHost("localhost", 8000)
 	go tcpHost.Listen(func(newChannel aln.Channel) {
 		router.AddChannel(newChannel)
 	})

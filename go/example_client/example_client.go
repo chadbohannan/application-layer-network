@@ -17,7 +17,7 @@ func main() {
 
 	// setup the second node to connect to the first using TCP
 	router := aln.NewRouter(localAddress)
-	conn, err := net.Dial("tcp", "localhost:8081")
+	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Println("dial failed:" + err.Error())
 		os.Exit(-1)
@@ -35,6 +35,8 @@ func main() {
 		router.ReleaseContext(ctx)   // not expecting any more response packets; release this handler
 		wg.Done()                    // release the lock
 	})
+
+	time.Sleep(100 * time.Millisecond) // let protocol chatter settle
 
 	// the round-trip journey begins
 	log.Println("generating ping packet")

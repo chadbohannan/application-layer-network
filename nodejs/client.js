@@ -4,7 +4,7 @@ const Router = require('./aln/router')
 const { Packet } = require('./aln/packet')
 const { TcpChannel } = require('./aln/tcpchannel')
 
-const TCP_PORT = process.env.TCP_PORT || 8081
+const TCP_PORT = process.env.TCP_PORT || 8000
 
 const alnRouter = new Router('nodejs-client')
 
@@ -14,8 +14,10 @@ const ctx = alnRouter.registerContextHandler((p) => {
 })
 
 const socket = new net.Socket()
-socket.connect({ port: TCP_PORT, host: 'localhost' }, function () {
+socket.connect({ port: TCP_PORT, host: '127.0.0.1' }, function () {
+  logger.info('channel connected')
   setTimeout(() => {
+    logger.info('sending ping')
     const pingPacket = new Packet()
     pingPacket.srv = 'ping'
     pingPacket.ctx = ctx
@@ -27,7 +29,3 @@ const tcpChannel = new TcpChannel(socket)
 alnRouter.addChannel(tcpChannel)
 
 logger.info('init complete')
-
-logger.info('sending ping')
-
-
