@@ -4,7 +4,8 @@ const Router = require('./aln/router')
 const { Packet } = require('./aln/packet')
 const { TcpChannel } = require('./aln/tcpchannel')
 
-// decomposed URL from tcp+maln://layer7node.net:8000/6b404c2d-50d1-4007-94af-1b157c64e4e3
+    // decomposed exmample URL; layer7node requires user registration
+    // tcp+maln://layer7node.net:8000/6b404c2d-50d1-4007-94af-1b157c64e4e3
 
 const TCP_HOST = 'layer7node.net'
 const TCP_PORT = 8000

@@ -110,7 +110,7 @@ class RouterTest {
         assertNull(parsedInfo.err);
         assertEquals("node-b", parsedInfo.address);
         assertEquals("ping", parsedInfo.service);
-        assertEquals((short) 2, parsedInfo.load);
+        assertEquals((short) 2, parsedInfo.capacity);
     }
 
     @Test
@@ -149,7 +149,6 @@ class RouterTest {
         try {
             Thread.sleep(10);
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 

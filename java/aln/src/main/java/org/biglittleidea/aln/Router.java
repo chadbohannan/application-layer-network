@@ -16,7 +16,7 @@ public class Router {
         public String service; // name of the service
         public String address; // host of the service
         public String nextHop; // next routing node for address
-        public Short load; // remote service load factor
+        public Short capacity; // remote service capacity; zero means unavailable
         public String err; // parser error
     }
 
@@ -39,38 +39,17 @@ public class Router {
     // map[address]RemoteNode
     HashMap<String, RemoteNodeInfo> remoteNodeMap = new HashMap<String, RemoteNodeInfo>();
 
-    class NodeLoad {
-        short Load;
+    class NodeCapacity {
+        short capacity;
         Date lastSeen;
     }
 
-    // map[service][address]NodeLoad
-    HashMap<String, HashMap<String, NodeLoad>> serviceLoadMap = new HashMap<String, HashMap<String, NodeLoad>>();
+    // map[service][address]NodeCapacity
+    HashMap<String, HashMap<String, NodeCapacity>> serviceCapacityMap = new HashMap<String, HashMap<String, NodeCapacity>>();
 
     // Router manages a set of channels and packet handlers
     protected String address = "";
     ArrayList<IChannel> channels = new ArrayList<>();
-
-    public String selectService(String service) {
-        String remoteAddress = "";
-        synchronized(this){
-            if (serviceHandlerMap.containsKey(service))
-                return this.address;
-
-            short minLoad = 0;
-            if (serviceLoadMap.containsKey(service)) {
-                HashMap<String, NodeLoad> addressToLoadMap = serviceLoadMap.get(service);
-                for (String address : addressToLoadMap.keySet()) {
-                    NodeLoad nodeLoad = addressToLoadMap.get(address);
-                    if (minLoad == 0 || minLoad > nodeLoad.Load) {
-                        remoteAddress = address;
-                        minLoad = nodeLoad.Load;
-                    }
-                }
-            }
-        }
-        return remoteAddress;
-    }
 
     ArrayList<String> serviceAddresses(String service) {
         ArrayList<String> addressList = new ArrayList<>();
@@ -78,9 +57,9 @@ public class Router {
             if (serviceHandlerMap.containsKey(service))
                 addressList.add(this.address);
 
-            if (serviceLoadMap.containsKey(service)) {
-                HashMap<String, NodeLoad> addressToLoadMap = serviceLoadMap.get(service);
-                for (String address : addressToLoadMap.keySet()) {
+            if (serviceCapacityMap.containsKey(service)) {
+                HashMap<String, NodeCapacity> addressToCapacityMap = serviceCapacityMap.get(service);
+                for (String address : addressToCapacityMap.keySet()) {
                     addressList.add(address);
                 }
             }
@@ -88,7 +67,6 @@ public class Router {
         return addressList;
     }
 
-    // TODO normal java behavior is to throw exceptions, not return error messages
     public String send(Packet p) {
         if (p.SourceAddress == null || p.SourceAddress.length() == 0) {
             p.SourceAddress = this.address;
@@ -189,7 +167,7 @@ public class Router {
         return info;
     }
 
-    protected Packet composeNetServiceShare(String address, String service, short load) {
+    protected Packet composeNetServiceShare(String address, String service, short capacity) {
         Packet p = new Packet();
         p.Net = Packet.NetState.SERVICE;
         p.SourceAddress = this.address;
@@ -199,7 +177,7 @@ public class Router {
         buffer.put(address.getBytes());
         buffer.put((byte) service.length());
         buffer.put(service.getBytes());
-        buffer.put(Packet.writeUINT16(load));
+        buffer.put(Packet.writeUINT16(capacity));
         buffer.rewind();
         buffer.get(p.Data, 0, p.Data.length);
         return p;
@@ -227,7 +205,7 @@ public class Router {
         info.service = new String(Arrays.copyOfRange(data, offset, offset + srvSize));
         offset += srvSize;
 
-        info.load = Packet.readUINT16(data, offset);
+        info.capacity = Packet.readUINT16(data, offset);
         return info;
     }
 
@@ -310,24 +288,29 @@ public class Router {
                     break;
                 }
                 synchronized (this) {
-                    NodeLoad nodeLoad = new NodeLoad();
-                    nodeLoad.Load = serviceInfo.load;
-                    nodeLoad.lastSeen = new Date();
-                    HashMap<String, NodeLoad> loadMap;
-                    if (!serviceLoadMap.containsKey(serviceInfo.service)) {
-                        loadMap = new HashMap<>();
-                        serviceLoadMap.put(serviceInfo.service, loadMap);
+                    HashMap<String, NodeCapacity> capacityMap;
+                    if (!serviceCapacityMap.containsKey(serviceInfo.service)) {
+                        capacityMap = new HashMap<>();
+                        serviceCapacityMap.put(serviceInfo.service, capacityMap);
+                    } else if (serviceInfo.capacity == 0) {
+                        capacityMap = serviceCapacityMap.get(serviceInfo.service);
+                        if (capacityMap.containsKey(serviceInfo.address))
+                            capacityMap.remove(serviceInfo.address);
+                        else // we have no record of this service at this address
+                            return; // drop packet to avoid propagation loops
                     } else {
-                        loadMap = serviceLoadMap.get(serviceInfo.service);
-                        if (loadMap.containsKey(serviceInfo.address) &&
-                                loadMap.get(serviceInfo.address).Load == nodeLoad.Load) {
-                            return; // drop redunant packet to avoid propagation loops
+                        capacityMap = serviceCapacityMap.get(serviceInfo.service);
+                        if (capacityMap.containsKey(serviceInfo.address) &&
+                                capacityMap.get(serviceInfo.address).capacity == serviceInfo.capacity) {
+                            return; // drop packet to avoid propagation loops
                         }
                     }
-
-                    loadMap.put(serviceInfo.address, nodeLoad);
+                    NodeCapacity nodeCapacity = new NodeCapacity();
+                    nodeCapacity.capacity = serviceInfo.capacity;
+                    nodeCapacity.lastSeen = new Date();
+                    capacityMap.put(serviceInfo.address, nodeCapacity);
                 }
-                // forward the service load
+                // forward the service capacity
                 for (IChannel ch : channels) {
                     if (ch != channel) {
                         ch.send(packet);
@@ -390,7 +373,7 @@ public class Router {
     protected void removeAddress(String address) {
         synchronized (this) {
             remoteNodeMap.remove(address);
-            for (HashMap<String, NodeLoad> nlm : serviceLoadMap.values()) {
+            for (HashMap<String, NodeCapacity> nlm : serviceCapacityMap.values()) {
                 nlm.remove(address);
             }
         }
@@ -421,19 +404,20 @@ public class Router {
 
     public Packet[] exportServiceTable() {
         int sz = serviceHandlerMap.size();
-        for (HashMap<String, NodeLoad> loadMap : serviceLoadMap.values()) {
-            sz += loadMap.size();
+        for (HashMap<String, NodeCapacity> capacityMap : serviceCapacityMap.values()) {
+            sz += capacityMap.size();
         }
         Packet[] services = new Packet[sz];
         int i = 0;
         for (String service : serviceHandlerMap.keySet()) {
-            services[i++] = composeNetServiceShare(this.address, service, (short) 0);
+            short capacity = 1; // TODO make dynamic
+            services[i++] = composeNetServiceShare(this.address, service, capacity);
         }
-        for (String service : serviceLoadMap.keySet()) {
-            HashMap<String, NodeLoad> loadMap = serviceLoadMap.get(service);
-            for (String address : loadMap.keySet()) {
-                NodeLoad loadInfo = loadMap.get(address);
-                services[i++] = composeNetServiceShare(address, service, loadInfo.Load);
+        for (String service : serviceCapacityMap.keySet()) {
+            HashMap<String, NodeCapacity> capacityMap = serviceCapacityMap.get(service);
+            for (String address : capacityMap.keySet()) {
+                NodeCapacity capacityInfo = capacityMap.get(address);
+                services[i++] = composeNetServiceShare(address, service, capacityInfo.capacity);
             }
         }
         return services;

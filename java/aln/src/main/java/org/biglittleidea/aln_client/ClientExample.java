@@ -1,7 +1,5 @@
 package org.biglittleidea.aln_client;
 
-import org.biglittleidea.aln.IChannel;
-import org.biglittleidea.aln.IChannelCloseHandler;
 import org.biglittleidea.aln.IPacketHandler;
 import org.biglittleidea.aln.Packet;
 import org.biglittleidea.aln.Router;
