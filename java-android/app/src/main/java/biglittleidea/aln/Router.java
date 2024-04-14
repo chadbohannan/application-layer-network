@@ -116,8 +116,8 @@ public class Router {
                 addressList.add(this.address);
 
             if (serviceCapacityMap.containsKey(service)) {
-                HashMap<String, NodeCapacity> addressToLoadMap = serviceCapacityMap.get(service);
-                for (String address : addressToLoadMap.keySet()) {
+                HashMap<String, NodeCapacity> addressToCapacityMap = serviceCapacityMap.get(service);
+                for (String address : addressToCapacityMap.keySet()) {
                     addressList.add(address);
                 }
             }
@@ -147,7 +147,7 @@ public class Router {
             }
         }
 
-        if (p.DestAddress.equals(this.address)) {
+        if (p.DestAddress != null && p.DestAddress.equals(this.address)) {
             IPacketHandler handler;
             if (this.serviceHandlerMap.containsKey(p.Service)) {
                 handler = this.serviceHandlerMap.get(p.Service);
@@ -211,9 +211,9 @@ public class Router {
         }
 
         byte[] data = packet.Data;
-        byte addrSize = data[0];
+        int addrSize = data[0] & 0x00ff; // make unsigned byte fit in signed int
 
-        if (data.length != addrSize + 3) {
+        if (data.length != (addrSize + 3)) {
             info.err = String.format("parseNetworkRouteSharePacket: len: %d; exp: %d", data.length, addrSize + 3);
             return info;
         }

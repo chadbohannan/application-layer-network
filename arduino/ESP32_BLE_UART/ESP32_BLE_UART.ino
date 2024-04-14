@@ -23,11 +23,10 @@ uint8_t buff[BLE_FRAME_SZ];
 bool wasConnected = false;
 char echo[] = "echo:";
 
-
-char nodeAddress[] = "ESP32-black-box";
-uint8 nodeAdressSize = 15;
-char nodeRouteData[] = "\x0f" "ESP32-black-box""\x0001";
-uint8 nodeRouteDataSz = 18;
+char nodeAddress[] = "ESP32-black-box-a";
+uint8 nodeAdressSize = 17;
+char nodeRouteData[] = "\x11" "ESP32-black-box-a" "\x00" "\x01";
+uint8 nodeRouteDataSz = 20;
 
 char srv[] = "log";
 char data[16];
@@ -80,8 +79,8 @@ float readSensor() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Starting echo-box-1...");
-  if (!bleSerial.start("echo-box-1")) {
+  Serial.println("Starting ESP32-black-box-a...");
+  if (!bleSerial.start("ESP32-black-box-a")) {
     while (true) {
       Serial.println("failed to initialize ArduinoBLESerial!");
       delay(1000);
