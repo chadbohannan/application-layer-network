@@ -11,11 +11,19 @@ import org.biglittleidea.aln.Packet;
 import org.biglittleidea.aln.Router;
 import org.biglittleidea.aln.TcpChannel;
 
-/* TODO docs */
+/* This application implements the Multiplexed ALN protocol extension 'maln'.
+ * This extension requires that the first packet over a new socket must be 
+ * addressed to an ALN node hosted by that server. This allows the server to
+ * complete the connection and the ALN protocol to function.
+ * This is implemented by sending a Packet on a new Channel to a
+ * multiplexing host prior to adding the Channel to the Router.
+ * The UUID provided here is for example only
+ */
 
 
 public final class MalnClientExample {
-    // decomposed URL from tcp+maln://layer7node.net:8000/6b404c2d-50d1-4007-94af-1b157c64e4e3
+    // decomposed exmample URL; layer7node requires user registration
+    // tcp+maln://layer7node.net:8000/6b404c2d-50d1-4007-94af-1b157c64e4e3
     public static String host = "layer7node.net";
     public static int port = 8000;
     public static String alnNode = "6b404c2d-50d1-4007-94af-1b157c64e4e3";
