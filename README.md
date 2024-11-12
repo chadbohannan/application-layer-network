@@ -12,7 +12,7 @@ To join an ALN, a device must:
  * Wrap the new connection in a Channel
  * Add the new Channel to the local Router
 
-The ALN protocol we being sharing route information between the local and remote routers. Routers with service handlers configured will advertise accessible services as well as network metrics for the [distance vector routing protocoal](https://en.wikipedia.org/wiki/Distance-vector_routing_protocol).
+The ALN protocol we being sharing route information between the local and remote routers. Routers with service handlers configured will advertise accessible services as well as network metrics for the xdistance vector routing protocol [(wikipedia)](https://en.wikipedia.org/wiki/Distance-vector_routing_protocol).
 
 Any node can advertise services on a network. An advertised service is a packet handler for a specific service name. It is up to the application developer to determine what behavior any particular service should have and that this behavior is consistant across their application.
 

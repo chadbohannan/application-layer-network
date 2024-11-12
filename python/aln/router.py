@@ -67,13 +67,14 @@ class Router(Thread):
         super(Router, self).__init__()
         self.lock = Lock()
         self.selector = selector # top-level application event loop
-        self.address = address   # TODO dynamic address allocation
+        self.address = address   # network node ID for this router
         self.channels = []       # pool of all channels for flood propagation
         self.contextMap = {}     # serviceHandlerMap
         self.remoteNodeMap = {}  # RemoteNodeMap // map[address]RemoteNodes
         self.serviceMap = {}     # map[address]callback registered local service handlers
         self.serviceCapacityMap = {} # ServiceCapacityMap // map[service][address]capacity (remote services)
         self.serviceQueue = {}   # map[service]PacketList
+        self.onServiceCapacityChanged = None # callback method (optional)
         self.stop = False
         self.daemon = True
 
@@ -126,15 +127,18 @@ class Router(Thread):
                 if service not in self.serviceCapacityMap:
                     self.serviceCapacityMap[service] = {}
                 
-                if capacity == 0: # remove zero capacity services from the service map
+                if capacity == 0 and address in self.serviceCapacityMap[service]: # remove zero capacity services from the service map
                     del self.serviceCapacityMap[service][address]
-                elif address not in self.serviceCapacityMap[service] or \
+                    self._on_service_capacity_changed(service, 0)
+
+                if capacity != 0 and address not in self.serviceCapacityMap[service] or \
                     self.serviceCapacityMap[service][address] != capacity: # skip if no change
                     self.serviceCapacityMap[service][address] = capacity
                     # share the update with neighbors
                     for chan in self.channels:
                         if chan is not channel:
                             chan.send(packet)
+                    self._on_service_capacity_changed(service, capacity)
                 
         elif packet.netState == Packet.NET_QUERY:
             self.share_net_state()
@@ -205,6 +209,13 @@ class Router(Thread):
             packetHandler(packet)
         return None
 
+    def set_on_service_capacity_changed_handler(self, callback):
+        self.onServiceCapacityChanged = callback
+    
+    def _on_service_capacity_changed(self, service, capacity):
+        if self.onServiceCapacityChanged:
+            self.onServiceCapacityChanged(service, capacity);
+
     def register_context_handler(self, callback):
         with self.lock:
             ctxID = random.randint(2, 65535)
@@ -253,7 +264,7 @@ class Router(Thread):
         # compose a list of packets encoding the service table of this node
         services = []
         for service in self.serviceMap:
-            capacity = 1 # TODO make capacity dynamic
+            capacity = 1 # TODO make local capacity variable
             services.append(makeNetworkServiceSharePacket(self.address, service, capacity))
         for service in self.serviceCapacityMap:
             capacityMap = self.serviceCapacityMap[service]

@@ -13,12 +13,16 @@ from aln.packet import Packet
 
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, "python-listening-client-1") # TODO dynamic address allocation protocol
+    router = Router(sel, "python-listening-client-1")
     router.start()
 
     def on_log(packet):
         print('log: ' + packet.data.decode('utf-8'))
     router.register_service("log", on_log)
+
+    def on_service_discovery(service, capacity):
+        print("service update: {0}:{1}".format(service, capacity))
+    router.set_on_service_capacity_changed_handler(on_service_discovery)
 
     s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('', 8082))

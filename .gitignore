@@ -30,3 +30,6 @@ build-aln-*
 
 # Android build folder
 java-android/app/build
+
+# Python3
+venv
