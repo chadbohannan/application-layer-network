@@ -1,14 +1,6 @@
 import asyncio
-import selectors, signal, socket, sched, time
-from threading import Lock
-from aln.tcp_channel import TcpChannel
-from aln.router import Router
-from aln.packet import Packet
-
-
-from aln.ble_scan import BLEScanner
-from aln.ble_serial import BLESerial, UART_NU_UUID
-from aln.ble_channel import BLEChannel
+import selectors
+from alnpy import Router, BLEScanner, BLESerial, UART_NU_UUID, BLEChannel
 
 pong_count = 0
 def main():

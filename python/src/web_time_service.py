@@ -1,9 +1,6 @@
-import selectors, signal, socket, sched, time
-from threading import Lock
-from aln.tcp_channel import TcpChannel
-from aln.router import Router
-from aln.packet import Packet
-from datetime import datetime # used to generate data for this example
+import selectors, socket, time
+from alnmeshpy import TcpChannel, Router, Packet
+from datetime import datetime
 
 TCP_HOST = "layer7node.net"
 TCP_PORT = 8000
@@ -19,10 +16,13 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((TCP_HOST, TCP_PORT))
 
-
-    # join the network
+    # connect to the remote host
     ch = TcpChannel(sock)
-    ch.send(Packet(destAddr=ALN_NODE))
+    
+    # layer7node.net is multiplexed; this first packet selects our network node
+    ch.send(Packet(destAddr=ALN_NODE)) 
+
+    # this socket is now configured and can be added to the router
     router.add_channel(ch)
 
     while True:

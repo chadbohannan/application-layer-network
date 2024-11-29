@@ -2,14 +2,11 @@
 TCP/IP client with UDP advertisement listener.
 This example listens for UDP broadcasts containing connection URLs
 """
-
-import selectors, signal, socket, time
-from urllib.parse import urlparse
+import selectors, signal, socket
+from alnmeshpy import TcpChannel, Router, Packet
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcp_channel import TcpChannel
-from aln.router import Router
-from aln.packet import Packet
+from urllib.parse import urlparse
 
 def main():
     sel = selectors.DefaultSelector()

@@ -1,5 +1,5 @@
 import selectors
-from aln.parser import Parser
+from .parser import Parser
 
 
 class BLEChannel():

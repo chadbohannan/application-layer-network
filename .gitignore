@@ -32,4 +32,5 @@ build-aln-*
 java-android/app/build
 
 # Python3
+python/dist
 venv

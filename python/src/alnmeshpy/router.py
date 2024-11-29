@@ -86,25 +86,26 @@ class Router(Thread):
                 callback(key.fileobj, mask)
 
     def handle_netstate(self, channel, packet):
+        updatedServiceCapacity = None
         if packet.netState == Packet.NET_ROUTE: #  neighbor is sharing it's routing table')
             remoteAddress, nextHop, cost, err = parseNetworkRouteSharePacket(packet)
+            msg = "recvd NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
+            print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
             if err is not None:
                 print("err:",err)
             elif cost == 0: # remove route
                 if remoteAddress == self.address: # readvertize self
                     time.sleep(0.1)
                     self.share_net_state()
-                else: # remove route
-                    # print("removing route to", remoteAddress)
+                elif remoteAddress in self.remoteNodeMap: # remove route
+                    print("removing route to", remoteAddress)
                     del self.remoteNodeMap[remoteAddress]
                     for capacityMap in self.serviceCapacityMap.values():
-                        del capacityMap[address]
+                        del capacityMap[remoteAddress] 
                     for ch in self.channels:
                         if ch != channel:
                              ch.send(packet)
             else:
-                # msg = "recvd NET_ROUTE to:[{rem}] via:[{next}] cost:{cost}"
-                # print(msg.format(rem=remoteAddress, next=nextHop, cost=cost))
                 if remoteAddress not in self.remoteNodeMap:
                     remoteNode = RemoteNode(remoteAddress, nextHop, cost, channel)
                     self.remoteNodeMap[remoteAddress] = remoteNode
@@ -121,6 +122,7 @@ class Router(Thread):
                                 chan.send(p)
         elif packet.netState == Packet.NET_SERVICE: # neighbor is sharing service capacity info
             address, service, capacity, err = parseNetworkServiceSharePacket(packet)
+            print("handle_netstate: address: {0}, service:{1}, capacity: {2}".format(address, service, capacity))
             if err is not None:
                 print("error parsing NET_SERVICE: {0}", err)
             elif address != self.address:
@@ -129,6 +131,7 @@ class Router(Thread):
                 
                 if capacity == 0 and address in self.serviceCapacityMap[service]: # remove zero capacity services from the service map
                     del self.serviceCapacityMap[service][address]
+                    updatedServiceCapacity = (service, 0)
                     self._on_service_capacity_changed(service, 0)
 
                 if capacity != 0 and address not in self.serviceCapacityMap[service] or \
@@ -138,19 +141,25 @@ class Router(Thread):
                     for chan in self.channels:
                         if chan is not channel:
                             chan.send(packet)
-                    self._on_service_capacity_changed(service, capacity)
-                
+                    updatedServiceCapacity = (service, capacity)
+                    #self._on_service_capacity_changed(service, capacity)
         elif packet.netState == Packet.NET_QUERY:
             self.share_net_state()
+        return updatedServiceCapacity
     
     def on_packet(self, channel, packet):
         if packet.netState:
+            capUpdate = None
             with self.lock:
-                self.handle_netstate(channel, packet)
+                capUpdate = self.handle_netstate(channel, packet)
+            if capUpdate:
+                self._on_service_capacity_changed(capUpdate[0], capUpdate[1])
         else:
+            print('on_packet->send')
             self.send(packet)
 
     def remove_channel(self, channel):
+        print('remove_channel lock')
         with self.lock:
             self.channels.remove(channel)
             delete = [addr for addr in self.remoteNodeMap if self.remoteNodeMap[addr].channel == channel]
@@ -163,21 +172,23 @@ class Router(Thread):
         channel.on_close(self.remove_channel)
         with self.lock:
             self.channels.append(channel)
-            channel.listen(self.selector, self.on_packet)
-            channel.send(makeNetQueryPacket())
+        channel.listen(self.selector, self.on_packet)
+        channel.send(makeNetQueryPacket())
     
     def send(self, packet):
         if packet.srcAddr == None:
             packet.srcAddr = self.address
 
-        # print("router.send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}, data:{6}".format(
-        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data), packet.data.decode("utf-8"))
-        # )
+
+        print("router.send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}, data:{6}".format(
+            packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data), packet.data)
+        )
 
         packetHandler = None
         if packet.destAddr is None and packet.service is not None:
             addresses = self.service_addresses(packet.service)
             if len(addresses):
+                print("service " + packet.service + " is available")
                 for i in range(1, len(addresses)):
                     pc = packet.copy()
                     pc.destAddr = addresses[i]
@@ -194,14 +205,13 @@ class Router(Thread):
                     packetHandler = self.contextMap[packet.contextID]
                 else:
                     return ("no suitable handler found for inbound packet")
-
             elif packet.nextAddr == self.address or packet.nextAddr == None:
                 if packet.destAddr in self.remoteNodeMap:
                     route = self.remoteNodeMap[packet.destAddr]
-                    packet.srcAddr = self.address
                     packet.nextAddr = route.nextHop
                     route.channel.send(packet)
                 else:
+                    print("route to {0} is unavailable".format(packet.destAddr))
                     return "no route for " + str(packet.destAddr)
             else:
                 return "packet is unroutable; no action taken"
@@ -280,6 +290,7 @@ class Router(Thread):
         for channel in self.channels:
             for routePacket in routes:
                 channel.send(routePacket)
+            time.sleep(0.1)
             for servicePacket in services:
                 channel.send(servicePacket)
 

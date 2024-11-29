@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alnmeshpy"
+version = "0.0.1"
+authors = [
+  { name="Chad Bohannan", email="chadbohannan@biglittleidea.org" },
+]
+description = "An implementation of the "
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+GitHub = "https://github.com/chadbohannan/application-layer-network"
+Issues = "https://github.com/chadbohannan/application-layer-network/issues"
+Homepage = "https://biglittleidea.org/article/5706803308396544"

@@ -38,5 +38,9 @@ class TcpChannel():
         return True
 
     def recv(self, sock, mask):
-        data = sock.recv(1024)
+        data = []
+        try:
+            data = sock.recv(1024)
+        except:
+            self.close()
         self.parser.readBytes(data) if data else self.close()

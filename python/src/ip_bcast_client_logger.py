@@ -1,12 +1,8 @@
-import sys
+import selectors, signal, socket, sys
 from math import remainder
-import selectors, signal, socket, time
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from aln.tcp_channel import TcpChannel
-from aln.router import Router
-from aln.packet import Packet
-
+from alnpy import TcpChannel, Router, Packet
 from urllib.parse import urlparse
 
 # This example listens for a host advertisment to be broadcast by UDP
