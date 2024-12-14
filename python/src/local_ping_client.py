@@ -1,4 +1,3 @@
-import asyncio
 import selectors, signal, socket
 from threading import Lock
 from alnmeshpy import TcpChannel, Router,Packet

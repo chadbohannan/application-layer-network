@@ -3,7 +3,7 @@ TCP/IP host with UDP advertisement broadcast.
 This example broacasts opens a TCP socket and bro URL to 
 """
 import selectors, signal, socket, time
-from alnpy import Packet, Router, TcpHost
+from alnmeshpy import Packet, Router, TcpHost
 from threading import Lock, Thread
 
 tcp_port = 8081 # TCP server listen port

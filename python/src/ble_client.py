@@ -1,6 +1,6 @@
 import asyncio
 import selectors
-from alnpy import Router, BLEScanner, BLESerial, UART_NU_UUID, BLEChannel
+from alnmeshpy import Router, BLEScanner, BLESerial, UART_NU_UUID, BLEChannel
 
 pong_count = 0
 def main():

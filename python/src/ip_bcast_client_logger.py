@@ -2,7 +2,7 @@ import selectors, signal, socket, sys
 from math import remainder
 from socket import AF_INET, SOCK_DGRAM
 from threading import Lock
-from alnpy import TcpChannel, Router, Packet
+from alnmeshpy import TcpChannel, Router, Packet
 from urllib.parse import urlparse
 
 # This example listens for a host advertisment to be broadcast by UDP
