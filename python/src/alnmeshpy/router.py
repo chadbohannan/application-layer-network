@@ -88,16 +88,16 @@ class Router(Thread):
         updatedServiceCapacity = None
         if packet.netState == Packet.NET_ROUTE: #  neighbor is sharing its routing table')
             remoteAddress, nextHop, cost, err = parseNetworkRouteSharePacket(packet)
-            msg = "recvd NET_ROUTE at [{address}] to:[{rem}] via:[{next}] cost:{cost}"
-            print(msg.format(address=self.address, rem=remoteAddress, next=nextHop, cost=cost))
+            # msg = "recvd NET_ROUTE at [{address}] to:[{rem}] via:[{next}] cost:{cost}"
+            # print(msg.format(address=self.address, rem=remoteAddress, next=nextHop, cost=cost))
             if err is not None:
                 print("err:",err)
             elif cost == 0: # remove route
                 if remoteAddress == self.address: # readvertize self
-                    print('sharing net state at {0}to refresh zero cost route discovery'.format(self.address))
+                    # print('sharing net state at {0}to refresh zero cost route discovery'.format(self.address))
                     self.share_net_state()
                 elif remoteAddress in self.remoteNodeMap: # remove route
-                    print("removing route at {0} to {1}".format(self.address, remoteAddress))
+                    # print("removing route at {0} to {1}".format(self.address, remoteAddress))
                     del self.remoteNodeMap[remoteAddress]
                     for capacityMap in self.serviceCapacityMap.values():
                         del capacityMap[remoteAddress] 
@@ -106,7 +106,7 @@ class Router(Thread):
                              ch.send(packet)
             else:
                 if remoteAddress not in self.remoteNodeMap:
-                    print("new node discovered at {0}:{1}".format(self.address,  remoteAddress))
+                    # print("new node discovered at {0}:{1}".format(self.address,  remoteAddress))
                     remoteNode = RemoteNode(remoteAddress, nextHop, cost, channel)
                     self.remoteNodeMap[remoteAddress] = remoteNode
                     p = makeNetworkRouteSharePacket(self.address, remoteAddress, cost+1)
@@ -116,7 +116,7 @@ class Router(Thread):
                 else:
                     remoteNode = self.remoteNodeMap[remoteAddress]
                     if remoteNode.channel not in self.channels or cost < remoteNode.cost or remoteNode.cost == 0:
-                        print('updating route at {0} to {1}'.format(self.address, remoteAddress))
+                        # print('updating route at {0} to {1}'.format(self.address, remoteAddress))
                         remoteNode.nextHop = nextHop
                         remoteNode.channel = channel
                         remoteNode.cost = cost
@@ -126,10 +126,11 @@ class Router(Thread):
                             if chan is not channel:
                                 chan.send(p)
                     else:
-                        print('no action taken at {0} for route to {1}'.format(self.address, remoteAddress))
+                        pass
+                        # print('no action taken at {0} for route to {1}'.format(self.address, remoteAddress))
         elif packet.netState == Packet.NET_SERVICE: # neighbor is sharing service capacity info
             address, service, capacity, err = parseNetworkServiceSharePacket(packet)
-            print("recvd NET_SERVICE at {0} for: {1}, service:{2}, capacity: {3}".format(self.address, address, service, capacity))
+            # print("recvd NET_SERVICE at {0} for: {1}, service:{2}, capacity: {3}".format(self.address, address, service, capacity))
             if err is not None:
                 print("error parsing NET_SERVICE at {0}: {0}".format(self.address, err))
             elif address != self.address:
@@ -139,36 +140,34 @@ class Router(Thread):
                 if capacity == 0 and address in self.serviceCapacityMap[service]: # remove zero capacity services from the service map
                     del self.serviceCapacityMap[service][address]
                     updatedServiceCapacity = (service, 0)
-                    # self._on_service_capacity_changed(service, 0)
                     updatedServiceCapacity = (service, 0, address)
                     print("clearing service at {0} for {1}:{2}".format(self.address, address, service))
 
                 if capacity != 0 and address not in self.serviceCapacityMap[service] or \
                     self.serviceCapacityMap[service][address] != capacity: # skip if no change
-                        print("updating service at {0} for {1}:{2}:{3}".format(self.address, address, service, capacity))
+                        # print("updating service at {0} for {1}:{2}:{3}".format(self.address, address, service, capacity))
                         self.serviceCapacityMap[service][address] = capacity
                         # share the update with neighbors
                         for chan in self.channels:
                             if chan is not channel:
-                                print("sharing service at {0} for {1}:{2}".format(self.address, address, service))
+                                # print("sharing service at {0} for {1}:{2}".format(self.address, address, service))
                                 chan.send(packet)
                         updatedServiceCapacity = (service, capacity, address)
-                        #self._on_service_capacity_changed(service, capacity)
                 else:
-                    print("no action for service at {0} for {1}:{2}:{3}".format(self.address, address, service, capacity))
+                    pass
+                    # print("no action for service at {0} for {1}:{2}:{3}".format(self.address, address, service, capacity))
         elif packet.netState == Packet.NET_QUERY:
             self.share_net_state()
         return updatedServiceCapacity
     
     def on_packet(self, channel, packet):
-        map = {1:"route", 2:"service", 3:"query"}
-        print("node {0} recieved packet with netState:{1}".format(self.address, map[packet.netState]))
+        # print("node {0} recieved packet with netState:{1}".format(self.address, packet.netState))
         if packet.netState:
             capacityUpdate = None
             with self.lock:
                 capacityUpdate = self.handle_netstate(channel, packet)
             if capacityUpdate:
-                print("service capacity update at {0}, {1}".format(self.address, capacityUpdate))
+                # print("service capacity update at {0}, {1}".format(self.address, capacityUpdate))
                 self._on_service_capacity_changed(capacityUpdate[0], capacityUpdate[1])
         else:
             self.send(packet)
@@ -195,15 +194,15 @@ class Router(Thread):
         if packet.srcAddr == None:
             packet.srcAddr = self.address
 
-        print("router.send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}, data:{6}".format(
-            packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data), packet.data)
-        )
+        # print("router.send from {0} to {1} via {2}, service:{3}, ctxID:{4}, datalen:{5}, data:{6}".format(
+        #     packet.srcAddr, packet.destAddr, packet.nextAddr, packet.service, packet.contextID, len(packet.data), packet.data)
+        # )
 
         packetHandler = None
         if packet.destAddr is None and packet.service is not None:
             addresses = self.service_addresses(packet.service)
             if len(addresses):
-                print("service " + packet.service + " is available")
+                # print("service " + packet.service + " is available")
                 for i in range(1, len(addresses)):
                     pc = packet.copy()
                     pc.destAddr = addresses[i]
@@ -222,12 +221,12 @@ class Router(Thread):
                     return ("no suitable handler found for inbound packet")
             elif packet.nextAddr == self.address or packet.nextAddr == None:
                 if packet.destAddr in self.remoteNodeMap:
-                    print('route available at', self.address, 'to', packet.destAddr)
+                    # print('route available at', self.address, 'to', packet.destAddr)
                     route = self.remoteNodeMap[packet.destAddr]
                     packet.nextAddr = route.nextHop
                     route.channel.send(packet)
                 else:
-                    print("route from {0} to {1} is unavailable".format(self.address, packet.destAddr))
+                    # print("route from {0} to {1} is unavailable".format(self.address, packet.destAddr))
                     return "no route for " + str(packet.destAddr)
             else:
                 return "packet is unroutable; no action taken"
@@ -303,8 +302,8 @@ class Router(Thread):
     def share_net_state(self):
         routes = self.export_routes()
         services = self.export_services()
-        print('node {0} sharing {1} routes, and {2} services over {3} channels'.format(
-            self.address, len(routes), len(services), len(self.channels)))
+        # print('node {0} sharing {1} routes, and {2} services over {3} channels'.format(
+        #     self.address, len(routes), len(services), len(self.channels)))
         for channel in self.channels:
             for routePacket in routes:
                 channel.send(routePacket)
