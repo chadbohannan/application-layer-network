@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Chad Bohannan", email="chadbohannan@biglittleidea.org" },
 ]
-description = "An implementation of the "
+description = "An implementation of the Application Layer Network (ALN)."
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
