@@ -12,8 +12,8 @@ def main():
         print("log from {0}: {1}".format(packet.srcAddr, packet.data.decode("utf-8")))
     router.register_service("log", log_handler)
 
-    def on_service_discovery(service, capacity):
-        print("service update: {0}:{1}".format(service, capacity))
+    def on_service_discovery(service, capacity, address):
+        print("service update: {0}:{1}:{2}".format(service, capacity, address))
     router.set_on_service_capacity_changed_handler(on_service_discovery)
 
     # need to grab the event loop before scanning because get_event_loop() fails if called later

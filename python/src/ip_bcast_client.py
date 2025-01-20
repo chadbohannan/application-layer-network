@@ -17,8 +17,8 @@ def main():
         print('log: ' + packet.data.decode('utf-8'))
     router.register_service("log", on_log)
 
-    def on_service_discovery(service, capacity):
-        print("service update: {0}:{1}".format(service, capacity))
+    def on_service_discovery(service, capacity, address):
+        print("service update: {0}:{1}:{2}".format(service, capacity, address))
     router.set_on_service_capacity_changed_handler(on_service_discovery)
 
     s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
