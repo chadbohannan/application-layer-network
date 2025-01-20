@@ -1,14 +1,6 @@
 import asyncio
-import selectors, signal, socket, sched, time
-from threading import Lock
-from aln.tcp_channel import TcpChannel
-from aln.router import Router
-from aln.packet import Packet
-
-
-from aln.ble_scan import BLEScanner
-from aln.ble_serial import BLESerial, UART_NU_UUID
-from aln.ble_channel import BLEChannel
+import selectors
+from alnmeshpy import Router, BLEScanner, BLESerial, UART_NU_UUID, BLEChannel
 
 pong_count = 0
 def main():
@@ -20,7 +12,11 @@ def main():
         print("log from {0}: {1}".format(packet.srcAddr, packet.data.decode("utf-8")))
     router.register_service("log", log_handler)
 
-    # need to grap the event loop before scanning because get_event_loop() fails if called later
+    def on_service_discovery(service, capacity):
+        print("service update: {0}:{1}".format(service, capacity))
+    router.set_on_service_capacity_changed_handler(on_service_discovery)
+
+    # need to grab the event loop before scanning because get_event_loop() fails if called later
     loop = asyncio.get_event_loop()
 
     scanner = BLEScanner(service_uuid=UART_NU_UUID)

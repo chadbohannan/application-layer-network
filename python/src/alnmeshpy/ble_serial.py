@@ -10,9 +10,6 @@ import os
 import asyncio
 import aiofiles
 from bleak import BleakClient
-from bleak import BleakClient
-from bleak import _logger as logger
-from bleak.uuids import uuid16_dict
 from select import select
 
 

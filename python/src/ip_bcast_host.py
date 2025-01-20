@@ -2,20 +2,13 @@
 TCP/IP host with UDP advertisement broadcast.
 This example broacasts opens a TCP socket and bro URL to 
 """
-
-import selectors, signal, socket, sys, time
-from aln.parser import Packet
-from aln.tcp_host import TcpHost
-from aln.router import Router
-from threading import Lock
-import socket
-from threading import Thread
+import selectors, signal, socket, time
+from alnmeshpy import Packet, Router, TcpHost
+from threading import Lock, Thread
 
 tcp_port = 8081 # TCP server listen port
 udp_port = 8082
 
-import socket
- 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:

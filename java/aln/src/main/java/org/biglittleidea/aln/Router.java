@@ -410,7 +410,7 @@ public class Router {
         Packet[] services = new Packet[sz];
         int i = 0;
         for (String service : serviceHandlerMap.keySet()) {
-            short capacity = 1; // TODO make dynamic
+            short capacity = 1; // TODO make local capacity variable
             services[i++] = composeNetServiceShare(this.address, service, capacity);
         }
         for (String service : serviceCapacityMap.keySet()) {
