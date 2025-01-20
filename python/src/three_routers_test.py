@@ -68,14 +68,10 @@ def main():
     router3.add_channel(ch2b)
     router2.add_channel(ch1b)
 
-    # listen for ^C
-    lock = Lock()
-    lock.acquire() # take the lock
     def signal_handler(signal, frame):
         sel.close()
-        lock.release() # release the main thread
     signal.signal(signal.SIGINT, signal_handler)
-    lock.acquire() # hang until ^C
+    signal.pause()
 
 if __name__ == "__main__":
     main()
