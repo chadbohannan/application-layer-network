@@ -168,7 +168,7 @@ class Router(Thread):
                 capacityUpdate = self.handle_netstate(channel, packet)
             if capacityUpdate:
                 # print("service capacity update at {0}, {1}".format(self.address, capacityUpdate))
-                self._on_service_capacity_changed(capacityUpdate[0], capacityUpdate[1])
+                self._on_service_capacity_changed(capacityUpdate[0], capacityUpdate[1], capacityUpdate[2])
         else:
             self.send(packet)
 
@@ -237,9 +237,9 @@ class Router(Thread):
     def set_on_service_capacity_changed_handler(self, callback):
         self.onServiceCapacityChanged = callback
     
-    def _on_service_capacity_changed(self, service, capacity):
+    def _on_service_capacity_changed(self, service, capacity, addr):
         if self.onServiceCapacityChanged:
-            self.onServiceCapacityChanged(service, capacity);
+            self.onServiceCapacityChanged(service, capacity, addr);
 
     def register_context_handler(self, callback):
         with self.lock:

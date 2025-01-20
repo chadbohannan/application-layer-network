@@ -1,8 +1,11 @@
 __all__ = ["ble_scan", "ble_serial", "ble_channel", "bt_channel", "local_channel", "packet", "parser", "router", "tcp_channel", "tcp_host"]
-from .ble_channel import BLEChannel
-from .ble_scan import BLEScanner
-from .ble_serial import BLESerial, UART_NU_UUID
-from .bt_channel import BtChannel
+try:
+    from .ble_channel import BLEChannel
+    from .ble_scan import BLEScanner
+    from .ble_serial import BLESerial, UART_NU_UUID
+    from .bt_channel import BtChannel
+except:
+    pass # print('bluetooth library import exception; bluetooth features disabled')
 from .packet import Packet
 from .parser import Parser
 from .router import Router

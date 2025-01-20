@@ -57,8 +57,8 @@ def main():
     ctxID = router3.register_context_handler(on_packet)
 
     # set up a service discovery handler for the "ping" service
-    def on_service_discovery(service, capacity):
-        print("on_service_discovery at aln-node-3: {0}:{1}".format(service, capacity))
+    def on_service_discovery(service, capacity, address):
+        print("on_service_discovery at aln-node-3: {0}:{1}:{2}".format(service, capacity, address))
         if service == "ping":
             print("sending ping with ctxID {0}".format(ctxID))
             text = "hello world".encode(encoding="utf-8")
