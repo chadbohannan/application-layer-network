@@ -13,8 +13,12 @@ class TcpHost:
         pass
 
     def accept(self, sock, mask):
-        conn, addr = sock.accept()  # Should be ready
-        self.on_connect(TcpChannel(conn), addr)
+        try:
+            conn, addr = sock.accept()  # Should be ready
+            self.on_connect(TcpChannel(conn), addr)
+        except Exception as e:
+            print('TcpHost.accept() failed:')
+            print(e)
 
     def listen(self, sel, interface, port, on_connect):
         self.sel = sel

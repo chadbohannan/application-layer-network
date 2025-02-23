@@ -17,13 +17,15 @@ class TcpChannel():
         self.selector.register(self.sock, selectors.EVENT_READ, self.recv)
 
     def close(self):
-        self.selector.unregister(self.sock)
-        self.sock.close()
+        try: self.selector.unregister(self.sock)
+        except: pass
+
+        try: self.sock.close()
+        except: pass
+
         for callback in self.on_close_callbacks:
-            try:
-                callback(self)
-            except Exception as e:
-                print(e)
+            try: callback(self)
+            except Exception as e: print(e)
 
     def on_close(self, callback):
         self.on_close_callbacks.append(callback)

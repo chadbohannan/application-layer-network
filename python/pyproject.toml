@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "alnmeshpy"
-version = "0.0.4"
+version = "0.0.5"
 authors = [
   { name="Chad Bohannan", email="chadbohannan@biglittleidea.org" },
 ]
@@ -12,8 +12,7 @@ description = "An implementation of the Application Layer Network (ALN)."
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-  "aiofiles>=24.1.0",
-  "bleak>=0.22.3"
+  "aiofiles>=24.1.0"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
