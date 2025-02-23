@@ -98,9 +98,11 @@ class Router(Thread):
                     self.share_net_state()
                 elif remoteAddress in self.remoteNodeMap: # remove route
                     # print("removing route at {0} to {1}".format(self.address, remoteAddress))
-                    del self.remoteNodeMap[remoteAddress]
+                    if remoteAddress in self.remoteNodeMap:
+                        del self.remoteNodeMap[remoteAddress]
                     for capacityMap in self.serviceCapacityMap.values():
-                        del capacityMap[remoteAddress] 
+                        if remoteAddress in capacityMap:
+                            del capacityMap[remoteAddress]
                     for ch in self.channels:
                         if ch != channel:
                              ch.send(packet)
