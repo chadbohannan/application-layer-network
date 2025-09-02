@@ -15,7 +15,6 @@ const (
 )
 
 type PacketCallback func(*Packet) bool
-type OnCloseCallback func(Channel)
 
 type Parser struct {
 	buffer         *bytes.Buffer

@@ -40,3 +40,6 @@ func bytesOfINT32U(value uint32) []byte {
 		byte(value & 0xFF),
 	}
 }
+
+// OnCloseCallback is a function that is called when a channel is closed.
+type OnCloseCallback func(Channel)

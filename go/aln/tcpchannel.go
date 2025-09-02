@@ -31,12 +31,12 @@ func (host *TcpChannelHost) Listen(onConnect func(Channel)) {
 	}
 	defer l.Close()
 
-	log.Println("TcpChannelHost: " + bindAddress)
+	log.Println("TcpChannelHost:", bindAddress)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("TCPHost:Accept err: ", err.Error())
+			fmt.Println("TCPHost:Accept err:", err.Error())
 			os.Exit(-1)
 		}
 		go onConnect(NewTCPChannel(conn))
@@ -53,8 +53,10 @@ func OpenTCPChannel(hostname string, port int) (Channel, error) {
 }
 
 type TCPChannel struct {
-	mutex sync.Mutex
-	conn  net.Conn
+	mutex        sync.Mutex
+	conn         net.Conn
+	onCloseOnce  sync.Once
+	onCloseHandler OnCloseCallback
 }
 
 // NewTCPChannel creates a new channel around an existing connection
@@ -98,12 +100,20 @@ func (ch *TCPChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) 
 		}
 	}
 	ch.Close()
-	if onClose != nil {
-		onClose(ch)
-	}
+	// ch.OnClose(onClose) // This line is no longer needed as Close() will call the handler
 }
 
 // Close .
 func (ch *TCPChannel) Close() {
 	ch.conn.Close()
+	ch.onCloseOnce.Do(func() {
+		if ch.onCloseHandler != nil {
+			ch.onCloseHandler(ch)
+		}
+	})
+}
+
+// OnClose registers handlers to be notified of channel teardown
+func (ch *TCPChannel) OnClose(onClose OnCloseCallback) {
+	ch.onCloseHandler = onClose
 }

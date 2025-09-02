@@ -10,6 +10,8 @@ import (
 type WebSocketChannel struct {
 	mutex sync.Mutex
 	conn  *websocket.Conn
+	onCloseOnce  sync.Once
+	onCloseHandler OnCloseCallback
 }
 
 // NewWebSocketChannel creates a new channel around an existing connection
@@ -47,10 +49,20 @@ func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCall
 		}
 	}
 	log.Printf("closing websocket")
-	onClose(ch)
+	ch.Close()
 }
 
 // Close .
 func (ch *WebSocketChannel) Close() {
 	ch.conn.Close()
+	ch.onCloseOnce.Do(func() {
+		if ch.onCloseHandler != nil {
+			ch.onCloseHandler(ch)
+		}
+	})
+}
+
+// OnClose registers handlers to be notified of channel teardown
+func (ch *WebSocketChannel) OnClose(onClose OnCloseCallback) {
+	ch.onCloseHandler = onClose
 }

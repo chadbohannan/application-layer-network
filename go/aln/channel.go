@@ -1,10 +1,13 @@
 package aln
 
+import "sync"
+
 // Channel sends one packet at a time by some mechanism
 type Channel interface {
 	Send(*Packet) error
 	Receive(PacketCallback, OnCloseCallback)
 	Close()
+	OnClose(OnCloseCallback)
 }
 
 type ChannelHost interface {
@@ -16,6 +19,8 @@ type LocalChannel struct {
 	outbound chan *Packet
 	inbound  chan *Packet
 	close    chan bool
+	onCloseOnce  sync.Once
+	onCloseHandler OnCloseCallback
 }
 
 // NewLocalChannel allocates the chans of a new LocalChannel
@@ -63,4 +68,14 @@ func (lc *LocalChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback
 // Close releases the Recieve go routine; no other cleanup required
 func (lc *LocalChannel) Close() {
 	lc.close <- true
+	lc.onCloseOnce.Do(func() {
+		if lc.onCloseHandler != nil {
+			lc.onCloseHandler(lc)
+		}
+	})
+}
+
+// OnClose registers handlers to be notified of channel teardown
+func (lc *LocalChannel) OnClose(onClose OnCloseCallback) {
+	lc.onCloseHandler = onClose
 }

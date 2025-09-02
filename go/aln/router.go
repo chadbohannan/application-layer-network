@@ -358,7 +358,6 @@ func (r *Router) ExportServiceTable() []*Packet {
 	services := []*Packet{}
 	for service := range r.serviceMap {
 		var load uint16 = 1 // TODO measure load
-		log.Printf("sharing local service: %s", service)
 		services = append(services, makeNetworkServiceSharePacket(r.address, service, load))
 	}
 	for service, loadMap := range r.serviceLoadMap {
