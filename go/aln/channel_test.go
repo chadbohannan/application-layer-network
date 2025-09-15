@@ -88,7 +88,7 @@ func TestWebSocketChannelOnClose(t *testing.T) {
 	})
 
 	// Start the Receive method in a goroutine
-	go channel.Receive(func(p *Packet) bool { return true }, func(c Channel) {})
+	go channel.Receive(func(p *Packet) bool { return true })
 
 	// Close the client connection to simulate a disconnect
 	clientConn.Close()

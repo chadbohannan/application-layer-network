@@ -8,9 +8,9 @@ import (
 // Channel sends one packet at a time by some mechanism
 type Channel interface {
 	Send(*Packet) error
-	Receive(PacketCallback, OnCloseCallback)
+	Receive(PacketCallback)
 	Close()
-	OnClose(OnCloseCallback)
+	OnClose(...OnCloseCallback)
 }
 
 type ChannelHost interface {
@@ -19,11 +19,11 @@ type ChannelHost interface {
 
 // LocalChannel wraps a pair of chan primatives; intended for development and testing
 type LocalChannel struct {
-	outbound       chan *Packet
-	inbound        chan *Packet
-	close          chan bool
-	onCloseOnce    sync.Once
-	onCloseHandler OnCloseCallback
+	outbound    chan *Packet
+	inbound     chan *Packet
+	close       chan bool
+	onCloseOnce sync.Once
+	onClose     []OnCloseCallback
 }
 
 // NewLocalChannel allocates the chans of a new LocalChannel
@@ -33,6 +33,7 @@ func NewLocalChannel() *LocalChannel {
 		outbound: make(chan *Packet, 6),
 		inbound:  make(chan *Packet, 6),
 		close:    make(chan bool),
+		onClose:  make([]OnCloseCallback, 0),
 	}
 }
 
@@ -56,7 +57,7 @@ func (lc *LocalChannel) Send(packet *Packet) error {
 }
 
 // Receive starts a go routine to call onPacket
-func (lc *LocalChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
+func (lc *LocalChannel) Receive(onPacket PacketCallback) {
 	go func() {
 		cont := true
 		for cont {
@@ -64,9 +65,6 @@ func (lc *LocalChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback
 			case packet := <-lc.inbound:
 				cont = onPacket(packet)
 			case <-lc.close:
-				if onClose != nil {
-					onClose(lc)
-				}
 				return
 			}
 		}
@@ -77,13 +75,13 @@ func (lc *LocalChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback
 func (lc *LocalChannel) Close() {
 	lc.close <- true
 	lc.onCloseOnce.Do(func() {
-		if lc.onCloseHandler != nil {
-			lc.onCloseHandler(lc)
+		for _, handler := range lc.onClose {
+			handler(lc)
 		}
 	})
 }
 
 // OnClose registers handlers to be notified of channel teardown
-func (lc *LocalChannel) OnClose(onClose OnCloseCallback) {
-	lc.onCloseHandler = onClose
+func (lc *LocalChannel) OnClose(onClose ...OnCloseCallback) {
+	lc.onClose = append(lc.onClose, onClose...)
 }

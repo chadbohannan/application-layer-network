@@ -62,16 +62,17 @@ func OpenSSLChannel(hostname string, port int, config *tls.Config) (Channel, err
 }
 
 type SSLChannel struct {
-	mutex        sync.Mutex
-	conn         *tls.Conn
-	onCloseOnce  sync.Once
-	onCloseHandler OnCloseCallback
+	mutex       sync.Mutex
+	conn        *tls.Conn
+	onCloseOnce sync.Once
+	onClose     []OnCloseCallback
 }
 
 // NewSSLChannel creates a new channel around an existing connection
 func NewSSLChannel(conn *tls.Conn) *SSLChannel {
 	return &SSLChannel{
-		conn: conn,
+		conn:    conn,
+		onClose: make([]OnCloseCallback, 0),
 	}
 }
 
@@ -94,7 +95,7 @@ func (ch *SSLChannel) Send(p *Packet) error {
 }
 
 // Receive deserializes packets from it's socket
-func (ch *SSLChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
+func (ch *SSLChannel) Receive(onPacket PacketCallback) {
 	parser := NewParser(onPacket)
 	byteBuff := []byte{0}
 	for {
@@ -106,8 +107,8 @@ func (ch *SSLChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) 
 			return
 		}
 	}
-	// ch.Close() // Removed redundant call
 	log.Printf("SSLChannel.Receive: exiting")
+	ch.Close() // Explicitly call Close() when Receive exits
 }
 
 // Close .
@@ -115,13 +116,13 @@ func (ch *SSLChannel) Close() {
 	log.Printf("SSLChannel.Close: called")
 	ch.conn.Close()
 	ch.onCloseOnce.Do(func() {
-		if ch.onCloseHandler != nil {
-			ch.onCloseHandler(ch)
+		for _, handler := range ch.onClose {
+			handler(ch)
 		}
 	})
 }
 
 // OnClose registers handlers to be notified of channel teardown
-func (ch *SSLChannel) OnClose(onClose OnCloseCallback) {
-	ch.onCloseHandler = onClose
+func (ch *SSLChannel) OnClose(onClose ...OnCloseCallback) {
+	ch.onClose = append(ch.onClose, onClose...)
 }

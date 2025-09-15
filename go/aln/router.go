@@ -349,7 +349,10 @@ func (r *Router) AddChannel(channel Channel) {
 			r.mutex.Unlock()
 		}
 		return true
-	}, r.RemoveChannel)
+	})
+	channel.OnClose(func(c Channel) {
+		r.RemoveChannel(c)
+	})
 	channel.Send(makeNetQueryPacket())
 }
 

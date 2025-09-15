@@ -15,7 +15,7 @@ func TestTcpChannelOnClose(t *testing.T) {
 	channel := NewTCPChannel(clientConn)
 
 	// Start the Receive method in a goroutine to process incoming data and detect connection closure
-	go channel.Receive(func(p *Packet) bool { return true }, func(c Channel) {})
+	go channel.Receive(func(p *Packet) bool { return true })
 
 	// Use a wait group to synchronize the test with the OnClose callback
 	var wg sync.WaitGroup

@@ -8,17 +8,17 @@ import (
 )
 
 type WebSocketChannel struct {
-	mutex sync.Mutex
-	conn  *websocket.Conn
-	onCloseOnce  sync.Once
-	onCloseHandler OnCloseCallback
+	mutex       sync.Mutex
+	conn        *websocket.Conn
+	onCloseOnce sync.Once
+	onClose     []OnCloseCallback
 }
 
 // NewWebSocketChannel creates a new channel around an existing connection
 func NewWebSocketChannel(conn *websocket.Conn) *WebSocketChannel {
-
 	return &WebSocketChannel{
-		conn: conn,
+		conn:    conn,
+		onClose: make([]OnCloseCallback, 0),
 	}
 }
 
@@ -34,7 +34,7 @@ func (ch *WebSocketChannel) Send(p *Packet) error {
 }
 
 // Receive deserializes packets from it's socket
-func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
+func (ch *WebSocketChannel) Receive(onPacket PacketCallback) {
 	ch.conn.SetCloseHandler(func(code int, text string) error {
 		fmt.Println("WebSocketChannel:onCloseHandler")
 		return nil
@@ -49,20 +49,20 @@ func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCall
 		}
 	}
 	fmt.Println("closing websocket")
-	// ch.Close() // Removed redundant call
+	ch.Close() // Explicitly call Close() when Receive exits
 }
 
 // Close .
 func (ch *WebSocketChannel) Close() {
 	ch.conn.Close()
 	ch.onCloseOnce.Do(func() {
-		if ch.onCloseHandler != nil {
-			ch.onCloseHandler(ch)
+		for _, handler := range ch.onClose {
+			handler(ch)
 		}
 	})
 }
 
 // OnClose registers handlers to be notified of channel teardown
-func (ch *WebSocketChannel) OnClose(onClose OnCloseCallback) {
-	ch.onCloseHandler = onClose
+func (ch *WebSocketChannel) OnClose(onClose ...OnCloseCallback) {
+	ch.onClose = append(ch.onClose, onClose...)
 }

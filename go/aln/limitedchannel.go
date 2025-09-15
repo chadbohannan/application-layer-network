@@ -35,10 +35,8 @@ func (lc *LimitedChannel) Send(packet *Packet) error {
 }
 
 // Receive starts a go routine to call onPacket
-func (lc *LimitedChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
-	lc.wrapped.Receive(onPacket, func(ch Channel) {
-		onClose(lc)
-	})
+func (lc *LimitedChannel) Receive(onPacket PacketCallback) {
+	lc.wrapped.Receive(onPacket)
 }
 
 // Close releases the Recieve go routine; no other cleanup required
@@ -50,6 +48,6 @@ func (lc *LimitedChannel) Close() {
 }
 
 // OnClose registers handlers to be notified of channel teardown
-func (lc *LimitedChannel) OnClose(f OnCloseCallback) {
-	lc.onCloseHandlers = append(lc.onCloseHandlers, f)
+func (lc *LimitedChannel) OnClose(onClose ...OnCloseCallback) {
+	lc.onCloseHandlers = append(lc.onCloseHandlers, onClose...)
 }
