@@ -1,6 +1,9 @@
 package aln
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 // Channel sends one packet at a time by some mechanism
 type Channel interface {
@@ -16,18 +19,19 @@ type ChannelHost interface {
 
 // LocalChannel wraps a pair of chan primatives; intended for development and testing
 type LocalChannel struct {
-	outbound chan *Packet
-	inbound  chan *Packet
-	close    chan bool
-	onCloseOnce  sync.Once
+	outbound       chan *Packet
+	inbound        chan *Packet
+	close          chan bool
+	onCloseOnce    sync.Once
 	onCloseHandler OnCloseCallback
 }
 
 // NewLocalChannel allocates the chans of a new LocalChannel
 func NewLocalChannel() *LocalChannel {
 	return &LocalChannel{
-		outbound: make(chan *Packet, 2),
-		inbound:  make(chan *Packet, 2),
+		// buffer of less than 5 can hang TestMulticastWithSelf
+		outbound: make(chan *Packet, 6),
+		inbound:  make(chan *Packet, 6),
 		close:    make(chan bool),
 	}
 }
@@ -43,8 +47,12 @@ func (lc *LocalChannel) FlippedChannel() *LocalChannel {
 // Send transmits immediately
 func (lc *LocalChannel) Send(packet *Packet) error {
 	packet.SetControlFlags()
-	lc.outbound <- packet
-	return nil
+	select {
+	case <-lc.close:
+		return fmt.Errorf("LocalChannel is closed, cannot send packet")
+	case lc.outbound <- packet:
+		return nil
+	}
 }
 
 // Receive starts a go routine to call onPacket

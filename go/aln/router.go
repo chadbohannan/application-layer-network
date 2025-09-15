@@ -64,6 +64,30 @@ func (r *Router) Address() AddressType {
 	return r.address
 }
 
+// routeAndSend handles the actual routing and sending of a packet.
+// This function assumes the router's mutex is already locked.
+func (r *Router) routeAndSend(p *Packet) error {
+	if p.DestAddr == r.address {
+		if onPacket, ok := r.serviceMap[p.Service]; ok {
+			onPacket(p)
+		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
+			onPacket(p)
+		} else {
+			return fmt.Errorf("service '%s' not registered", p.Service)
+		}
+	} else if p.NextAddr == r.address || len(p.NextAddr) == 0 {
+		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
+			p.NextAddr = route.NextHop
+			route.Channel.Send(p)
+		} else {
+			return fmt.Errorf("failed to find route for %s", p.DestAddr)
+		}
+	} else {
+		return fmt.Errorf("packet is unroutable; no action taken")
+	}
+	return nil
+}
+
 // ServiceAddresses returns all the addresses that advertise a specific service
 func (r *Router) ServiceAddresses(service string) []AddressType {
 	r.mutex.Lock()
@@ -106,48 +130,45 @@ func (r *Router) SelectService(service string) AddressType {
 //
 //	locally by a registered Node, or on a multi-hop route to it's destination.
 func (r *Router) Send(p *Packet) error {
-	handler := func(p *Packet) {}
-	packetCallback := func(p *Packet) { handler(p) }
-	defer packetCallback(p)
-
 	if len(p.SrcAddr) == 0 {
 		p.SrcAddr = r.address
 	}
+
 	if len(p.DestAddr) == 0 && len(p.Service) != 0 {
 		// service multicast; send to all service instances
+
+		r.mutex.Lock()
+		// First, handle local delivery if the router itself provides the service
+		if onPacket, ok := r.serviceMap[p.Service]; ok {
+			if pc, err := p.Copy(); err == nil {
+				pc.DestAddr = r.address // Ensure local delivery
+				onPacket(pc)
+			}
+		}
+		r.mutex.Unlock()
+
 		serviceAddresses := r.ServiceAddresses(p.Service)
-		if len(serviceAddresses) > 0 {
-			for i := 1; i < len(serviceAddresses); i++ {
+		for _, destAddr := range serviceAddresses {
+			if destAddr != r.address { // Avoid sending to self again if already handled locally
 				if pc, err := p.Copy(); err == nil {
-					pc.DestAddr = serviceAddresses[i]
-					r.Send(pc)
+					pc.DestAddr = destAddr
+					go func(packet *Packet) {
+						r.mutex.Lock()
+						defer r.mutex.Unlock()
+						if err := r.routeAndSend(packet); err != nil {
+							log.Printf("error routing multicast packet to %s: %v", packet.DestAddr, err)
+						}
+					}(pc)
 				}
 			}
-			p.DestAddr = serviceAddresses[0]
 		}
+		return nil // Multicast handled, no further processing for this packet in this Send call
 	}
+
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	if p.DestAddr == r.address {
-		if onPacket, ok := r.serviceMap[p.Service]; ok {
-			handler = onPacket
-		} else if onPacket, ok = r.contextMap[p.ContextID]; ok {
-			handler = onPacket
-		} else {
-			return fmt.Errorf("service '%s' not registered", p.Service)
-		}
-	} else if p.NextAddr == r.address || len(p.NextAddr) == 0 {
-		if route, ok := r.remoteNodeMap[p.DestAddr]; ok {
-			p.NextAddr = route.NextHop
-			route.Channel.Send(p)
-		} else {
-			return fmt.Errorf("failed to find route for %s", p.DestAddr)
-		}
-	} else {
-		return fmt.Errorf("packet is unroutable; no action taken")
-	}
-	return nil
+	return r.routeAndSend(p)
 }
 
 // RegisterContextHandler returns a contextID. Services must respond with the same
@@ -172,29 +193,27 @@ func (r *Router) ReleaseContext(ctxID uint16) {
 
 func (r *Router) RemoveChannel(channel Channel) {
 	log.Printf("router:RemoveChannel")
-	go func() {
-		r.mutex.Lock()
-		defer r.mutex.Unlock()
-		// slice out the channel
-		for i, ch := range r.channels {
-			if ch == channel {
-				a := r.channels
-				a[i] = a[len(a)-1]
-				a[len(a)-1] = nil
-				r.channels = a[:len(a)-1]
-				break
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	// slice out the channel
+	for i, ch := range r.channels {
+		if ch == channel {
+			a := r.channels
+			a[i] = a[len(a)-1]
+			a[len(a)-1] = nil
+			r.channels = a[:len(a)-1]
+			break
+		}
+	}
+	// bcast the loss of routes through the channel
+	for address, nodeInfo := range r.remoteNodeMap {
+		if nodeInfo.Channel == channel {
+			r.removeAddress(address)
+			for _, ch := range r.channels {
+				ch.Send(makeNetworkRouteSharePacket(r.address, address, 0))
 			}
 		}
-		// bcast the loss of routes through the channel
-		for address, nodeInfo := range r.remoteNodeMap {
-			if nodeInfo.Channel == channel {
-				r.removeAddress(address)
-				for _, ch := range r.channels {
-					ch.Send(makeNetworkRouteSharePacket(r.address, address, 0))
-				}
-			}
-		}
-	}()
+	}
 }
 
 func (r *Router) removeAddress(remoteAddress AddressType) {
@@ -310,7 +329,24 @@ func (r *Router) AddChannel(channel Channel) {
 		case NET_ERROR:
 			log.Printf("NET_ERROR 255 %s", string(packet.Data))
 		default:
-			r.Send(packet)
+			// For regular data packets, directly process or forward
+			r.mutex.Lock()
+			// Assuming the packet has arrived at its final destination or needs to be forwarded
+			if packet.DestAddr == r.address {
+				if onPacket, ok := r.serviceMap[packet.Service]; ok {
+					onPacket(packet)
+				} else if onPacket, ok = r.contextMap[packet.ContextID]; ok {
+					onPacket(packet)
+				} else {
+					log.Printf("received unhandled packet for service '%s' or context '%d'", packet.Service, packet.ContextID)
+				}
+			} else if route, ok := r.remoteNodeMap[packet.DestAddr]; ok {
+				packet.NextAddr = route.NextHop
+				route.Channel.Send(packet)
+			} else {
+				log.Printf("packet is unroutable; no action taken for dest %s", packet.DestAddr)
+			}
+			r.mutex.Unlock()
 		}
 		return true
 	}, r.RemoveChannel)
@@ -349,6 +385,27 @@ func (r *Router) ExportRouteTable() []*Packet {
 
 func (r *Router) NumChannels() int {
 	return len(r.channels)
+}
+
+// HasRoute returns true if the router has a route to the given address
+func (r *Router) HasRoute(address AddressType) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	_, ok := r.remoteNodeMap[address]
+	return ok
+}
+
+// HasService returns true if the router has a service registered locally or remotely
+func (r *Router) HasService(service string) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if _, ok := r.serviceMap[service]; ok {
+		return true
+	}
+	if loadMap, ok := r.serviceLoadMap[service]; ok {
+		return len(loadMap) > 0
+	}
+	return false
 }
 
 // ExportServiceTable composes a list of packets encoding the service table of this node

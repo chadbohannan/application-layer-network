@@ -106,11 +106,13 @@ func (ch *SSLChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) 
 			return
 		}
 	}
-	ch.Close()
+	// ch.Close() // Removed redundant call
+	log.Printf("SSLChannel.Receive: exiting")
 }
 
 // Close .
 func (ch *SSLChannel) Close() {
+	log.Printf("SSLChannel.Close: called")
 	ch.conn.Close()
 	ch.onCloseOnce.Do(func() {
 		if ch.onCloseHandler != nil {

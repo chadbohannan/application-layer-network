@@ -1,7 +1,7 @@
 package aln
 
 import (
-	"log"
+	"fmt"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -36,7 +36,7 @@ func (ch *WebSocketChannel) Send(p *Packet) error {
 // Receive deserializes packets from it's socket
 func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
 	ch.conn.SetCloseHandler(func(code int, text string) error {
-		log.Printf("WebSocketChannel:onCloseHandler")
+		fmt.Println("WebSocketChannel:onCloseHandler")
 		return nil
 	})
 	for { // ever and ever
@@ -44,12 +44,12 @@ func (ch *WebSocketChannel) Receive(onPacket PacketCallback, onClose OnCloseCall
 		if err := ch.conn.ReadJSON(packet); err == nil {
 			onPacket(packet)
 		} else {
-			log.Printf("client read err: %s\nclosing socket: %s", err.Error(), ch.conn.RemoteAddr().String())
+			fmt.Printf("client read err: %s\nclosing socket: %s\n", err.Error(), ch.conn.RemoteAddr().String())
 			break // jk; not forever
 		}
 	}
-	log.Printf("closing websocket")
-	ch.Close()
+	fmt.Println("closing websocket")
+	// ch.Close() // Removed redundant call
 }
 
 // Close .
