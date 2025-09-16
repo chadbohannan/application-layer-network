@@ -30,8 +30,8 @@ type LocalChannel struct {
 func NewLocalChannel() *LocalChannel {
 	return &LocalChannel{
 		// buffer of less than 5 can hang TestMulticastWithSelf
-		outbound: make(chan *Packet, 6),
-		inbound:  make(chan *Packet, 6),
+		outbound: make(chan *Packet, 10),
+		inbound:  make(chan *Packet, 10),
 		close:    make(chan bool),
 		onClose:  make([]OnCloseCallback, 0),
 	}

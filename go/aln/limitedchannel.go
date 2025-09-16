@@ -6,20 +6,20 @@ import "fmt"
 // a server implmentation to control the sending of packets.
 // This allows injecting business logic into enabling the sending of packets.
 type LimitedChannel struct {
-	wrapped         Channel
-	router          *Router
-	CanSend         func(*Router, *Packet) (bool, error)
-	onCloseHandlers []OnCloseCallback
+	wrapped Channel
+	router  *Router
+	CanSend func(*Router, *Packet) (bool, error)
 }
 
 // NewLimitedChannel wraps another channel with a new LimitedChannel
 func NewLimitedChannel(ch Channel, router *Router, canSend func(*Router, *Packet) (bool, error)) *LimitedChannel {
-	return &LimitedChannel{
-		wrapped:         ch,
-		router:          router,
-		CanSend:         canSend,
-		onCloseHandlers: make([]OnCloseCallback, 0),
+	lc := &LimitedChannel{
+		wrapped: ch,
+		router:  router,
+		CanSend: canSend,
 	}
+
+	return lc
 }
 
 // Send transmits immediately
@@ -42,12 +42,9 @@ func (lc *LimitedChannel) Receive(onPacket PacketCallback) {
 // Close releases the Recieve go routine; no other cleanup required
 func (lc *LimitedChannel) Close() {
 	lc.wrapped.Close()
-	for _, f := range lc.onCloseHandlers {
-		f(lc)
-	}
 }
 
 // OnClose registers handlers to be notified of channel teardown
 func (lc *LimitedChannel) OnClose(onClose ...OnCloseCallback) {
-	lc.onCloseHandlers = append(lc.onCloseHandlers, onClose...)
+	lc.wrapped.OnClose(onClose...)
 }
