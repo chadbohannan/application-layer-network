@@ -6,25 +6,23 @@ import "fmt"
 // a server implmentation to control the sending of packets.
 // This allows injecting business logic into enabling the sending of packets.
 type LimitedChannel struct {
-	wrapped Channel
-	router  *Router
-	CanSend func(*Router, *Packet) (bool, error)
+	wrapped    Channel
+	resourceID string
+	CanSend    func(string, *Packet) (bool, error)
 }
 
 // NewLimitedChannel wraps another channel with a new LimitedChannel
-func NewLimitedChannel(ch Channel, router *Router, canSend func(*Router, *Packet) (bool, error)) *LimitedChannel {
-	lc := &LimitedChannel{
-		wrapped: ch,
-		router:  router,
-		CanSend: canSend,
+func NewLimitedChannel(ch Channel, rID string, canSend func(string, *Packet) (bool, error)) *LimitedChannel {
+	return &LimitedChannel{
+		wrapped:    ch,
+		resourceID: rID,
+		CanSend:    canSend,
 	}
-
-	return lc
 }
 
 // Send transmits immediately
 func (lc *LimitedChannel) Send(packet *Packet) error {
-	ok, err := lc.CanSend(lc.router, packet)
+	ok, err := lc.CanSend(lc.resourceID, packet)
 	if ok {
 		lc.wrapped.Send(packet)
 	}

@@ -2,7 +2,6 @@ package aln
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -31,7 +30,6 @@ func (host *TcpChannelHost) Listen(onConnect func(Channel)) {
 	}
 	defer l.Close()
 
-	log.Println("TcpChannelHost:", bindAddress)
 	for {
 		// Listen for an incoming connection.
 		conn, err := l.Accept()

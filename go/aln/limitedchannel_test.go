@@ -6,17 +6,15 @@ import (
 	"time"
 )
 
-// TODO: Add tests for LimitedChannel
-
 func TestLimitedChannelOnClose(t *testing.T) {
 	// Create a LocalChannel as the underlying channel to be wrapped
 	localChannel := NewLocalChannel()
 
 	// Create a LimitedChannel wrapping the LocalChannel
-	canSend := func(router *Router, packet *Packet) (bool, error) {
+	canSend := func(resouceID string, packet *Packet) (bool, error) {
 		return true, nil
 	}
-	lc := NewLimitedChannel(localChannel, nil, canSend)
+	lc := NewLimitedChannel(localChannel, "", canSend)
 
 	lc.Receive(func(p *Packet) bool { return false })
 

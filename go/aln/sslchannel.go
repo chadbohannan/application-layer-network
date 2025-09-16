@@ -113,7 +113,6 @@ func (ch *SSLChannel) Receive(onPacket PacketCallback) {
 
 // Close .
 func (ch *SSLChannel) Close() {
-	log.Printf("SSLChannel.Close: called")
 	ch.conn.Close()
 	ch.onCloseOnce.Do(func() {
 		for _, handler := range ch.onClose {

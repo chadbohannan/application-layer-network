@@ -36,7 +36,7 @@ func main() {
 		wg.Done()                    // release the lock
 	})
 
-	time.Sleep(100 * time.Millisecond) // let protocol chatter settle
+	time.Sleep(time.Second) // let protocol chatter settle
 
 	// the round-trip journey begins
 	log.Println("generating ping packet")

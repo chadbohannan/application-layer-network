@@ -34,7 +34,7 @@ func main() {
 	ch.Send(packet)
 	router.AddChannel(ch)
 
-	time.Sleep(100 * time.Millisecond) // let protocol chatter settle
+	time.Sleep(1 * time.Second) // let protocol chatter settle
 
 	// send a log message to any 'log' services that might be connected
 	log.Println("generating log packet")
