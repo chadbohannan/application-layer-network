@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 )
 
 // implements ChannelHost
@@ -47,6 +48,80 @@ func (host *SslChannelHost) Listen(onConnect func(Channel)) {
 			fmt.Println("SslChannelHost:Accept err: ", err.Error())
 			os.Exit(-1)
 		}
-		go onConnect(NewTCPChannel(conn))
+		go onConnect(NewSSLChannel(conn.(*tls.Conn)))
 	}
+}
+
+// OpenSSLChannel attempts to create an ELP wrapped socket connection to a remote host
+func OpenSSLChannel(hostname string, port int, config *tls.Config) (Channel, error) {
+	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", hostname, port), config)
+	if err != nil {
+		return nil, err
+	}
+	return NewSSLChannel(conn), nil
+}
+
+type SSLChannel struct {
+	mutex       sync.Mutex
+	conn        *tls.Conn
+	onCloseOnce sync.Once
+	onClose     []OnCloseCallback
+}
+
+// NewSSLChannel creates a new channel around an existing connection
+func NewSSLChannel(conn *tls.Conn) *SSLChannel {
+	return &SSLChannel{
+		conn:    conn,
+		onClose: make([]OnCloseCallback, 0),
+	}
+}
+
+// Send serializes a packet frame through the socket
+func (ch *SSLChannel) Send(p *Packet) error {
+	p.SetControlFlags()
+	pktBytes, err := p.ToFrameBytes()
+	if err != nil {
+		return err
+	}
+
+	ch.mutex.Lock()
+	defer ch.mutex.Unlock()
+	if n, err := ch.conn.Write(pktBytes); err != nil {
+		return err
+	} else if n != len(pktBytes) {
+		return fmt.Errorf("SSLChannel conn.Write sent %d/%d bytes", n, len(pktBytes))
+	}
+	return nil
+}
+
+// Receive deserializes packets from it's socket
+func (ch *SSLChannel) Receive(onPacket PacketCallback) {
+	parser := NewParser(onPacket)
+	byteBuff := []byte{0}
+	for {
+		n, err := ch.conn.Read(byteBuff)
+		if n < 1 || err != nil {
+			break
+		}
+		if !parser.IngestStream(byteBuff) {
+			return
+		}
+	}
+	log.Printf("SSLChannel.Receive: exiting")
+	ch.Close() // Explicitly call Close() when Receive exits
+}
+
+// Close .
+func (ch *SSLChannel) Close() {
+	ch.conn.Close()
+	ch.onCloseOnce.Do(func() {
+		for _, handler := range ch.onClose {
+			handler(ch)
+		}
+	})
+}
+
+// OnClose registers handlers to be notified of channel teardown
+func (ch *SSLChannel) OnClose(onClose ...OnCloseCallback) {
+	ch.onClose = append(ch.onClose, onClose...)
 }

@@ -125,7 +125,8 @@ func TestMulticastWithSelf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(200 * time.Millisecond) // let async operation settle
+	time.Sleep(200 * time.Millisecond) // allow route and service table to sync
+
 	if !receivedPacket1 {
 		t.Fatal("!receivedPacket1")
 	}
@@ -147,12 +148,12 @@ func TestRoute1LimitedHop(t *testing.T) {
 	localChannel := NewLocalChannel()
 
 	count := 0
-	canSend := func(router *Router, packet *Packet) (bool, error) {
+	canSend := func(resourceID string, packet *Packet) (bool, error) {
 		count += 1
 		return true, nil
 	}
 
-	limitedChannel := NewLimitedChannel(localChannel, rtr1, canSend)
+	limitedChannel := NewLimitedChannel(localChannel, string(rtr1.Address()), canSend)
 
 	rtr1.AddChannel(limitedChannel)
 	rtr2.AddChannel(localChannel.FlippedChannel())

@@ -2,25 +2,27 @@ package aln
 
 import "fmt"
 
-// LimitedChannel wraps a pair of chan primatives; intended for development and testing
+// LimitedChannel wraps another Channel and adds a CanSend callback to enable
+// a server implmentation to control the sending of packets.
+// This allows injecting business logic into enabling the sending of packets.
 type LimitedChannel struct {
-	wrapped Channel
-	router  *Router
-	CanSend func(*Router, *Packet) (bool, error)
+	wrapped    Channel
+	resourceID string
+	CanSend    func(string, *Packet) (bool, error)
 }
 
 // NewLimitedChannel wraps another channel with a new LimitedChannel
-func NewLimitedChannel(ch Channel, router *Router, canSend func(*Router, *Packet) (bool, error)) *LimitedChannel {
+func NewLimitedChannel(ch Channel, rID string, canSend func(string, *Packet) (bool, error)) *LimitedChannel {
 	return &LimitedChannel{
-		wrapped: ch,
-		router:  router,
-		CanSend: canSend,
+		wrapped:    ch,
+		resourceID: rID,
+		CanSend:    canSend,
 	}
 }
 
 // Send transmits immediately
 func (lc *LimitedChannel) Send(packet *Packet) error {
-	ok, err := lc.CanSend(lc.router, packet)
+	ok, err := lc.CanSend(lc.resourceID, packet)
 	if ok {
 		lc.wrapped.Send(packet)
 	}
@@ -31,13 +33,16 @@ func (lc *LimitedChannel) Send(packet *Packet) error {
 }
 
 // Receive starts a go routine to call onPacket
-func (lc *LimitedChannel) Receive(onPacket PacketCallback, onClose OnCloseCallback) {
-	lc.wrapped.Receive(onPacket, func(ch Channel) {
-		onClose(lc)
-	})
+func (lc *LimitedChannel) Receive(onPacket PacketCallback) {
+	lc.wrapped.Receive(onPacket)
 }
 
 // Close releases the Recieve go routine; no other cleanup required
 func (lc *LimitedChannel) Close() {
 	lc.wrapped.Close()
+}
+
+// OnClose registers handlers to be notified of channel teardown
+func (lc *LimitedChannel) OnClose(onClose ...OnCloseCallback) {
+	lc.wrapped.OnClose(onClose...)
 }

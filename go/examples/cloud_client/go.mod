@@ -2,7 +2,7 @@ module example_client
 
 replace github.com/chadbohannan/application-layer-network/go => ../
 
-replace github.com/chadbohannan/application-layer-network/go/aln => ../aln/
+replace github.com/chadbohannan/application-layer-network/go/aln => ../../aln/
 
 go 1.13
 
