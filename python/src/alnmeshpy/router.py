@@ -74,15 +74,18 @@ class Router(Thread):
         self.serviceCapacityMap = {} # ServiceCapacityMap // map[service][address]capacity (remote services)
         self.serviceQueue = {}   # map[service]PacketList
         self.onServiceCapacityChanged = None # callback method (optional)
-        self.stop = False
+        self._stop_flag = False
         self.daemon = True
 
     def run(self):
-        while not self.stop:
+        while not self._stop_flag:
             events = self.selector.select()
             for key, mask in events:
                 callback = key.data
                 callback(key.fileobj, mask)
+
+    def stop(self):
+        self._stop_flag = True
 
     def handle_netstate(self, channel, packet):
         updatedServiceCapacity = None

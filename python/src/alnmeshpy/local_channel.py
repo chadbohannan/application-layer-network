@@ -20,7 +20,8 @@ class LocalChannel():
 
     def close(self):
         self.selector.unregister(self.r)
-        self.r.close()
+        os.close(self.r)
+        os.close(self.w)
         for callback in self.on_close_callbacks:
             try:
                 callback(self)
