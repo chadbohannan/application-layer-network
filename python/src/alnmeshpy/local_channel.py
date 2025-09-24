@@ -28,8 +28,8 @@ class LocalChannel():
             except Exception as e:
                 print(e)
 
-    def on_close(self, callback):
-        self.on_close_callbacks.append(callback)
+    def on_close(self, *callbacks):
+        self.on_close_callbacks.extend(callbacks)
 
     def send(self, packet):
         frame = packet.toFrameBytes()

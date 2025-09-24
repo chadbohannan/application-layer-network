@@ -26,5 +26,8 @@ Issues = "https://github.com/chadbohannan/application-layer-network/issues"
 Homepage = "https://biglittleidea.org/article/5706803308396544"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.2.2"]
+dev = [
+  "pytest>=8.2.2",
+  "pip>=25.0.1"
+]
 
