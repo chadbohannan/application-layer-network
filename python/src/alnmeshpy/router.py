@@ -79,10 +79,14 @@ class Router(Thread):
 
     def run(self):
         while not self._stop_flag:
-            events = self.selector.select()
-            for key, mask in events:
-                callback = key.data
-                callback(key.fileobj, mask)
+            try:
+                events = self.selector.select(timeout=0.1)
+                for key, mask in events:
+                    callback = key.data
+                    callback(key.fileobj, mask)
+            except (OSError, ValueError):
+                # Selector closed or invalid, exit gracefully
+                break
 
     def stop(self):
         self._stop_flag = True
@@ -261,11 +265,12 @@ class Router(Thread):
     def register_service(self, service, handler):
         with self.lock:
             self.serviceMap[service] = handler
-        self.export_services()
+        # TODO isolate sharing routing table from sharing service mappings
+        self.share_net_state()
 
     def unregister_service(self, service):
         with self.lock:
-            self.serviceMap.pol(service, None)
+            self.serviceMap.pop(service, None)
         # TODO send service offline packet
         self.share_net_state()
 

@@ -3,9 +3,11 @@ try:
     from .ble_channel import BLEChannel
     from .ble_scan import BLEScanner
     from .ble_serial import BLESerial, UART_NU_UUID
-    from .bt_channel import BtChannel
 except:
     pass # print('bluetooth library import exception; bluetooth features disabled')
+
+# BtChannel doesn't require bluetooth libraries, only socket
+from .bt_channel import BtChannel
 from .packet import Packet
 from .parser import Parser
 from .router import Router

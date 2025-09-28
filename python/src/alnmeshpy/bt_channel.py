@@ -18,8 +18,16 @@ class BtChannel():
         self.selector.register(self.sock, selectors.EVENT_READ, self.recv)
 
     def close(self):
-        self.selector.unregister(self.sock)
-        self.sock.close()
+        try:
+            self.selector.unregister(self.sock)
+        except (KeyError, ValueError):
+            # Socket already unregistered or selector closed
+            pass
+        try:
+            self.sock.close()
+        except OSError:
+            # Socket already closed
+            pass
         for callback in self.on_close_callbacks:
             try:
                 callback(self)
@@ -46,10 +54,4 @@ class BtChannel():
         if data:
             self.parser.readBytes(data)
         else:
-            self.selector.unregister(sock)
-            sock.close()
-            for callback in self.on_close_callbacks:
-                try:
-                    callback(self)
-                except Exception as e:
-                    print("BtChannel recv close exception:", e)
+            self.close()
