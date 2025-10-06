@@ -61,12 +61,12 @@ def three_routers_setup():
     ping_service_available = Event()
     ping_service_address = {"addr": None}
 
-    def on_service_discovery(service, capacity, address):
+    def on_service_discovery(service, load, address):
         if service == "ping":
             ping_service_address["addr"] = address
             ping_service_available.set()
 
-    router3.set_on_service_capacity_changed_handler(on_service_discovery)
+    router3.set_on_service_load_changed_handler(on_service_discovery)
     router3.add_channel(ch2b)
     router2.add_channel(ch1b)
 

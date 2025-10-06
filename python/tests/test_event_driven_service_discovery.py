@@ -47,17 +47,17 @@ def test_event_driven_service_discovery():
         service_removed = Event()
         test_service_address = {"addr": None}
 
-        def on_service_capacity_changed(service, capacity, address):
-            print(f"Service discovery: {service} capacity {capacity} at {address}")
+        def on_service_load_changed(service, load, address):
+            print(f"Service discovery: {service} load {load} at {address}")
             if service == "test-service":
-                if capacity > 0:
+                if load > 0:
                     test_service_address["addr"] = address
                     service_discovered.set()
                 else:
                     service_removed.set()
 
         # Set up service discovery handler on router2
-        router2.set_on_service_capacity_changed_handler(on_service_capacity_changed)
+        router2.set_on_service_load_changed_handler(on_service_load_changed)
 
         # Register service on router1
         service_called = Event()

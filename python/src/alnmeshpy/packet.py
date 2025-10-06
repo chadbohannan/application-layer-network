@@ -147,12 +147,13 @@ class Packet:
         DATATYPE_FIELD_SIZE + \
         DATALENGTH_FIELD_SIZE
 
-    MAX_DATA_SIZE = 0xFFFF
+    MAX_DATA_SIZE = 4096
     MAX_PACKET_SIZE = MAX_HEADER_SIZE + MAX_DATA_SIZE + CRC_FIELD_SIZE
 
     NET_ROUTE = 0x01  # packet contains route entry
     NET_SERVICE = 0x02  # packet contains service entry
     NET_QUERY = 0x03  # packet is a request for content
+    NET_ERROR = 0xFF  # packet contains error message
 
     # parse packet from incoming data, if available
     def __init__(self,
@@ -251,7 +252,7 @@ class Packet:
             packetBuffer.extend(writeINT16U(self.contextID))
 
         if (self.controlFlags & Packet.CF_DATATYPE):
-            packetBuffer.append(self.netState)
+            packetBuffer.append(self.dataType)
 
         if (self.controlFlags & Packet.CF_DATA):
             packetBuffer.extend(writeINT16U(self.dataSize))
@@ -317,7 +318,7 @@ class Packet:
 
         if(self.controlFlags & Packet.CF_ACKBLOCK):
             ackBytes = packetBuffer[offset:offset+Packet.ACKBLOCK_FIELD_SIZE]
-            self.ackBlock = readINT16U(ackBytes)
+            self.ackBlock = readINT32U(ackBytes)
             offset += Packet.ACKBLOCK_FIELD_SIZE
 
         if(self.controlFlags & Packet.CF_CONTEXTID):
@@ -363,7 +364,7 @@ class Packet:
         if "ack" in obj:
             p.ackBlock = obj["ack"]
         if "ctx" in obj:
-            p.controlFlags = obj["ctx"]
+            p.contextID = obj["ctx"]
         if "typ" in obj:
             p.dataType = obj["typ"]
         if "data" in obj:
