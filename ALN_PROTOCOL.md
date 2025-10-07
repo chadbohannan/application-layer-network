@@ -115,9 +115,11 @@ Packets are serialized as binary data with the following encoding:
 
 ## 4. Frame Layer
 
-### 4.1 Frame Structure
+The frame layer provides packet delimitation over transport channels. ALN supports two framing methods depending on the transport type.
 
-ALN packets are transmitted using KISS-style byte stuffing for frame delimitation:
+### 4.1 Binary Frame Structure (KISS Framing)
+
+For stream-based transports (TCP, serial, etc.), ALN packets are transmitted using KISS-style byte stuffing for frame delimitation:
 
 ```
 Frame ::= SEQUENCE OF {
@@ -126,20 +128,63 @@ Frame ::= SEQUENCE OF {
 }
 ```
 
-### 4.2 Escape Sequences
-
+**Escape Sequences:**
 - **Frame End**: `0xC0` - Indicates end of frame
 - **Frame Escape**: `0xDB` - Escape character for byte stuffing
 - **Escaped Frame End**: `0xDC` - Literal 0xC0 in data
 - **Escaped Frame Escape**: `0xDD` - Literal 0xDB in data
 
-### 4.3 Encoding Algorithm
-
+**Encoding Algorithm:**
 1. For each byte in the packet:
    - If byte = 0xC0, send 0xDB 0xDC
    - If byte = 0xDB, send 0xDB 0xDD
    - Otherwise, send byte as-is
 2. Send 0xC0 to mark end of frame
+
+### 4.2 WebSocket Frame Structure (JSON Encoding)
+
+For WebSocket transports, ALN packets MAY use JSON encoding instead of binary KISS framing:
+
+**Rationale:**
+- WebSocket provides built-in message framing
+- No need for byte stuffing or special delimiters
+- JSON encoding simplifies debugging and cross-language compatibility
+- Human-readable packet inspection
+
+**JSON Packet Format:**
+```json
+{
+  "cf": <uint16>,           // Control flags (optional)
+  "net": <uint8>,           // Network state type (optional)
+  "srv": "<string>",        // Service name (optional)
+  "src": "<string>",        // Source address (optional)
+  "dst": "<string>",        // Destination address (optional)
+  "nxt": "<string>",        // Next hop address (optional)
+  "seq": <uint16>,          // Sequence number (optional)
+  "ack": <uint32>,          // Acknowledgment block (optional)
+  "ctx": <uint16>,          // Context ID (optional)
+  "typ": <uint8>,           // Data type (optional)
+  "data": "<base64>",       // Packet data as base64 (optional)
+  "data_sz": <uint16>       // Data size in bytes (optional)
+}
+```
+
+**Field Mapping:**
+- All packet fields map directly to JSON properties
+- Binary data is base64-encoded
+- Null/undefined fields are omitted (sparse encoding)
+- `data_sz` provides the original binary data length
+
+**WebSocket Channel Implementation:**
+- Send: Serialize packet to JSON, send as WebSocket text message
+- Receive: Parse JSON message, decode base64 data, construct packet
+- The WebSocket frame itself provides message boundaries
+
+**Transport Selection:**
+- TCP/Serial channels: MUST use binary KISS framing (Section 4.1)
+- WebSocket channels: SHOULD use JSON encoding (Section 4.2)
+- WebSocket channels MAY use binary KISS framing for compatibility
+- Implementations MUST document which framing method is used per transport
 
 ## 5. Routing Protocol
 
@@ -204,12 +249,73 @@ Where:
 - `serviceName`: Name of advertised service
 - `serviceLoad`: Current load metric (0 = service removal)
 
-### 6.2 Load Balancing
+### 6.2 Service Load Metrics
 
-Service selection uses lowest-load-first algorithm:
-- Local services are preferred (load = 0 equivalent)
-- Remote services ranked by advertised load metric
-- Load metrics are implementation-specific capacity indicators
+The `serviceLoad` field is a 16-bit unsigned integer representing the current capacity or utilization of a service instance:
+
+**Load Value Semantics:**
+- `0`: Service removal - indicates the service is no longer available at this address
+- `1-65535`: Active service with current load/capacity metric
+
+**Load Metric Interpretation:**
+The load value is implementation-specific but should follow these guidelines:
+- **Lower values indicate better availability** (less loaded, more capacity)
+- **Higher values indicate higher utilization** (more loaded, less capacity)
+- Common implementations:
+  - Active connection count
+  - CPU/memory utilization percentage (0-100 scale)
+  - Queue depth or pending request count
+  - Inverse capacity measure (65535 = fully loaded)
+
+### 6.3 Service Selection and Load Balancing
+
+When multiple instances of a service are available, nodes select the optimal instance using the following algorithm:
+
+**Selection Priority:**
+1. **Local Service First**: If the service is registered locally, always use it (no network hop)
+2. **Lowest Remote Load**: Select the remote service instance with the lowest `serviceLoad` value
+3. **No Service**: If no instances are available, routing fails
+
+**Load-Based Selection Algorithm:**
+```
+function SelectService(serviceName):
+    if localServiceExists(serviceName):
+        return localAddress
+
+    minLoad = ∞
+    selectedAddress = null
+
+    for each (address, load) in remoteServices[serviceName]:
+        if load > 0 and load < minLoad:
+            minLoad = load
+            selectedAddress = address
+
+    return selectedAddress
+```
+
+**Load Update Propagation:**
+- Service load changes are propagated immediately as triggered updates
+- Each router relays service advertisements to all other channels
+- Duplicate advertisements (same address, service, load) are suppressed to prevent loops
+- Service removal (`load=0`) is propagated to all channels immediately
+
+### 6.4 Service Lifecycle Management
+
+**Service Registration:**
+1. Node registers local service handler
+2. Node sends `netService` packet with `serviceLoad=1` (or actual load) to all channels
+3. Neighbors update service tables and relay to their channels
+
+**Service Update:**
+1. Node measures current service load
+2. If load changes significantly, send updated `netService` packet
+3. Update frequency is implementation-defined (recommend throttling to avoid floods)
+
+**Service Removal:**
+1. Node unregisters service handler
+2. Node sends `netService` packet with `serviceLoad=0` to all channels
+3. Neighbors remove service from tables and relay removal to their channels
+4. Service entries are also removed when their host route expires or is withdrawn
 
 ## 7. Network State Management
 
@@ -246,10 +352,33 @@ For request-response communication:
 
 ### 8.3 Service Multicast
 
-Services can be multicast by:
-- Setting `service` field without `destAddr`
-- Routers deliver to all known service instances
-- Enables service redundancy and load distribution
+Service multicast enables sending a single packet to all instances of a service across the network.
+
+**Multicast Packet Format:**
+- `service`: Target service name (required)
+- `destAddr`: Empty/unset (triggers multicast behavior)
+- `data`: Application payload
+- Other fields as needed (srcAddr, contextID, etc.)
+
+**Multicast Delivery Behavior:**
+1. If local service exists, deliver to local handler first
+2. For each remote service instance:
+   - Create a copy of the packet
+   - Set `destAddr` to the remote service's address
+   - Route the copy to that destination
+3. All instances receive the same payload independently
+
+**Use Cases:**
+- Service redundancy: Send to all instances for fault tolerance
+- State synchronization: Broadcast state updates to all service nodes
+- Load distribution: Let all instances process the request
+- Discovery: Query all instances for capabilities
+
+**Important Considerations:**
+- Each service instance receives an independent copy
+- No ordering guarantees between instances
+- Responses (if any) must be handled per-instance using `contextID`
+- Multicast to non-existent service fails silently (no instances to deliver to)
 
 ## 9. Error Handling
 
@@ -306,6 +435,9 @@ Conforming implementations must:
 - Maintain routing and service tables
 - Provide service registration and discovery APIs
 - Handle frame-level escaping correctly
+- Implement service load-based selection (prefer local, then lowest load)
+- Handle service removal (load=0) correctly
+- Suppress duplicate service advertisements to prevent loops
 
 ### 11.3 Optional Features
 
@@ -315,6 +447,9 @@ Implementations may optionally support:
 - Custom data types
 - CRC validation
 - Quality of service metrics
+- Service capacity change notifications/callbacks
+- Dynamic load measurement and reporting
+- Service load update throttling
 
 ## 12. Constants and Limits
 
