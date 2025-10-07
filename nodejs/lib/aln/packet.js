@@ -28,7 +28,7 @@ class Packet {
     this.crc = null
     if (content) {
       const buf = ByteBuffer.fromBinary(content)
-      this.cf = buf.readUint16()
+      this.cf = cfHamDecode(buf.readUint16())
       if (this.cf & CF_NETSTATE) this.net = buf.readUint8()
       if (this.cf & CF_SERVICE) this.srv = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_SRCADDR) this.src = buf.readBytes(buf.readUint8()).toUTF8()
@@ -37,7 +37,7 @@ class Packet {
       if (this.cf & CF_SEQNUM) this.seq = buf.readUint16()
       if (this.cf & CF_ACKBLOCK) this.ack = buf.readUint32()
       if (this.cf & CF_CONTEXTID) this.ctx = buf.readUint16()
-      if (this.typ & CF_DATATYPE) this.typ = buf.readUint8()
+      if (this.cf & CF_DATATYPE) this.typ = buf.readUint8()
       if (this.cf & CF_DATA) {
         this.sz = buf.readUint16()
         this.data = buf.readBytes(this.sz)
@@ -107,28 +107,28 @@ function cfHamEncode (value) {
     (intXOR(value & 0x026F) << 15)
 }
 
-// function cfHamDecode (value) {
-//   const hamDecodMap = {
-//     0x0F: 0x0001,
-//     0x07: 0x0002,
-//     0x0B: 0x0004,
-//     0x0D: 0x0008,
-//     0x0E: 0x0010,
-//     0x03: 0x0020,
-//     0x05: 0x0040,
-//     0x06: 0x0080,
-//     0x0A: 0x0100,
-//     0x09: 0x0200,
-//     0x0C: 0x0400
-//   }
-//   const err = intXOR(value & 0x826F) |
-//       (intXOR(value & 0x41B7) << 1) |
-//       (intXOR(value & 0x24DB) << 2) |
-//       (intXOR(value & 0x171D) << 3) &
-//       0xFF
+function cfHamDecode (value) {
+  const hamDecodMap = {
+    0x0F: 0x0001,
+    0x07: 0x0002,
+    0x0B: 0x0004,
+    0x0D: 0x0008,
+    0x0E: 0x0010,
+    0x03: 0x0020,
+    0x05: 0x0040,
+    0x06: 0x0080,
+    0x0A: 0x0100,
+    0x09: 0x0200,
+    0x0C: 0x0400
+  }
+  const err = intXOR(value & 0x826F) |
+      (intXOR(value & 0x41B7) << 1) |
+      (intXOR(value & 0x24DB) << 2) |
+      (intXOR(value & 0x171D) << 3) &
+      0xFF
 
-//   value ^= hamDecodMap.get(err, 0)
-//   return value
-// }
+  value ^= hamDecodMap[err] || 0
+  return value
+}
 
 module.exports.Packet = Packet

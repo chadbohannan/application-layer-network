@@ -1,12 +1,12 @@
 // const ByteBuffer = require('bytebuffer')
-// const { Packet } = require('../aln/packet')
+// const { Packet } = require('../lib/aln/packet')
 const {
   makeNetQueryPacket,
   makeNetworkRouteSharePacket,
   parseNetworkRouteSharePacket,
   makeNetworkServiceSharePacket,
   parseNetworkServiceSharePacket
-} = require('../aln/utils')
+} = require('../lib/aln/utils')
 const chai = require('chai')
 const assert = chai.assert
 const { describe, it } = require('mocha')

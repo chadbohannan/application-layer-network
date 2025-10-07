@@ -2,7 +2,7 @@ const chai = require('chai')
 const chaiHttp = require('chai-http')
 chai.use(chaiHttp)
 const assert = chai.assert
-const app = require('../app')
+const app = require('../examples/server/app')
 const { describe, it } = require('mocha')
 
 describe('# Test Web App', function () {

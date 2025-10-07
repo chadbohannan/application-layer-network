@@ -1,31 +1,33 @@
 {
+  "name": "aln",
+  "version": "1.0.0",
+  "description": "Application Layer Network - A mesh networking protocol for distributed service discovery and communication",
+  "main": "lib/aln/router.js",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chadbohannan/application-layer-network.git"
+  },
+  "keywords": [
+    "mesh",
+    "networking",
+    "routing",
+    "service-discovery",
+    "distributed",
+    "protocol"
+  ],
   "scripts": {
     "test": "standard && nyc --reporter=lcov mocha tests/*",
-    "lint": "standard --fix",
-    "start": "node server.js",
-    "coverage": "codecov"
+    "lint": "standard --fix"
   },
   "dependencies": {
     "bytebuffer": "^5.0.1",
-    "compression": "^1.8.1",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "morgan": "^1.10.1",
-    "net": "^1.0.2",
-    "winston": "^3.2.1",
     "ws": "^8.17.1"
   },
   "devDependencies": {
     "chai": "^4.2.0",
-    "chai-http": "^4.3.0",
-    "codecov": "^3.7.1",
     "mocha": "^7.1.1",
-    "nodemon": "^2.0.3",
     "nyc": "^15.0.0",
     "standard": "^16.0.4"
-  },
-  "optionalDependencies": {
-    "bufferutil": "^4.0.6"
   }
 }

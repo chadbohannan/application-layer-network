@@ -1,87 +1,132 @@
-## Getting Started
-```
-$ npm install
-```
+# ALN - Application Layer Network (Node.js)
 
-### Run a host node
-Host nodes listen for connections and act as hubs for data flows.
-```
-$ node server.js
-```
+A mesh networking protocol for distributed service discovery and communication.
 
-
-## Running the server
+## Project Structure
 
 ```
-$ npm start
+nodejs/
+├── lib/aln/              # Core ALN library
+│   ├── packet.js         # Packet structure and serialization
+│   ├── parser.js         # KISS frame parser
+│   ├── router.js         # Core routing logic
+│   ├── utils.js          # Network state packet helpers
+│   ├── tcpchannel.js     # TCP transport channel
+│   └── wschannel.js      # WebSocket transport channel
+│
+├── examples/             # Demo applications
+│   ├── simple-client/    # Basic TCP client example
+│   ├── maln-client/      # Multiplexed ALN client
+│   └── server/           # Server with TCP & WebSocket support
+│
+├── tests/                # Unit tests
+└── package.json          # Minimal library dependencies
 ```
 
-Note: This will run a server in the development environment.
-For information on deploying an express application to production and learn best practices, take a look [here](https://expressjs.com/en/advanced/best-practice-performance.html).
+## Installation
 
-## Logging
+### Core Library
+```bash
+npm install
+```
 
-This directory has 2 files.
+**Dependencies:**
+- `bytebuffer` - Binary packet serialization
+- `ws` - WebSocket transport
 
-- `logger.js` exports a winston object which we use for logging. You should modify logger.js to customize your logging configuration.
-- `morgan.js` exports a pre-configured morgan object to write logs using a stream to winston. It is used to intercept http requests and log the request and response details.
-  For more details visit the official page for [morgan](https://www.npmjs.com/package/morgan).
+### Examples (Optional)
+```bash
+cd examples
+npm install
+```
 
-## Routes
+## Usage
 
-Directory for defining routes. I don't think this needs more explanation.
+### Import the Library
 
-## Additional Information
+```javascript
+const Router = require('./lib/aln/router')
+const { Packet } = require('./lib/aln/packet')
+const { TcpChannel } = require('./lib/aln/tcpchannel')
+const { WebSocketChannel } = require('./lib/aln/wschannel')
+```
 
-- On Linux, UNIX and Mac, running the following command adds ./node_modules/.bin to the path.
+### Basic Routing Example
 
-  ```bash
-  source ./activate
-  ```
+```javascript
+const Router = require('./lib/aln/router')
+const { Packet } = require('./lib/aln/packet')
 
-  This makes it easier to run locally installed command packages.
-  This won't be required in many IDEs like Webstorm, but we thought it's a good idea to include it anyway.
+// Create a router with a unique address
+const router = new Router('my-node')
 
-- [standard.js](https://npmjs.com/package/standard) has been added as the default linting and styling tool
+// Register a service
+router.registerService('ping', (packet) => {
+  console.log('Received ping from:', packet.src)
 
-  Use :
+  const response = new Packet()
+  response.dst = packet.src
+  response.ctx = packet.ctx
+  response.data = 'pong'
+  router.send(response)
+})
 
-  ```bash
-  npm run lint
-  ```
+// Add a transport channel (TCP, WebSocket, etc.)
+router.addChannel(channel)
+```
 
-  Formats the entire project, and logs out anything it couldn't fix.
+### Run Examples
 
-- [mocha](https://npmjs.com/package/mocha) is used for testing and [chai](https://npmjs.com/package/chai) is used for assertion.
-  [chai-http](https://npmjs.com/package/chai) is used to test http endpoints.
+From the `examples/` directory:
 
-  Use:
+```bash
+# Start the server (TCP port 8000, HTTP/WebSocket port 8080)
+npm run server
 
-  ```bash
-  npm test
-  ```
+# In another terminal, run a client
+npm run simple-client
 
-- [nyc](https://npmjs.com/package/nyc) is used as the default coverage tool.
-  Use:
+# Or run the multiplexed ALN client
+npm run maln-client
+```
 
-  ```bash
-  npm run coverage
-  ```
+## Core Concepts
 
-* The master branch ships code for a **http** server. Checkout the **https** branch for the https server.
-  Replace the self-signed certificates in the certs with your own SSL certificates.
+### Router
+The central component that manages:
+- Service registration and discovery
+- Distance-vector routing
+- Multi-hop packet forwarding
+- Load-based service selection
 
-## Dependencies
+### Channels
+Transport-agnostic connections:
+- **TcpChannel**: Stream-based binary KISS framing
+- **WebSocketChannel**: JSON-encoded packets (human-readable)
 
-| Dependency                                           | Usage                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------ |
-| [body-parser](https://npm.com/package/body-parser)   | POST body parsing middleware. Adds body object to incoming request |
-| [compression](https://npmjs.com/package/compression) | Response compression middleware                                    |
-| [express](https://npmjs.com/package/express)         | Express REST API framework                                         |
-| [cors](https://npm.com/package/cors)                 | CORS middleware to set CORS policy                                 |
-| [morgan](https://npmjs.com/package/morgan)           | HTTP request logger                                                |
-| [winston](https://npmjs.com/package/winston)         | General purpose logger for the application                         |
-| [nyc](https://npmjs.com/package/nyc)                 | Code Coverage tool                                                 |
-| [standard](https://npmjs.com/package/standard)       | Linting and styling tool.                                          |
-| [chai](https://npmjs.com/package/chai)               | Assertion Library                                                  |
-| [chai-http](https://npmjs.com/package/chai-http)     | Middleware for chai to test http endpoints                         |
+### Packets
+Messages exchanged over the network:
+- Network state (routes, services, queries)
+- Application data
+- Request/response via context IDs
+
+### Services
+Named endpoints that handle application requests:
+- Automatic service discovery
+- Load balancing across multiple instances
+- Service multicast support
+
+## Testing
+
+```bash
+npm test          # Run all tests with coverage
+npm run lint      # Check code style
+```
+
+## Protocol
+
+See [ALN_PROTOCOL.md](../ALN_PROTOCOL.md) for complete protocol specification.
+
+## License
+
+MIT
