@@ -6,7 +6,7 @@ class BtChannel():
     def __init__(self, sock):
         self.sock = sock
         self.sock.setblocking(False)
-        self.on_close = None
+        self.on_close_callbacks = []
 
     def packet_handler(self, packet):
         self.on_packet_callback(self, packet)
@@ -18,10 +18,24 @@ class BtChannel():
         self.selector.register(self.sock, selectors.EVENT_READ, self.recv)
 
     def close(self):
-        self.selector.unregister(self.sock)
-        self.sock.close()
-        if self.on_close:
-            self.on_close(self)
+        try:
+            self.selector.unregister(self.sock)
+        except (KeyError, ValueError):
+            # Socket already unregistered or selector closed
+            pass
+        try:
+            self.sock.close()
+        except OSError:
+            # Socket already closed
+            pass
+        for callback in self.on_close_callbacks:
+            try:
+                callback(self)
+            except Exception as e:
+                print("BtChannel close exception:", e)
+
+    def on_close(self, *callbacks):
+        self.on_close_callbacks.extend(callbacks)
 
     def send(self, packet):
         frame = packet.toFrameBytes()
@@ -40,7 +54,4 @@ class BtChannel():
         if data:
             self.parser.readBytes(data)
         else:
-            self.selector.unregister(sock)
-            sock.close()
-            if self.on_close:
-                self.on_close(self)
+            self.close()

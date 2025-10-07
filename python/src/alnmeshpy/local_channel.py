@@ -19,16 +19,29 @@ class LocalChannel():
         self.selector.register(self.r, selectors.EVENT_READ, self.recv)
 
     def close(self):
-        self.selector.unregister(self.r)
-        self.r.close()
+        try:
+            self.selector.unregister(self.r)
+        except (KeyError, ValueError):
+            # File descriptor already unregistered or selector closed
+            pass
+        try:
+            os.close(self.r)
+        except OSError:
+            # File descriptor already closed
+            pass
+        try:
+            os.close(self.w)
+        except OSError:
+            # File descriptor already closed
+            pass
         for callback in self.on_close_callbacks:
             try:
                 callback(self)
             except Exception as e:
                 print(e)
 
-    def on_close(self, callback):
-        self.on_close_callbacks.append(callback)
+    def on_close(self, *callbacks):
+        self.on_close_callbacks.extend(callbacks)
 
     def send(self, packet):
         frame = packet.toFrameBytes()

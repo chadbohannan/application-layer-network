@@ -59,7 +59,7 @@ func (p *Parser) IngestStream(buffer []byte) bool {
 			case FRAME_ESC_T:
 				p.buffer.WriteByte(FRAME_ESC)
 			default:
-				fmt.Printf("unexpected char in KISS frame: %x", msg)
+				fmt.Printf("unexpected char in KISS-style frame: %x", msg)
 			}
 			p.state = STATE_BUFFERING
 		} else if msg == FRAME_ESC {

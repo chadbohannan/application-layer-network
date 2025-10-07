@@ -19,6 +19,9 @@ type contextHandlerMap map[uint16]func(*Packet)
 // serviceHandlerMap maps local endpoint nodes to packet handlers
 type serviceHandlerMap map[string]func(*Packet)
 
+// ServiceCapacityChangedHandler is called when a service capacity changes
+type ServiceCapacityChangedHandler func(service string, capacity uint16, address AddressType)
+
 type RemoteNodeInfo struct {
 	Address  AddressType // target addres to communicate with
 	NextHop  AddressType // next routing service node for address
@@ -39,13 +42,14 @@ type ServiceLoadMap map[string]NodeLoadMap // map[service][address]NodeLoad
 
 // Router manages a set of channels and packet handlers
 type Router struct {
-	mutex          sync.Mutex
-	address        AddressType
-	channels       []Channel
-	serviceMap     serviceHandlerMap // map[address]callback registered local node packet handlers
-	contextMap     contextHandlerMap
-	remoteNodeMap  RemoteNodeMap // map[address][]RemoteNodes
-	serviceLoadMap ServiceLoadMap
+	mutex                    sync.Mutex
+	address                  AddressType
+	channels                 []Channel
+	serviceMap               serviceHandlerMap // map[address]callback registered local node packet handlers
+	contextMap               contextHandlerMap
+	remoteNodeMap            RemoteNodeMap // map[address][]RemoteNodes
+	serviceLoadMap           ServiceLoadMap
+	onServiceCapacityChanged ServiceCapacityChangedHandler
 }
 
 // NewRouter instantiates an applications ELP Router
@@ -64,9 +68,24 @@ func (r *Router) Address() AddressType {
 	return r.address
 }
 
+// SetOnServiceCapacityChangedHandler sets the callback for service capacity changes
+func (r *Router) SetOnServiceCapacityChangedHandler(handler ServiceCapacityChangedHandler) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.onServiceCapacityChanged = handler
+}
+
+// notifyServiceCapacityChanged calls the handler if set (assumes mutex is already locked)
+func (r *Router) notifyServiceCapacityChanged(service string, capacity uint16, address AddressType) {
+	if r.onServiceCapacityChanged != nil {
+		go r.onServiceCapacityChanged(service, capacity, address)
+	}
+}
+
 // routeAndSend handles the actual routing and sending of a packet.
 // This function assumes the router's mutex is already locked.
 func (r *Router) routeAndSend(p *Packet) error {
+	// log.Printf("DEBUG: routeAndSend called with DestAddr='%s', SrcAddr='%s', Service='%s', ContextID=%d", p.DestAddr, p.SrcAddr, p.Service, p.ContextID)
 	if p.DestAddr == r.address {
 		if onPacket, ok := r.serviceMap[p.Service]; ok {
 			onPacket(p)
@@ -192,7 +211,7 @@ func (r *Router) ReleaseContext(ctxID uint16) {
 }
 
 func (r *Router) RemoveChannel(channel Channel) {
-	log.Printf("router:RemoveChannel")
+	// log.Printf("router:RemoveChannel")
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	// slice out the channel
@@ -219,8 +238,12 @@ func (r *Router) RemoveChannel(channel Channel) {
 func (r *Router) removeAddress(remoteAddress AddressType) {
 	// remove node and relay
 	delete(r.remoteNodeMap, remoteAddress)
-	for _, nodeLoadMap := range r.serviceLoadMap {
-		delete(nodeLoadMap, remoteAddress)
+	// Notify about service removals before deleting
+	for service, nodeLoadMap := range r.serviceLoadMap {
+		if _, exists := nodeLoadMap[remoteAddress]; exists {
+			r.notifyServiceCapacityChanged(service, 0, remoteAddress)
+			delete(nodeLoadMap, remoteAddress)
+		}
 	}
 }
 
@@ -235,6 +258,7 @@ func (r *Router) AddChannel(channel Channel) {
 		// log.Printf("received packet srv:'%s' dst:'%s' src:'%s' nxt:'%s' net:%d ctx:%d data:%v\n",
 		// 	packet.Service, packet.DestAddr, packet.SrcAddr, packet.NextAddr, packet.NetState, packet.ContextID, packet.Data)
 
+		// log.Printf("DEBUG: packet.NetState=%d, SrcAddr='%s', DestAddr='%s'", packet.NetState, packet.SrcAddr, packet.DestAddr)
 		switch packet.NetState {
 		case NET_ROUTE:
 			// neighbor is sharing it's routing table
@@ -297,19 +321,42 @@ func (r *Router) AddChannel(channel Channel) {
 				}
 				// log.Printf("NET_SERVICE node:'%s', service:'%s', load:%d\n", address, service, serviceLoad)
 				r.mutex.Lock()
-				defer r.mutex.Unlock()
+				serviceChanged := false
+
 				if _, ok := r.serviceLoadMap[service]; !ok {
 					r.serviceLoadMap[service] = NodeLoadMap{}
 				}
-				if nl, ok := r.serviceLoadMap[service][address]; ok {
-					if nl.Load == serviceLoad {
-						return true // drop packet to avoid propagation loops
+
+				if serviceLoad == 0 {
+					// Service removal
+					if _, ok := r.serviceLoadMap[service][address]; ok {
+						delete(r.serviceLoadMap[service], address)
+						serviceChanged = true
+					}
+				} else {
+					// Service addition or update
+					if nl, ok := r.serviceLoadMap[service][address]; ok {
+						if nl.Load == serviceLoad {
+							r.mutex.Unlock()
+							return true // drop packet to avoid propagation loops
+						}
+						serviceChanged = true
+					} else {
+						serviceChanged = true // new service
+					}
+					r.serviceLoadMap[service][address] = NodeLoad{
+						Load:     serviceLoad,
+						LastSeen: time.Now().UTC(),
 					}
 				}
-				r.serviceLoadMap[service][address] = NodeLoad{
-					Load:     serviceLoad,
-					LastSeen: time.Now().UTC(),
+
+				if serviceChanged {
+					r.notifyServiceCapacityChanged(service, serviceLoad, address)
 				}
+
+				r.mutex.Unlock()
+
+				// Relay to other channels
 				for _, c := range r.channels {
 					if c != channel {
 						c.Send(packet)
@@ -331,22 +378,47 @@ func (r *Router) AddChannel(channel Channel) {
 		default:
 			// For regular data packets, directly process or forward
 			r.mutex.Lock()
+
+			// Auto-learn route to packet source for direct TCP connections
+			if len(packet.SrcAddr) > 0 && packet.SrcAddr != r.address {
+				if _, exists := r.remoteNodeMap[packet.SrcAddr]; !exists {
+					r.remoteNodeMap[packet.SrcAddr] = &RemoteNodeInfo{
+						Address:  packet.SrcAddr,
+						NextHop:  packet.SrcAddr, // Direct connection
+						Channel:  channel,
+						Cost:     1, // Direct connection cost
+						LastSeen: time.Now().UTC(),
+					}
+					log.Printf("Auto-learned route to %s via channel", packet.SrcAddr)
+				}
+			}
+
 			// Assuming the packet has arrived at its final destination or needs to be forwarded
 			if packet.DestAddr == r.address {
-				if onPacket, ok := r.serviceMap[packet.Service]; ok {
-					onPacket(packet)
-				} else if onPacket, ok = r.contextMap[packet.ContextID]; ok {
-					onPacket(packet)
+				// Copy handler reference and release mutex before calling to avoid deadlock
+				var handler func(*Packet)
+				var found bool
+				if handler, found = r.serviceMap[packet.Service]; found {
+					// Found service handler
+				} else if handler, found = r.contextMap[packet.ContextID]; found {
+					// Found context handler
 				} else {
 					log.Printf("received unhandled packet for service '%s' or context '%d'", packet.Service, packet.ContextID)
+				}
+
+				r.mutex.Unlock()
+
+				if found && handler != nil {
+					handler(packet) // Call handler WITHOUT holding mutex
 				}
 			} else if route, ok := r.remoteNodeMap[packet.DestAddr]; ok {
 				packet.NextAddr = route.NextHop
 				route.Channel.Send(packet)
+				r.mutex.Unlock()
 			} else {
 				log.Printf("packet is unroutable; no action taken for dest %s", packet.DestAddr)
+				r.mutex.Unlock()
 			}
-			r.mutex.Unlock()
 		}
 		return true
 	})
@@ -359,8 +431,9 @@ func (r *Router) AddChannel(channel Channel) {
 // RegisterService binds a handler to a service and shares the info with neighbors
 func (r *Router) RegisterService(service string, onPacket func(*Packet)) {
 	r.mutex.Lock()
-	defer r.mutex.Unlock()
 	r.serviceMap[service] = onPacket
+	r.notifyServiceCapacityChanged(service, 1, r.address) // Notify about local service with capacity 1
+	r.mutex.Unlock()
 	go r.ShareNetState()
 }
 
@@ -368,7 +441,19 @@ func (r *Router) RegisterService(service string, onPacket func(*Packet)) {
 func (r *Router) UnregisterService(service string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+
+	if _, exists := r.serviceMap[service]; !exists {
+		return // Service not registered
+	}
+
 	delete(r.serviceMap, service)
+	r.notifyServiceCapacityChanged(service, 0, r.address) // Notify about service removal
+
+	// Send removal notification to all channels
+	removalPacket := makeNetworkServiceSharePacket(r.address, service, 0)
+	for _, channel := range r.channels {
+		channel.Send(removalPacket)
+	}
 }
 
 // ExportRouteTable generates a set of packets that another router can read
