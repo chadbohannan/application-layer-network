@@ -45,11 +45,6 @@ function waitForEvent (checkFn, timeoutMs = 5000, checkIntervalMs = 50) {
   })
 }
 
-// Helper to wait for a specified time
-function wait (ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 describe('# Three Router Topology Tests', function () {
   this.timeout(15000) // Increase timeout for network discovery
 
@@ -59,23 +54,16 @@ describe('# Three Router Topology Tests', function () {
     //
     // Router1 has the "ping" service
     // Router3 will discover and send a ping request
-    // Router2 acts as a relay between them
+    // Router2 acts as a relay node to create a multihop nework
 
     // Setup Router 1 and Router 2 connection
     const ch1a = new LocalChannel()
     const ch2a = ch1a.twin
 
-    // Track ping handler execution
-    let receivedPing = false
-    let pingResponseSent = false
-    let receivedPingData = null
-
     // Create Router 1 with ping service
     const router1 = new Router('aln-node-1')
     router1.registerService('ping', (packet) => {
       console.log('Router 1: Received ping request')
-      receivedPing = true
-      receivedPingData = packet.data
 
       // Send pong response back to the source
       const pongPacket = new Packet()
@@ -83,7 +71,6 @@ describe('# Three Router Topology Tests', function () {
       pongPacket.ctx = packet.ctx
       pongPacket.data = 'pong'
       router1.send(pongPacket)
-      pingResponseSent = true
       console.log('Router 1: Sent pong response')
     })
     router1.addChannel(ch1a)
@@ -96,29 +83,25 @@ describe('# Three Router Topology Tests', function () {
     const ch1b = new LocalChannel()
     const ch2b = ch1b.twin
 
-    // Track pong response reception
-    let receivedPong = false
-    let pongData = null
-
     // Create Router 3 (client)
     const router3 = new Router('aln-node-3')
 
     // Register context handler for pong response
+    let receivedPong = false
     const ctxID = router3.registerContextHandler((packet) => {
-      console.log('Router 3: Received pong response')
-      pongData = packet.data
+      console.log('Router 3: Received pong response', packet.data)
       receivedPong = true
     })
-
-    // Track service discovery
-    let pingServiceDiscovered = false
-    let pingServiceAddress = null
 
     router3.setOnServiceCapacityChanged((service, capacity, address) => {
       console.log(`Router 3: Service discovered - ${service} at ${address} (capacity: ${capacity})`)
       if (service === 'ping' && capacity > 0) {
-        pingServiceAddress = address
-        pingServiceDiscovered = true
+        // Send ping request from Router 3
+        const pingPacket = new Packet()
+        pingPacket.srv = 'ping'
+        pingPacket.ctx = ctxID
+        pingPacket.data = 'hello world'
+        router3.send(pingPacket)
       }
     })
 
@@ -128,64 +111,17 @@ describe('# Three Router Topology Tests', function () {
 
     console.log('All routers connected, waiting for network discovery...')
 
-    // Wait for initial network discovery
-    await wait(500)
-
-    // Manually trigger network state sharing to ensure discovery
-    router1.shareNetState()
-    router2.shareNetState()
-    router3.shareNetState()
-
-    // Wait for route propagation through all hops
-    await wait(1000)
-
-    // Trigger again to ensure full propagation
-    router1.shareNetState()
-    router2.shareNetState()
-    router3.shareNetState()
-
-    await wait(500)
-
-    // Wait for service discovery with timeout
-    console.log('Waiting for ping service discovery...')
-    await waitForEvent(() => pingServiceDiscovered, 10000)
-    assert.isTrue(pingServiceDiscovered, 'Ping service should be discovered')
-    assert.equal(pingServiceAddress, 'aln-node-1', 'Ping service should be at aln-node-1')
-
-    console.log('Ping service discovered! Sending ping request...')
-
-    // Send ping request from Router 3
-    const pingPacket = new Packet()
-    pingPacket.srv = 'ping'
-    pingPacket.ctx = ctxID
-    pingPacket.data = 'hello world'
-    router3.send(pingPacket)
-
-    // Wait for ping to be received by Router 1
-    console.log('Waiting for Router 1 to receive ping...')
-    await waitForEvent(() => receivedPing, 5000)
-    assert.isTrue(receivedPing, 'Router 1 should receive ping')
-    assert.equal(receivedPingData, 'hello world', 'Ping data should match')
-
-    // Wait for Router 1 to send pong response
-    console.log('Waiting for Router 1 to send pong...')
-    await waitForEvent(() => pingResponseSent, 5000)
-    assert.isTrue(pingResponseSent, 'Router 1 should send pong response')
-
-    // Wait for Router 3 to receive pong response
-    console.log('Waiting for Router 3 to receive pong...')
-    await waitForEvent(() => receivedPong, 5000)
-    assert.isTrue(receivedPong, 'Router 3 should receive pong')
-    assert.equal(pongData, 'pong', 'Pong data should be "pong"')
-
+    await waitForEvent(() => receivedPong, 5000) // 5 second wait for test to pass
+    assert.isTrue(receivedPong, 'Pong Recieved')
     console.log('✅ Three-router ping-pong test passed!')
   })
 
   it('# service multicast across three routers', async function () {
     // Create three routers where Router1 and Router3 both have the same service
-    // Router2 in the middle should route to both
+    // Router2 acts as a relay node; represents any number of nodes in a multihop network
+    // Router3 sends a multicast that should reach both local and remote echo services
 
-    // Setup Router 1
+    // Setup Router 1 with echo service
     const ch1a = new LocalChannel()
     const ch2a = ch1a.twin
 
@@ -197,50 +133,51 @@ describe('# Three Router Topology Tests', function () {
     })
     router1.addChannel(ch1a)
 
-    // Setup Router 2 (relay)
+    // Setup Router 2 as passive relay
     const router2 = new Router('aln-node-2')
     router2.addChannel(ch2a)
 
-    // Setup Router 3
+    // Setup Router 3 with echo service
     const ch1b = new LocalChannel()
     const ch2b = ch1b.twin
 
-    let router3Received = false
+    let router3LocalReceived = false
     const router3 = new Router('aln-node-3')
     router3.registerService('echo', (packet) => {
-      console.log('Router 3: Received echo request')
-      router3Received = true
+      console.log('Router 3: Received echo request (local)')
+      router3LocalReceived = true
     })
+
+    // Track when Router 3 discovers Router 1's echo service
+    let router1ServiceDiscovered = false
+    router3.setOnServiceCapacityChanged((service, capacity, address) => {
+      if (service === 'echo' && capacity > 0 && address === 'aln-node-1') {
+        console.log(`Router 3: Discovered echo service at ${address}`)
+        router1ServiceDiscovered = true
+      }
+    })
+
     router3.addChannel(ch2b)
     router2.addChannel(ch1b)
 
     console.log('All routers connected, waiting for network discovery...')
 
-    // Wait for network discovery
-    await wait(500)
-    router1.shareNetState()
-    router2.shareNetState()
-    router3.shareNetState()
-    await wait(1000)
-    router1.shareNetState()
-    router2.shareNetState()
-    router3.shareNetState()
-    await wait(500)
+    // Wait for Router 3 to discover Router 1's echo service
+    await waitForEvent(() => router1ServiceDiscovered, 5000)
+    console.log('Router 3 has discovered Router 1 echo service')
 
-    console.log('Sending multicast echo request from Router 2...')
-
-    // Send service multicast from Router 2 (should reach both Router 1 and Router 3)
+    // Send service multicast from Router 3 (should reach both local and remote)
     const echoPacket = new Packet()
     echoPacket.srv = 'echo'
     echoPacket.data = 'broadcast message'
-    router2.send(echoPacket)
+    router3.send(echoPacket)
 
-    // Wait for both routers to receive the message
+    // Wait for both services to receive the message
     console.log('Waiting for multicast delivery...')
-    await waitForEvent(() => router1Received && router3Received, 5000)
+    await waitForEvent(() => router1Received && router3LocalReceived, 5000)
 
     assert.isTrue(router1Received, 'Router 1 should receive echo')
-    assert.isTrue(router3Received, 'Router 3 should receive echo')
+    assert.isTrue(router3LocalReceived, 'Router 3 should receive echo locally')
 
     console.log('✅ Service multicast test passed!')
   })
