@@ -13,12 +13,11 @@ const ctx = alnRouter.registerContextHandler((p) => {
   process.exit(0) // exit after receiving response
 })
 
-// Event-driven service discovery - send ping when service is available
 alnRouter.setOnServiceCapacityChanged((service, capacity, address) => {
   console.log(`Service discovered: ${service} at ${address} (capacity: ${capacity})`)
 
   if (service === 'ping' && capacity > 0) {
-    console.log('sending ping (event-driven, no delay!)')
+    console.log('ping service discovered; sending ping')
     const pingPacket = new Packet()
     pingPacket.srv = 'ping'
     pingPacket.ctx = ctx
@@ -29,7 +28,6 @@ alnRouter.setOnServiceCapacityChanged((service, capacity, address) => {
 const socket = new net.Socket()
 socket.connect({ port: TCP_PORT, host: '127.0.0.1' }, function () {
   console.log('channel connected')
-  // No setTimeout needed - event-driven!
 })
 
 const tcpChannel = new TcpChannel(socket)
