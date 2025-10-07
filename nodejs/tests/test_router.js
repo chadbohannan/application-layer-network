@@ -1,11 +1,11 @@
 // const ByteBuffer = require('bytebuffer')
-// const { Packet } = require('../aln/packet')
-// const { Parser } = require('../aln/parser')
+// const { Packet } = require('../lib/aln/packet')
+// const { Parser } = require('../lib/aln/parser')
 const chai = require('chai')
 const assert = chai.assert
 const { describe, it } = require('mocha')
-const { Packet } = require('../aln/packet')
-const Router = require('../aln/router')
+const { Packet } = require('../lib/aln/packet')
+const Router = require('../lib/aln/router')
 
 class LocalChannel {
   constructor (twin) {

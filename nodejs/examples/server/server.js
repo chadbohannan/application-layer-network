@@ -2,11 +2,11 @@ const app = require('./app')
 const http = require('http')
 const net = require('net')
 const logger = require('./logging/logger')
-const Router = require('./aln/router')
-const { TcpChannel } = require('./aln/tcpchannel')
-const { WebSocketChannel } = require('./aln/wschannel')
+const Router = require('../../lib/aln/router')
+const { TcpChannel } = require('../../lib/aln/tcpchannel')
+const { WebSocketChannel } = require('../../lib/aln/wschannel')
 const { WebSocketServer } = require('ws')
-const { Packet } = require('./aln/packet')
+const { Packet } = require('../../lib/aln/packet')
 
 const PORT = process.env.PORT || 8080
 const TCP_PORT = process.env.TCP_PORT || 8000

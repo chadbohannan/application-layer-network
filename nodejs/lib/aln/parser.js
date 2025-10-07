@@ -15,7 +15,7 @@ function toAx25Frame (content) {
     if (b === End) {
       frame.append([Esc])
       frame.append([EndT])
-    } else if (b === [Esc]) {
+    } else if (b === Esc) {
       frame.append([Esc])
       frame.append([EscT])
     } else {

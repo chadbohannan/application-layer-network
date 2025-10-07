@@ -48,6 +48,13 @@ class Router {
     this.contextMap = new Map() // map[uint16]func(packet)
     this.remoteNodeMap = new Map() // map[address]RemoteNodes[]
     this.serviceCapacityMap = new Map()// map[serviceID][address]NodeCapacity
+    this.onServiceCapacityChanged = null // callback for service capacity changes
+  }
+
+  // setOnServiceCapacityChanged registers a callback for service capacity changes
+  // callback signature: function(service, capacity, address)
+  setOnServiceCapacityChanged (callback) {
+    this.onServiceCapacityChanged = callback
   }
 
   serviceAddresses (serviceID) {
@@ -164,9 +171,9 @@ class Router {
             if (remoteNode.cost === 0) {
               this.remoteNodeMap.delete(remoteAddress)
             } else if (cost <= remoteNode.cost) {
-              remoteNode.NextHop = nextHop
-              remoteNode.Channel = channel
-              remoteNode.Cost = cost
+              remoteNode.nextHop = nextHop
+              remoteNode.channel = channel
+              remoteNode.cost = cost
               // relay update to other channels
               const p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
               this.channels.forEach((ch) => (ch !== channel) ? ch.send(p) : {})
@@ -181,11 +188,36 @@ class Router {
         if (address === this.address) break
         if (serviceErr === null) {
           console.log(`NET_SERVICE node:${address}, service:${serviceID}, capacity:${serviceCapacity}`)
-          // TODO if capacity is zero then remove the service from the serviceCapacityMap
+
+          let serviceChanged = false
+
+          // Check if this is a new service or capacity changed
           if (!this.serviceCapacityMap.has(serviceID)) {
             this.serviceCapacityMap.set(serviceID, new Map())
           }
-          this.serviceCapacityMap.get(serviceID).set(address, new NodeCapacity(serviceCapacity, Date.now()))
+
+          const capacityMap = this.serviceCapacityMap.get(serviceID)
+
+          if (serviceCapacity === 0) {
+            // Service removal
+            if (capacityMap.has(address)) {
+              capacityMap.delete(address)
+              serviceChanged = true
+            }
+          } else {
+            // Service addition or update
+            const existingCapacity = capacityMap.get(address)
+            if (!existingCapacity || existingCapacity.capacity !== serviceCapacity) {
+              capacityMap.set(address, new NodeCapacity(serviceCapacity, Date.now()))
+              serviceChanged = true
+            }
+          }
+
+          // Notify callback if service changed
+          if (serviceChanged && this.onServiceCapacityChanged) {
+            this.onServiceCapacityChanged(serviceID, serviceCapacity, address)
+          }
+
           this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
         } else {
           console.log(`error parsing NET_SERVICE: ${serviceErr}`)

@@ -1,6 +1,6 @@
 // const ByteBuffer = require('bytebuffer')
-const { Packet } = require('../aln/packet')
-const { Parser, toAx25Frame } = require('../aln/parser')
+const { Packet } = require('../lib/aln/packet')
+const { Parser, toAx25Frame } = require('../lib/aln/parser')
 const chai = require('chai')
 const assert = chai.assert
 const { describe, it } = require('mocha')

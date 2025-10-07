@@ -1,0 +1,19 @@
+{
+  "name": "aln-examples",
+  "version": "1.0.0",
+  "description": "Example applications demonstrating ALN protocol usage",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "server": "node server/server.js",
+    "simple-client": "node simple-client/client.js",
+    "maln-client": "node maln-client/client_maln.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "morgan": "^1.10.1",
+    "winston": "^3.2.1"
+  }
+}
