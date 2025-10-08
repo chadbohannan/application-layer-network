@@ -9,7 +9,7 @@ const { WebSocketServer } = require('ws')
 const { Packet } = require('../../lib/aln/packet')
 
 const WS_PORT = process.env.PORT || 8080
-const TCP_PORT = process.env.TCP_PORT || 8000
+const TCP_PORT = process.env.TCP_PORT || 8001
 
 const alnRouter = new Router('nodejs-host')
 alnRouter.registerService('ping', (packet) => {

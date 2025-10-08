@@ -5,7 +5,7 @@ class WebSocketChannel {
   constructor (ws) {
     this.ws = ws
     this.onPacket = () => { console.log('WebSocketChannel::onPacket; default') }
-    ws.on('message', function message (data) {
+    ws.on('message', (data) => {
       console.log('ws received: %s', data)
       const obj = JSON.parse(data)
       const packet = new Packet()
@@ -20,7 +20,7 @@ class WebSocketChannel {
       if (obj.ctx) packet.ctx = obj.ctx
       if (obj.typ) packet.typ = obj.typ
       if (obj.data) packet.data = ByteBuffer.fromBase64(obj.data).toBinary()
-      this.onPacket(new Packet(data))
+      this.onPacket(packet) // Fixed: use parsed packet, not raw data
     })
   }
 

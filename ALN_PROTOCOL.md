@@ -344,11 +344,63 @@ Application data is transported using standard ALN packets with:
 
 ### 8.2 Request-Response Pattern
 
-For request-response communication:
-1. Client generates unique `contextID`
-2. Client sends request with `contextID` set
-3. Service responds using same `contextID`
-4. Client matches responses using `contextID`
+The `contextID` field enables request-response communication by correlating responses with their originating requests. This is an **implementation pattern** - the protocol only defines the field; applications must manage the mapping.
+
+**Protocol Flow:**
+1. Client generates unique `contextID` (non-zero, 16-bit unsigned integer)
+2. Client registers a response handler mapped to this `contextID`
+3. Client sends request packet with `contextID` field set
+4. Service receives request, processes it, and sends response(s) with the same `contextID`
+5. Client receives response(s), looks up handler by `contextID`, and invokes it
+6. **Client is responsible for cleanup** - must explicitly release the context when done
+
+**Implementation Pattern (Pseudocode):**
+```
+// Client side - sending request
+ctxID = generateUniqueContextID()
+registerContextHandler(ctxID, (responsePacket) => {
+    // Handle response
+    console.log("Received:", responsePacket.data)
+
+    // Clean up when done (user's responsibility)
+    // May receive multiple responses before releasing
+    if (isDone) {
+        releaseContext(ctxID)
+    }
+})
+
+sendPacket({
+    srv: "my-service",
+    ctx: ctxID,
+    data: "request payload"
+})
+
+// Service side - responding
+serviceHandler = (requestPacket) => {
+    // Process request...
+
+    // Send response(s) with same contextID
+    sendPacket({
+        dst: requestPacket.src,  // Reply to sender
+        ctx: requestPacket.ctx,  // Use same context
+        data: "response payload"
+    })
+
+    // May send multiple responses for same context
+    sendPacket({
+        dst: requestPacket.src,
+        ctx: requestPacket.ctx,
+        data: "additional data"
+    })
+}
+```
+
+**Important Considerations:**
+- **Multiple Responses**: A service may send multiple packets for a single request (streaming, pagination, progress updates). The client must track completion and release the context when appropriate.
+- **Cleanup**: Contexts consume memory. Clients MUST release contexts when done to prevent memory leaks.
+- **Timeouts**: Implementations should consider timeout mechanisms for contexts that never receive responses.
+- **Context ID 0**: Reserved. Valid context IDs are 1-65535.
+- **Uniqueness**: Context IDs must be unique per client node at any given time. Reuse after release is acceptable.
 
 ### 8.3 Service Multicast
 
