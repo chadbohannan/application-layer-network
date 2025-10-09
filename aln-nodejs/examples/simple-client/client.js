@@ -3,7 +3,7 @@ const Router = require('../../lib/aln/router')
 const { Packet } = require('../../lib/aln/packet')
 const { TcpChannel } = require('../../lib/aln/tcpchannel')
 
-const TCP_PORT = process.env.TCP_PORT || 8000
+const TCP_PORT = process.env.TCP_PORT || 8001
 
 const alnRouter = new Router('nodejs-client')
 

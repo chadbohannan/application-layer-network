@@ -1,6 +1,6 @@
 {
   "name": "aln-nodejs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Application Layer Network - A mesh networking protocol for distributed service discovery and communication",
   "main": "lib/aln/router.js",
   "author": "Chad Bohannan",
