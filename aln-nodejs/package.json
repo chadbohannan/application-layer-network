@@ -1,8 +1,9 @@
 {
-  "name": "aln",
-  "version": "1.0.0",
+  "name": "aln-nodejs",
+  "version": "0.1.0",
   "description": "Application Layer Network - A mesh networking protocol for distributed service discovery and communication",
   "main": "lib/aln/router.js",
+  "author": "Chad Bohannan",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,6 +16,9 @@
     "service-discovery",
     "distributed",
     "protocol"
+  ],
+  "files": [
+    "lib/"
   ],
   "scripts": {
     "test": "standard && nyc --reporter=lcov mocha tests/*",
