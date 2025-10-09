@@ -1,181 +1,311 @@
-# ALN Browser Client
+# aln-browser
 
-Browser implementation of the Application Layer Network protocol using WebSocket and native browser APIs. It is not _itself_ a browser of ALN, which may be confusing. This is the Router and Packet handling system that _runs_ in a browser. Provide it a WebSocket connection to an ALN host for instant mesh networking!
+Application Layer Network protocol implementation for web browsers - Zero-dependency mesh networking over WebSocket.
 
-**Zero dependencies** • ES6 modules • JSON framing • WebSocket-only
+[![npm version](https://badge.fury.io/js/aln-browser.svg)](https://www.npmjs.com/package/aln-browser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Zero dependencies** • **ES6 modules** • **JSON framing** • **WebSocket-only**
+
+## Features
+
+- 🌐 **Browser-native** - No Node.js dependencies, runs purely in the browser
+- 📦 **Zero dependencies** - Lightweight and fast
+- 🔌 **Service Discovery** - Automatic advertisement and discovery of network services
+- 🚀 **Mesh Networking** - Multi-hop routing across the ALN network
+- ⚖️ **Load Balancing** - Service selection based on capacity metrics
+- 🎯 **Request/Response** - Context-based message correlation
+- 📡 **Service Multicast** - Broadcast to all service instances
 
 ## Installation
+
+### NPM/Bundlers (Vite, Webpack, etc.)
 
 ```bash
 npm install aln-browser
 ```
 
+```javascript
+import { Router } from 'aln-browser'
+import { WebSocketChannel } from 'aln-browser/wschannel'
+```
+
+### CDN (unpkg)
+
+```html
+<script src="https://unpkg.com/aln-browser/dist/aln-browser.min.js"></script>
+<script>
+  const router = new ALN.Router('my-node')
+  // All exports available under ALN namespace
+</script>
+```
+
+### ES Module from CDN
+
+```html
+<script type="module">
+  import { Router } from 'https://unpkg.com/aln-browser/dist/aln-browser.esm.js'
+  const router = new Router('my-node')
+</script>
+```
+
 ## Quick Start
 
 ```javascript
-import { Router } from 'aln-browser';
-import { WebSocketChannel } from 'aln-browser/wschannel';
+import { Router } from 'aln-browser'
+import { WebSocketChannel } from 'aln-browser/wschannel'
+import { Packet } from 'aln-browser/packet'
 
 // Create router with unique address
-const address = 'browser-client-' + Math.random().toString(36).slice(2, 8);
-const router = new Router(address);
+const address = 'browser-' + Math.random().toString(36).slice(2, 8)
+const router = new Router(address)
 
 // Connect to ALN WebSocket server
-const ws = new WebSocket('ws://localhost:8080');
+const ws = new WebSocket('ws://localhost:8080')
 
 ws.onopen = () => {
-    const channel = new WebSocketChannel(ws);
-    router.addChannel(channel);
-    console.log('Connected to ALN network');
-};
+  const channel = new WebSocketChannel(ws)
+  router.addChannel(channel)
+  console.log('Connected to ALN network')
+}
 
-// Register a log capture service
-router.registerService('log', (packet) => {
-    console.log('logging: ' + packet.data)
-});
-
-// Register a ping capture service
+// Register a service
 router.registerService('ping', (packet) => {
-    console.log('pong: ' + packet.data)
-});
+  console.log('Received ping:', packet.data)
 
-// Send to all instances of the 'log' service on the network
-router.send({
-    srv: 'log',
-    data: 'Hello World!'
-});
+  const response = new Packet()
+  response.dst = packet.src
+  response.ctx = packet.ctx
+  response.data = 'pong: ' + packet.data
+  router.send(response)
+})
 
-// Send to a specific instance of the logging service
-router.send({
-    srv: 'log',
-    dst: address,
-    data: 'Hello World!'
-});
-
-// To capture a response from a service, set up a context handler
-// use ctxID in your service request, the service must then copy
-// the ctx from the request packet to the return packet so it is
-// routed all the way to the correct handler.
+// Send a request
 const ctxID = router.registerContextHandler((response) => {
-    console.log(`Response from ${serviceID}@${address}: ${data}`);
-    router.releaseContext(ctxID); // free some memory
-});
+  console.log('Got response:', response.data)
+  router.releaseContext(ctxID)
+})
 
-// Send to a specific instance of the logging service with a reference
-// to a response handler
-router.send({
-    srv: 'ping',
-    dst: address,
-    ctx: ctxID,
-    data: 'tag, yer it!'
-});
-
+const request = new Packet()
+request.srv = 'ping'
+request.ctx = ctxID
+request.data = 'Hello!'
+router.send(request)
 ```
 
-## Running the Example
-
-The package includes an interactive demo. To run it:
-
-```bash
-# Start HTTP server (required for ES6 modules)
-python3 -m http.server 8000
-
-# In another terminal, start an ALN WebSocket server
-# Node.js option:
-cd node_modules/aln-browser/../../../nodejs/examples/server
-npm install && npm start
-
-# Go option:
-cd examples/go-server
-go run main.go
-```
-
-Open http://localhost:8000/examples/ping-client.html
-
-**Note:** Files must be served over HTTP, not opened directly (`file://` protocol doesn't support ES6 modules).
-
-## API
+## API Reference
 
 ### Router
 
+**Constructor:**
 ```javascript
-new Router(address: string)
+const router = new Router(address)
 ```
-
-Create a router with a unique address.
+- `address` (string): Unique identifier for this router node
 
 **Methods:**
-- `addChannel(channel)` - Attach a WebSocket channel
-- `send(packet)` - Send a packet (auto-routes to destination)
-- `registerService(serviceID, handler)` - Handle incoming requests
-- `registerContextHandler(handler)` - Returns contextID for responses
-- `releaseContext(ctxID)` - Free context handler (prevents memory leaks)
+
+#### `addChannel(channel)`
+Attach a WebSocket channel to the router.
+
+#### `send(packet)`
+Send a packet through the network.
+- Returns: `null` on success, error string on failure
+
+#### `registerService(serviceID, handler)`
+Register a service handler for incoming requests.
+- `serviceID` (string): Service name
+- `handler` (function): Callback `(packet) => {}`
+
+#### `unregisterService(serviceID)`
+Remove a service handler.
+
+#### `registerContextHandler(handler)`
+Register a response handler for request/response pattern.
+- Returns: `contextID` (number) to use in outgoing request
+
+#### `releaseContext(contextID)`
+Free memory associated with a context handler.
+
+#### `setOnServiceCapacityChanged(callback)`
+Register callback for service capacity changes.
+- `callback` signature: `(serviceID, capacity, address) => {}`
+
+### Packet
+
+**Constructor:**
+```javascript
+const packet = new Packet()
+```
+
+**Properties:**
+- `src` (string): Source address (auto-filled by router)
+- `dst` (string): Destination address (optional if `srv` is set)
+- `srv` (string): Service name
+- `ctx` (number): Context ID for request/response
+- `data` (string): Packet payload
+- `net` (number): Network state type (internal use)
+- `seq`, `ack`, `typ`: Optional fields
+
+**Methods:**
+- `toJson()`: Serialize to JSON string
+- `copy()`: Create a deep copy
 
 ### WebSocketChannel
 
 ```javascript
-new WebSocketChannel(websocket: WebSocket)
+import { WebSocketChannel } from 'aln-browser/wschannel'
+
+const ws = new WebSocket('ws://localhost:8080')
+const channel = new WebSocketChannel(ws)
+router.addChannel(channel)
 ```
 
-Wraps a browser WebSocket for ALN routing.
+**Methods:**
+- `send(packet)`: Send a packet through the WebSocket
+- `close()`: Close the WebSocket connection
 
-### Packet Format
+## Examples
 
-Packets are plain JavaScript objects:
+### Service Discovery
 
 ```javascript
-{
-    srv: 'service-name',    // Service to invoke
-    src: 'source-addr',     // Source address (auto-filled)
-    dst: 'dest-addr',       // Destination address (optional if srv is set)
-    ctx: 12345,             // Context ID for request-response
-    data: 'payload'         // Arbitrary data
-}
+import { Router } from 'aln-browser'
+import { Packet } from 'aln-browser/packet'
+
+const router = new Router('service-node')
+
+// Register a service
+router.registerService('echo', (packet) => {
+  const response = new Packet()
+  response.dst = packet.src
+  response.ctx = packet.ctx
+  response.data = packet.data // Echo back
+  router.send(response)
+})
+
+// Service discovery happens automatically when channels connect
 ```
+
+### Service Multicast
+
+```javascript
+const packet = new Packet()
+packet.srv = 'log' // Target all 'log' services
+// Don't set packet.dst - multicast requires empty destination
+packet.data = 'Broadcast message'
+router.send(packet)
+// All instances of 'log' service will receive this
+```
+
+### Monitoring Service Capacity
+
+```javascript
+router.setOnServiceCapacityChanged((serviceID, capacity, address) => {
+  console.log(`Service ${serviceID} at ${address} has capacity ${capacity}`)
+})
+```
+
+## Running the Demo
+
+The package includes an interactive browser demo:
+
+```bash
+# Clone the repository
+git clone https://github.com/chadbohannan/application-layer-network.git
+cd application-layer-network/aln-browser
+
+# Start HTTP server (required for ES6 modules)
+npm run serve
+
+# In another terminal, start an ALN WebSocket server
+cd ../aln-nodejs/examples
+npm install
+npm run server
+```
+
+Open http://localhost:8000/examples/ping-client.html
+
+![Browser Client Demo](aln-browser-client.png)
+
+**Note:** Files must be served over HTTP, not opened directly (`file://` protocol doesn't support ES6 modules).
 
 ## Architecture
 
-- **WebSocket Only**: No TCP/Serial support (browser limitation)
+- **WebSocket Only**: Browser environment limitation (no TCP/Serial support)
 - **JSON Framing**: WebSocket provides message boundaries, no KISS encoding needed
 - **Native APIs**: Uses TextEncoder, DataView, atob/btoa for binary handling
-- **Service Discovery**: Automatic advertisement and routing to services
+- **Service Discovery**: Automatic advertisement and routing
 - **Distance Vector Routing**: Multi-hop packet routing with cost metrics
+- **Load Balancing**: Routes to service instances based on capacity
 
-## Development
+## Building
+
+The package includes both raw ES modules and pre-built bundles:
 
 ```bash
-# Run tests (Node.js)
-npm test
-
-# Run tests (browser)
-python3 -m http.server 8000
-# Open http://localhost:8000/examples/browser-client.html
-
-# Serve examples
-npm run serve
+npm install
+npm run build
 ```
 
-[examples/browser-client.html](examples/browser-client.html) demonstrates a front-end built on `aln-browser`:
-![image](aln-browser-client.png)
+This creates:
+- `dist/aln-browser.min.js` - IIFE bundle for `<script>` tags
+- `dist/aln-browser.esm.js` - ESM bundle for modern bundlers
+- Source maps for debugging
+
+## Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+```
 
 ## Browser Compatibility
 
-Requires:
+**Requires:**
 - WebSocket API
-- ES6 modules
+- ES6 modules (`import`/`export`)
 - TextEncoder/TextDecoder
+- Modern JavaScript (ES2020+)
 
-Works on Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+**Works on:**
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
 
-## Security
+## Protocol
 
-**Development:** WebSocket servers typically allow all origins for testing.
+See [ALN_PROTOCOL.md](https://github.com/chadbohannan/application-layer-network/blob/master/ALN_PROTOCOL.md) for complete protocol specification.
+
+## Related Projects
+
+- **aln-nodejs**: Node.js implementation with TCP and WebSocket support
+- **aln-python**: Python implementation
+- **aln-go**: Go implementation
+
+## Security Considerations
+
+**Development:**
+- WebSocket servers typically allow all origins for testing
 
 **Production:**
-- Validate WebSocket origin headers
+- Validate WebSocket origin headers on the server
 - Use WSS (secure WebSocket) when serving over HTTPS
 - Restrict connections to trusted domains
+- Implement authentication/authorization in your services
 
 ## License
 
-MIT
+MIT - See LICENSE file for details
+
+## Author
+
+Chad Bohannan
+
+## Contributing
+
+Issues and pull requests welcome at https://github.com/chadbohannan/application-layer-network
