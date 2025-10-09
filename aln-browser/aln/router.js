@@ -167,7 +167,30 @@ import {
     }
   
     removeChannel (channel) {
+      // Remove channel from channel list
       this.channels = this.channels.filter((ch) => ch !== channel)
+
+      // Find all routes using this channel and send withdrawals
+      const affectedRoutes = []
+      this.remoteNodeMap.forEach((route, address) => {
+        if (route.channel === channel) {
+          affectedRoutes.push(address)
+        }
+      })
+
+      // Remove routes and advertise withdrawals
+      affectedRoutes.forEach((address) => {
+        this.remoteNodeMap.delete(address)
+
+        // Send withdrawal (cost=0) to all remaining channels
+        const withdrawal = makeNetworkRouteSharePacket(this.address, address, 0)
+        this.channels.forEach((ch) => ch.send(withdrawal))
+      })
+
+      // Trigger network state update
+      if (affectedRoutes.length > 0) {
+        this.onNetStateChanged()
+      }
     }
   
     onPacket (packet, channel) {

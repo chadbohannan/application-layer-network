@@ -1,9 +1,17 @@
 {
   "name": "aln-browser",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Application Layer Network - Browser WebSocket client for mesh networking",
   "main": "aln/router.js",
   "type": "module",
+  "exports": {
+    ".": "./aln/router.js",
+    "./packet": "./aln/packet.js",
+    "./utils": "./aln/utils.js",
+    "./wschannel": "./aln/wschannel.js",
+    "./binary-utils": "./aln/binary-utils.js"
+  },
+  "author": "Chad Bohannan",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -33,7 +41,6 @@
     "ws": false
   },
   "files": [
-    "aln/",
-    "examples/"
+    "aln/"
   ]
 }

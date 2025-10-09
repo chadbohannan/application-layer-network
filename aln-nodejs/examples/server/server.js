@@ -11,13 +11,13 @@ const { Packet } = require('../../lib/aln/packet')
 const WS_PORT = process.env.PORT || 8080
 const TCP_PORT = process.env.TCP_PORT || 8001
 
-const alnRouter = new Router('nodejs-host')
+const alnRouter = new Router('nodejs-host-' + process.pid.toString(16).slice(0, 6).padStart(6, '0'))
 alnRouter.registerService('ping', (packet) => {
   logger.debug('ping handler for:', packet.toJson())
   const pongPacket = new Packet()
   pongPacket.dst = packet.src
   pongPacket.ctx = packet.ctx
-  pongPacket.data = 'pong'
+  pongPacket.data = 'pong:' + (packet.data || '')
   alnRouter.send(pongPacket)
   logger.debug('"pong" returned')
 })

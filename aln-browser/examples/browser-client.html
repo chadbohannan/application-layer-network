@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALN Browser Client - Ping Example</title>
+    <title>ALN Browser Client</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -135,90 +135,150 @@
             align-items: center;
             flex-wrap: wrap;
         }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card-header h2 {
+            margin: 0;
+        }
+        .card-header button {
+            margin: 0;
+        }
+        .service-row {
+            display: grid;
+            grid-template-columns: 200px 1fr auto;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border-left: 3px solid #1976d2;
+        }
+        .service-label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+        .service-label .address {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            font-weight: normal;
+        }
+        .service-row input {
+            width: 100%;
+        }
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>ALN Browser Client - Ping Example</h1>
+    <h1>ALN Browser Client</h1>
 
     <div class="container" id="serverWarning" style="background-color: #fff3cd; border-left: 4px solid #ffc107; display: none;">
         <h2 style="color: #856404;">⚠️ Incorrect Setup</h2>
         <p style="color: #856404;">
             You opened this file directly (file:// protocol). ES6 modules require HTTP.<br>
-            <strong>Solution:</strong> Run <code>python3 -m http.server 8000</code> and access via <code>http://localhost:8000/examples/ping-client.html</code>
+            <strong>Solution:</strong> Run <code>python3 -m http.server 8000</code> and access via <code>http://localhost:8000/examples/browser-client.html</code>
         </p>
     </div>
 
-    <div class="container">
-        <h2>Connection</h2>
-        <div class="controls">
-            <label>WebSocket URL:</label>
-            <input type="text" id="wsUrl" value="ws://localhost:8080" placeholder="ws://localhost:8080">
-            <button id="connectBtn" onclick="connect()">Connect</button>
-            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
-        </div>
-        <div style="margin-top: 10px; font-size: 12px; color: #666;">
-            Default servers: Node.js (8080), Go (8082)
-        </div>
-        <div id="status" class="status disconnected">Disconnected</div>
-    </div>
-
-    <div class="container">
-        <h2>Ping Service</h2>
-        <div class="controls">
-            <button id="pingBtn" onclick="sendPing()" disabled>Send Ping</button>
-            <button onclick="clearLog()">Clear Log</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <h2>Network State</h2>
-        <div class="network-info">
-            <div class="info-box">
-                <h3>Local Address</h3>
-                <div class="value" id="localAddress">-</div>
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="container" style="padding: 15px;">
+                <div class="card-header" style="margin-bottom: 10px;">
+                    <h2 style="margin: 0;">Connection</h2>
+                    <div id="status" class="status disconnected" style="margin: 0; padding: 6px 10px;">Disconnected</div>
+                </div>
+                <div class="controls">
+                    <input type="text" id="wsUrl" value="ws://localhost:8080" placeholder="ws://localhost:8080" style="flex: 1; min-width: 200px;">
+                    <button id="connectBtn" onclick="connect()">Connect</button>
+                    <button id="disconnectBtn" onclick="disconnect()" style="display: none;">Disconnect</button>
+                </div>
             </div>
-            <div class="info-box">
-                <h3>Known Routes</h3>
-                <div class="value" id="routeCount">0</div>
-            </div>
-            <div class="info-box">
-                <h3>Known Services</h3>
-                <div class="value" id="serviceCount">0</div>
+
+            <div class="container">
+                <h2>Network State</h2>
+                <div class="network-info">
+                    <div class="info-box">
+                        <h3>Local Address</h3>
+                        <div class="value" id="localAddress">-</div>
+                    </div>
+                    <div class="info-box">
+                        <h3>Known Routes</h3>
+                        <div class="value" id="routeCount">0</div>
+                    </div>
+                    <div class="info-box">
+                        <h3>Known Services</h3>
+                        <div class="value" id="serviceCount">0</div>
+                    </div>
+                </div>
+
+                <h3>Routes</h3>
+                <table class="routes-table">
+                    <thead>
+                        <tr>
+                            <th>Address</th>
+                            <th>Next Hop</th>
+                            <th>Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody id="routesTable">
+                        <tr><td colspan="3">No routes</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Services</h3>
+                <table class="services-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Address</th>
+                            <th>Capacity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="servicesTable">
+                        <tr><td colspan="3">No services</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <h3>Routes</h3>
-        <table class="routes-table">
-            <thead>
-                <tr>
-                    <th>Address</th>
-                    <th>Next Hop</th>
-                    <th>Cost</th>
-                </tr>
-            </thead>
-            <tbody id="routesTable">
-                <tr><td colspan="3">No routes</td></tr>
-            </tbody>
-        </table>
+        <div class="right-column">
+            <div class="container">
+                <h2>Discovered Services</h2>
+                <div id="servicesControls">
+                    <div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>
+                </div>
+            </div>
 
-        <h3>Services</h3>
-        <table class="services-table">
-            <thead>
-                <tr>
-                    <th>Service</th>
-                    <th>Address</th>
-                    <th>Capacity</th>
-                </tr>
-            </thead>
-            <tbody id="servicesTable">
-                <tr><td colspan="3">No services</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="container">
-        <h2>Event Log</h2>
-        <div class="log" id="log"></div>
+            <div class="container">
+                <div class="card-header">
+                    <h2>Event Log</h2>
+                    <button onclick="clearLog()">Clear Log</button>
+                </div>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -236,12 +296,13 @@
         let wsChannel = null;
         let ws = null;
         const localAddress = 'browser-client-' + Math.random().toString(36).substring(2, 8);
+        const knownServices = new Set(); // Track services we've already seen
 
         // Make functions available globally
         window.connect = connect;
         window.disconnect = disconnect;
-        window.sendPing = sendPing;
         window.clearLog = clearLog;
+        window.sendToService = sendToService;
 
         // Initialize
         document.getElementById('localAddress').textContent = localAddress;
@@ -302,6 +363,13 @@
                         <td>${address}</td>
                         <td>${nodeCapacity.capacity}</td>
                     </tr>`;
+
+                    // Check for newly discovered services
+                    const serviceKey = `${serviceID}@${address}`;
+                    if (!knownServices.has(serviceKey)) {
+                        knownServices.add(serviceKey);
+                        log(`Discovered service '${serviceID}' at ${address}`, 'success');
+                    }
                 });
             });
 
@@ -312,6 +380,67 @@
             } else {
                 servicesTableBody.innerHTML = servicesHtml;
             }
+
+            // Update service controls
+            updateServiceControls();
+        }
+
+        function updateServiceControls() {
+            if (!router) return;
+
+            const container = document.getElementById('servicesControls');
+            const currentServices = new Map(); // Map of serviceKey -> {serviceID, address}
+
+            // Collect all current services
+            router.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+                capacityMap.forEach((nodeCapacity, address) => {
+                    const serviceKey = `${serviceID}@${address}`;
+                    currentServices.set(serviceKey, { serviceID, address });
+                });
+            });
+
+            // If no services, show empty state
+            if (currentServices.size === 0) {
+                container.innerHTML = '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
+                return;
+            }
+
+            // Remove empty state if it exists
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Remove controls for services that no longer exist
+            const existingControls = container.querySelectorAll('.service-row');
+            existingControls.forEach(control => {
+                const serviceKey = control.dataset.serviceKey;
+                if (!currentServices.has(serviceKey)) {
+                    control.remove();
+                }
+            });
+
+            // Add controls for new services
+            currentServices.forEach(({ serviceID, address }, serviceKey) => {
+                const existing = container.querySelector(`[data-service-key="${serviceKey}"]`);
+                if (!existing) {
+                    const row = document.createElement('div');
+                    row.className = 'service-row';
+                    row.dataset.serviceKey = serviceKey;
+                    row.innerHTML = `
+                        <div class="service-label">
+                            ${serviceID}
+                            <span class="address">${address}</span>
+                        </div>
+                        <input type="text"
+                               id="payload-${serviceKey}"
+                               placeholder="Enter message payload..."
+                               value="Hello from browser!">
+                        <button onclick="sendToService('${serviceKey}', '${serviceID}', '${address}')">Send</button>
+                    `;
+                    container.appendChild(row);
+                }
+            });
         }
 
         function connect() {
@@ -343,9 +472,8 @@
                     };
 
                     // Update UI
-                    document.getElementById('connectBtn').disabled = true;
-                    document.getElementById('disconnectBtn').disabled = false;
-                    document.getElementById('pingBtn').disabled = false;
+                    document.getElementById('connectBtn').style.display = 'none';
+                    document.getElementById('disconnectBtn').style.display = 'inline-block';
 
                     log('Router initialized with address: ' + localAddress, 'info');
                 };
@@ -360,14 +488,18 @@
                     updateStatus('disconnected', 'Disconnected');
 
                     // Update UI
-                    document.getElementById('connectBtn').disabled = false;
-                    document.getElementById('disconnectBtn').disabled = true;
-                    document.getElementById('pingBtn').disabled = true;
+                    document.getElementById('connectBtn').style.display = 'inline-block';
+                    document.getElementById('disconnectBtn').style.display = 'none';
+
+                    // Clear service controls
+                    document.getElementById('servicesControls').innerHTML =
+                        '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
 
                     // Clean up
                     router = null;
                     wsChannel = null;
                     ws = null;
+                    knownServices.clear();
                 };
 
             } catch (error) {
@@ -380,29 +512,48 @@
             if (ws) {
                 log('Disconnecting...', 'info');
                 ws.close();
+                // Update UI immediately (onclose will also do this, but this is instant)
+                updateStatus('disconnected', 'Disconnected');
+                document.getElementById('connectBtn').style.display = 'inline-block';
+                document.getElementById('disconnectBtn').style.display = 'none';
+
+                // Clear network state
+                document.getElementById('routeCount').textContent = '0';
+                document.getElementById('serviceCount').textContent = '0';
+                document.getElementById('routesTable').innerHTML = '<tr><td colspan="3">No routes</td></tr>';
+                document.getElementById('servicesTable').innerHTML = '<tr><td colspan="3">No services</td></tr>';
+
+                // Clear service controls
+                document.getElementById('servicesControls').innerHTML =
+                    '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
             }
         }
 
-        function sendPing() {
+        function sendToService(serviceKey, serviceID, address) {
             if (!router) {
                 log('Not connected', 'error');
                 return;
             }
 
-            // Create a ping packet
+            // Get the payload from the input field
+            const payloadInput = document.getElementById(`payload-${serviceKey}`);
+            const payload = payloadInput ? payloadInput.value : 'Hello from browser!';
+
+            // Create a packet for the service
             const packet = {
-                srv: 'ping',
-                data: 'Hello from browser!',
+                srv: serviceID,
+                dst: address,
+                data: payload,
                 src: localAddress
             };
 
             // Register a context handler for the response
             const ctxID = router.registerContextHandler((response) => {
                 const data = response.data || '';
-                log(`Received response: ${data}`, 'success');
+                log(`Response from ${serviceID}@${address}: ${data}`, 'success');
 
                 // Cleanup is user's responsibility!
-                // For this simple ping (single response), release immediately:
+                // For this simple request (single response), release immediately:
                 router.releaseContext(ctxID);
 
                 // For multi-response services (streaming, pagination, etc.),
@@ -412,11 +563,11 @@
 
             packet.ctx = ctxID;
 
-            log('Sending ping to service "ping" with context ' + ctxID + '...', 'info');
+            log(`Sending to service "${serviceID}" at ${address} with context ${ctxID}...`, 'info');
 
             const err = router.send(packet);
             if (err) {
-                log('Failed to send ping: ' + err, 'error');
+                log(`Failed to send to ${serviceID}@${address}: ${err}`, 'error');
             }
         }
 

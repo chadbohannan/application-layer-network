@@ -226,6 +226,16 @@ Where:
 - Route withdrawals (cost 0) are propagated immediately
 - Periodic full routing table advertisements
 
+#### Channel Closure and Route Cleanup
+Network consistency is improved by detecting when channels close.
+When a channel closure is detected, routers MUST perform cleanup operations to maintain network consistency:
+
+**Required Actions:**
+1. **Identify Affected Routes**: Find all routes in the routing table where the lost channel was the next-hop
+2. **Remove Local Routes**: Delete all affected routes from the local routing table
+3. **Advertise Withdrawals**: Send route withdrawal packets (cost=0) for each affected route to all remaining channels
+4. **Clean Service Entries**: Remove service advertisements from nodes that are no longer reachable
+
 ## 6. Service Discovery Protocol
 
 ### 6.1 Service Advertisement Format

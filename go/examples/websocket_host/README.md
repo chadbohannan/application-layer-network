@@ -28,7 +28,7 @@ go run main.go
    python3 -m http.server 8000
    ```
 
-3. Open browser to http://localhost:8000/examples/ping-client.html
+3. Open browser to http://localhost:8000/examples/browser-client.html
 
 4. Click "Connect" and then "Send Ping"
 
