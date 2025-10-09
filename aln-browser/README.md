@@ -1,6 +1,6 @@
 # ALN Browser Client
 
-Browser implementation of the Application Layer Network protocol using WebSocket and native browser APIs.
+Browser implementation of the Application Layer Network protocol using WebSocket and native browser APIs. It is not _itself_ a browser of ALN, which may be confusing. This is the Router and Packet handling system that _runs_ in a browser. Provide it a WebSocket connection to an ALN host for instant mesh networking!
 
 **Zero dependencies** • ES6 modules • JSON framing • WebSocket-only
 
@@ -149,13 +149,14 @@ npm test
 
 # Run tests (browser)
 python3 -m http.server 8000
-# Open http://localhost:8000/examples/test.html
+# Open http://localhost:8000/examples/browser-client.html
 
 # Serve examples
 npm run serve
 ```
 
-All 41 tests passing ✅
+[examples/browser-client.html](examples/browser-client.html) demonstrates a front-end built on `aln-browser`:
+![image](aln-browser-client.png)
 
 ## Browser Compatibility
 
