@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALN Browser Client</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.disconnected {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .status.connecting {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+        .status.connected {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        button {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #1565c0;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+            font-size: 14px;
+        }
+        .log {
+            background-color: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .log-entry.info {
+            color: #64b5f6;
+        }
+        .log-entry.success {
+            color: #81c784;
+        }
+        .log-entry.error {
+            color: #e57373;
+        }
+        .log-entry.warning {
+            color: #ffb74d;
+        }
+        .network-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .info-box {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #1976d2;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .info-box .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .routes-table, .services-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .routes-table th, .routes-table td,
+        .services-table th, .services-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .routes-table th, .services-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card-header h2 {
+            margin: 0;
+        }
+        .card-header button {
+            margin: 0;
+        }
+        .service-row {
+            display: grid;
+            grid-template-columns: 200px 1fr auto;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border-left: 3px solid #1976d2;
+        }
+        .service-label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+        .service-label .address {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            font-weight: normal;
+        }
+        .service-row input {
+            width: 100%;
+        }
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>ALN Browser Client</h1>
+
+    <div class="container" id="serverWarning" style="background-color: #fff3cd; border-left: 4px solid #ffc107; display: none;">
+        <h2 style="color: #856404;">⚠️ Incorrect Setup</h2>
+        <p style="color: #856404;">
+            You opened this file directly (file:// protocol). ES6 modules require HTTP.<br>
+            <strong>Solution:</strong> Run <code>python3 -m http.server 8000</code> and access via <code>http://localhost:8000/examples/browser-client.html</code>
+        </p>
+    </div>
+
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="container" style="padding: 15px;">
+                <div class="card-header" style="margin-bottom: 10px;">
+                    <h2 style="margin: 0;">Connection</h2>
+                    <div id="status" class="status disconnected" style="margin: 0; padding: 6px 10px;">Disconnected</div>
+                </div>
+                <div class="controls">
+                    <input type="text" id="wsUrl" value="ws://localhost:8080" placeholder="ws://localhost:8080" style="flex: 1; min-width: 200px;">
+                    <button id="connectBtn" onclick="connect()">Connect</button>
+                    <button id="disconnectBtn" onclick="disconnect()" style="display: none;">Disconnect</button>
+                </div>
+            </div>
+
+            <div class="container">
+                <h2>Network State</h2>
+                <div class="network-info">
+                    <div class="info-box">
+                        <h3>Local Address</h3>
+                        <div class="value" id="localAddress">-</div>
+                    </div>
+                    <div class="info-box">
+                        <h3>Known Routes</h3>
+                        <div class="value" id="routeCount">0</div>
+                    </div>
+                    <div class="info-box">
+                        <h3>Known Services</h3>
+                        <div class="value" id="serviceCount">0</div>
+                    </div>
+                </div>
+
+                <h3>Routes</h3>
+                <table class="routes-table">
+                    <thead>
+                        <tr>
+                            <th>Address</th>
+                            <th>Next Hop</th>
+                            <th>Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody id="routesTable">
+                        <tr><td colspan="3">No routes</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Services</h3>
+                <table class="services-table">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Address</th>
+                            <th>Capacity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="servicesTable">
+                        <tr><td colspan="3">No services</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="container">
+                <h2>Discovered Services</h2>
+                <div id="servicesControls">
+                    <div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>
+                </div>
+            </div>
+
+            <div class="container">
+                <div class="card-header">
+                    <h2>Event Log</h2>
+                    <button onclick="clearLog()">Clear Log</button>
+                </div>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Detect if opened via file:// protocol
+        if (window.location.protocol === 'file:') {
+            document.getElementById('serverWarning').style.display = 'block';
+            throw new Error('Cannot load ES6 modules from file:// protocol. Please use a web server.');
+        }
+
+        import { Router } from '../aln/router.js';
+        import { WebSocketChannel } from '../aln/wschannel.js';
+
+        // Global state
+        let router = null;
+        let wsChannel = null;
+        let ws = null;
+        const localAddress = 'browser-client-' + Math.random().toString(36).substring(2, 8);
+        const knownServices = new Set(); // Track services we've already seen
+
+        // Make functions available globally
+        window.connect = connect;
+        window.disconnect = disconnect;
+        window.clearLog = clearLog;
+        window.sendToService = sendToService;
+
+        // Initialize
+        document.getElementById('localAddress').textContent = localAddress;
+        log('Ready to connect', 'info');
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateStatus(status, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ' + status;
+            statusDiv.textContent = message;
+        }
+
+        function updateNetworkState() {
+            if (!router) return;
+
+            // Update route count
+            const routeCount = router.remoteNodeMap.size;
+            document.getElementById('routeCount').textContent = routeCount;
+
+            // Update routes table
+            const routesTableBody = document.getElementById('routesTable');
+            if (routeCount === 0) {
+                routesTableBody.innerHTML = '<tr><td colspan="3">No routes</td></tr>';
+            } else {
+                let html = '';
+                router.remoteNodeMap.forEach((info, address) => {
+                    html += `<tr>
+                        <td>${address}</td>
+                        <td>${info.nextHop || '-'}</td>
+                        <td>${info.cost}</td>
+                    </tr>`;
+                });
+                routesTableBody.innerHTML = html;
+            }
+
+            // Update service count and table
+            let serviceCount = 0;
+            let servicesHtml = '';
+
+            router.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+                capacityMap.forEach((nodeCapacity, address) => {
+                    serviceCount++;
+                    servicesHtml += `<tr>
+                        <td>${serviceID}</td>
+                        <td>${address}</td>
+                        <td>${nodeCapacity.capacity}</td>
+                    </tr>`;
+
+                    // Check for newly discovered services
+                    const serviceKey = `${serviceID}@${address}`;
+                    if (!knownServices.has(serviceKey)) {
+                        knownServices.add(serviceKey);
+                        log(`Discovered service '${serviceID}' at ${address}`, 'success');
+                    }
+                });
+            });
+
+            document.getElementById('serviceCount').textContent = serviceCount;
+            const servicesTableBody = document.getElementById('servicesTable');
+            if (serviceCount === 0) {
+                servicesTableBody.innerHTML = '<tr><td colspan="3">No services</td></tr>';
+            } else {
+                servicesTableBody.innerHTML = servicesHtml;
+            }
+
+            // Update service controls
+            updateServiceControls();
+        }
+
+        function updateServiceControls() {
+            if (!router) return;
+
+            const container = document.getElementById('servicesControls');
+            const currentServices = new Map(); // Map of serviceKey -> {serviceID, address}
+
+            // Collect all current services
+            router.serviceCapacityMap.forEach((capacityMap, serviceID) => {
+                capacityMap.forEach((nodeCapacity, address) => {
+                    const serviceKey = `${serviceID}@${address}`;
+                    currentServices.set(serviceKey, { serviceID, address });
+                });
+            });
+
+            // If no services, show empty state
+            if (currentServices.size === 0) {
+                container.innerHTML = '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
+                return;
+            }
+
+            // Remove empty state if it exists
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Remove controls for services that no longer exist
+            const existingControls = container.querySelectorAll('.service-row');
+            existingControls.forEach(control => {
+                const serviceKey = control.dataset.serviceKey;
+                if (!currentServices.has(serviceKey)) {
+                    control.remove();
+                }
+            });
+
+            // Add controls for new services
+            currentServices.forEach(({ serviceID, address }, serviceKey) => {
+                const existing = container.querySelector(`[data-service-key="${serviceKey}"]`);
+                if (!existing) {
+                    const row = document.createElement('div');
+                    row.className = 'service-row';
+                    row.dataset.serviceKey = serviceKey;
+                    row.innerHTML = `
+                        <div class="service-label">
+                            ${serviceID}
+                            <span class="address">${address}</span>
+                        </div>
+                        <input type="text"
+                               id="payload-${serviceKey}"
+                               placeholder="Enter message payload..."
+                               value="Hello from browser!">
+                        <button onclick="sendToService('${serviceKey}', '${serviceID}', '${address}')">Send</button>
+                    `;
+                    container.appendChild(row);
+                }
+            });
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+
+            if (!url) {
+                log('Please enter a WebSocket URL', 'error');
+                return;
+            }
+
+            log(`Connecting to ${url}...`, 'info');
+            updateStatus('connecting', 'Connecting...');
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    log('WebSocket connected', 'success');
+                    updateStatus('connected', 'Connected to ' + url);
+
+                    // Create router and channel
+                    router = new Router(localAddress);
+                    wsChannel = new WebSocketChannel(ws);
+                    router.addChannel(wsChannel);
+
+                    // Set up network state change handler
+                    router.onNetStateChanged = () => {
+                        updateNetworkState();
+                    };
+
+                    // Update UI
+                    document.getElementById('connectBtn').style.display = 'none';
+                    document.getElementById('disconnectBtn').style.display = 'inline-block';
+
+                    log('Router initialized with address: ' + localAddress, 'info');
+                };
+
+                ws.onerror = (error) => {
+                    log('WebSocket error: ' + error, 'error');
+                    updateStatus('disconnected', 'Connection error');
+                };
+
+                ws.onclose = () => {
+                    log('WebSocket disconnected', 'warning');
+                    updateStatus('disconnected', 'Disconnected');
+
+                    // Update UI
+                    document.getElementById('connectBtn').style.display = 'inline-block';
+                    document.getElementById('disconnectBtn').style.display = 'none';
+
+                    // Clear service controls
+                    document.getElementById('servicesControls').innerHTML =
+                        '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
+
+                    // Clean up
+                    router = null;
+                    wsChannel = null;
+                    ws = null;
+                    knownServices.clear();
+                };
+
+            } catch (error) {
+                log('Failed to connect: ' + error.message, 'error');
+                updateStatus('disconnected', 'Connection failed');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                log('Disconnecting...', 'info');
+                ws.close();
+                // Update UI immediately (onclose will also do this, but this is instant)
+                updateStatus('disconnected', 'Disconnected');
+                document.getElementById('connectBtn').style.display = 'inline-block';
+                document.getElementById('disconnectBtn').style.display = 'none';
+
+                // Clear network state
+                document.getElementById('routeCount').textContent = '0';
+                document.getElementById('serviceCount').textContent = '0';
+                document.getElementById('routesTable').innerHTML = '<tr><td colspan="3">No routes</td></tr>';
+                document.getElementById('servicesTable').innerHTML = '<tr><td colspan="3">No services</td></tr>';
+
+                // Clear service controls
+                document.getElementById('servicesControls').innerHTML =
+                    '<div class="empty-state">No services discovered yet. Connect to a server to discover services.</div>';
+            }
+        }
+
+        function sendToService(serviceKey, serviceID, address) {
+            if (!router) {
+                log('Not connected', 'error');
+                return;
+            }
+
+            // Get the payload from the input field
+            const payloadInput = document.getElementById(`payload-${serviceKey}`);
+            const payload = payloadInput ? payloadInput.value : 'Hello from browser!';
+
+            // Create a packet for the service
+            const packet = {
+                srv: serviceID,
+                dst: address,
+                data: payload,
+                src: localAddress
+            };
+
+            // Register a context handler for the response
+            const ctxID = router.registerContextHandler((response) => {
+                const data = response.data || '';
+                log(`Response from ${serviceID}@${address}: ${data}`, 'success');
+
+                // Cleanup is user's responsibility!
+                // For this simple request (single response), release immediately:
+                router.releaseContext(ctxID);
+
+                // For multi-response services (streaming, pagination, etc.),
+                // you would track state and release when done:
+                // if (isComplete) { router.releaseContext(ctxID); }
+            });
+
+            packet.ctx = ctxID;
+
+            log(`Sending to service "${serviceID}" at ${address} with context ${ctxID}...`, 'info');
+
+            const err = router.send(packet);
+            if (err) {
+                log(`Failed to send to ${serviceID}@${address}: ${err}`, 'error');
+            }
+        }
+
+        // Update network state every 2 seconds
+        setInterval(() => {
+            if (router) {
+                updateNetworkState();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

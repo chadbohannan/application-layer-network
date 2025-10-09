@@ -1,11 +1,11 @@
-import { Packet } from './packet'
+import { Packet } from './packet.js'
 import {
     makeNetQueryPacket,
     makeNetworkRouteSharePacket,
     parseNetworkRouteSharePacket,
     makeNetworkServiceSharePacket,
     parseNetworkServiceSharePacket
-  } from './utils'
+  } from './utils.js'
   
   export const NET_ROUTE = 0x01 // packet contains route entry
   export const NET_SERVICE = 0x02 // packet contains service entry
@@ -92,9 +92,9 @@ import {
       if (this.serviceMap.has(serviceID)) {
         addresses.push(this.address)
       }
-      if (this.serviceLoadMap.has(serviceID)) {
-        const loadMap = this.serviceLoadMap.get(serviceID)
-        loadMap.forEach((nodeLoad, address) => {
+      if (this.serviceCapacityMap.has(serviceID)) {
+        const capacityMap = this.serviceCapacityMap.get(serviceID)
+        capacityMap.forEach((nodeCapacity, address) => {
           addresses.push(address)
         })
       }
@@ -113,40 +113,51 @@ import {
         const addresses = this.serviceAddresses(packet.srv)
         if (addresses.length > 0) {
           for (let i = 1; i < addresses.length; i++) {
-            const pc = packet.copy()
+            const pc = packet.copy ? packet.copy() : { ...packet }
             pc.dst = addresses[i]
             this.send(pc)
           }
           packet.dst = addresses[0]
-        }
-      } else if (packet.dst === this.address) {
-        if (this.serviceMap.has(packet.srv)) {
-          this.serviceMap.get(packet.srv)(packet)
-        } else if (this.contextMap.has(packet.srv)) {
-          this.contextMap.get(packet.srv)(packet)
+          // Fall through to routing logic below
         } else {
-          return `service ${packet.srv} not registered`
+          return 'no service providers found for: ' + packet.srv
         }
-      } else if (!packet.nxt || packet.nxt === this.address) {
+      }
+
+      if (packet.dst === this.address) {
+        // Check for context handler first (request-response pattern)
+        if (packet.ctx && this.contextMap.has(packet.ctx)) {
+          this.contextMap.get(packet.ctx)(packet)
+        } else if (this.serviceMap.has(packet.srv)) {
+          this.serviceMap.get(packet.srv)(packet)
+        } else {
+          return `no handler for packet - srv: ${packet.srv}, ctx: ${packet.ctx}`
+        }
+        return null
+      }
+
+      if (!packet.nxt || packet.nxt === this.address) {
         if (this.remoteNodeMap.has(packet.dst)) {
           const route = this.remoteNodeMap.get(packet.dst)
           packet.nxt = route.nextHop
           route.channel.send(packet)
+          return null
+        } else {
+          return 'no route to destination: ' + packet.dst
         }
-      } else {
-        return 'packet is unroutable; no action taken'
       }
-      return null
+
+      return 'packet is unroutable; no action taken'
     }
   
     // registerContextHandler returns a new contextID. Services must respond with the same
     // contextID to reach the correct response handler.
     registerContextHandler (packetHandler) {
-      let ctxID = Math.floor(Math.random() * 2 << 15)
-      while (this.contextMap.has(ctxID)) {
-        ctxID = Math.floor(Math.random() * 2 << 15)
+      let ctxID = Math.floor(Math.random() * (2 << 15))
+      while (ctxID === 0 || this.contextMap.has(ctxID)) {
+        ctxID = Math.floor(Math.random() * (2 << 15))
       }
-      this.contextMap[ctxID] = packetHandler
+      this.contextMap.set(ctxID, packetHandler)
       return ctxID
     }
   
@@ -156,7 +167,30 @@ import {
     }
   
     removeChannel (channel) {
+      // Remove channel from channel list
       this.channels = this.channels.filter((ch) => ch !== channel)
+
+      // Find all routes using this channel and send withdrawals
+      const affectedRoutes = []
+      this.remoteNodeMap.forEach((route, address) => {
+        if (route.channel === channel) {
+          affectedRoutes.push(address)
+        }
+      })
+
+      // Remove routes and advertise withdrawals
+      affectedRoutes.forEach((address) => {
+        this.remoteNodeMap.delete(address)
+
+        // Send withdrawal (cost=0) to all remaining channels
+        const withdrawal = makeNetworkRouteSharePacket(this.address, address, 0)
+        this.channels.forEach((ch) => ch.send(withdrawal))
+      })
+
+      // Trigger network state update
+      if (affectedRoutes.length > 0) {
+        this.onNetStateChanged()
+      }
     }
   
     onPacket (packet, channel) {
@@ -178,9 +212,9 @@ import {
               })
               p = makeNetworkRouteSharePacket(this.address, remoteAddress, 0)
             } else if (cost <= remoteNode.cost) {
-              remoteNode.NextHop = nextHop
-              remoteNode.Channel = channel
-              remoteNode.Cost = cost
+              remoteNode.nextHop = nextHop
+              remoteNode.channel = channel
+              remoteNode.cost = cost
               p = makeNetworkRouteSharePacket(this.address, remoteAddress, cost + 1)
             }
             // relay update to other channels
@@ -194,13 +228,30 @@ import {
         case NET_SERVICE: {
           const [address, serviceID, serviceCapacity, serviceErr] = parseNetworkServiceSharePacket(packet)
           if (serviceErr === null) {
-            // TODO if capacity is zero then remove the service from the serviceCapacityMap
-            if (!this.serviceCapacityMap.has(serviceID)) {
-              this.serviceCapacityMap.set(serviceID, new Map())
+            let serviceChanged = false
+
+            if (serviceCapacity === 0) {
+              // Service removal (capacity = 0)
+              if (this.serviceCapacityMap.has(serviceID)) {
+                const capacityMap = this.serviceCapacityMap.get(serviceID)
+                if (capacityMap.has(address)) {
+                  capacityMap.delete(address)
+                  serviceChanged = true
+                }
+              }
+            } else {
+              // Service addition/update
+              if (!this.serviceCapacityMap.has(serviceID)) {
+                this.serviceCapacityMap.set(serviceID, new Map())
+              }
+              this.serviceCapacityMap.get(serviceID).set(address, new NodeCapacity(serviceCapacity, Date.now()))
+              serviceChanged = true
             }
-            this.serviceCapacityMap.get(serviceID).set(address, new NodeCapacity(serviceCapacity, Date.now()))
-            this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
-            this.onNetStateChanged()
+
+            if (serviceChanged) {
+              this.channels.forEach((ch) => (ch !== channel) ? ch.send(packet) : {})
+              this.onNetStateChanged()
+            }
           } else {
             console.log(`error parsing NET_SERVICE: ${serviceErr}`)
           }

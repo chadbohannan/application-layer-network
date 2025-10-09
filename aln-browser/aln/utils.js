@@ -1,5 +1,5 @@
-import ByteBuffer from 'bytebuffer'
-import { Packet } from './packet'
+import { BinaryBuilder, BinaryParser } from './binary-utils.js'
+import { Packet } from './packet.js'
 
 export const NET_ROUTE = 0x01 // packet contains route entry
 export const NET_SERVICE = 0x02 // packet contains service entry
@@ -12,14 +12,14 @@ export function makeNetQueryPacket () {
 }
 
 export function makeNetworkRouteSharePacket (srcAddr, destAddr, cost) {
-  const buf = new ByteBuffer(destAddr.length + 3)
+  const buf = new BinaryBuilder(destAddr.length + 3)
   buf.writeUint8(destAddr.length)
   buf.writeUTF8String(destAddr)
   buf.writeUint16(cost)
   const p = new Packet()
   p.net = NET_ROUTE
   p.src = srcAddr
-  p.data = buf.reset().toBinary()
+  p.data = buf.toBinary()
   p.sz = p.data.length
   return p
 }
@@ -32,7 +32,7 @@ export function parseNetworkRouteSharePacket (packet) {
   if (!packet.data) {
     return ['', '', 0, 'parseNetworkRouteSharePacket: packet.Data is empty']
   }
-  const dataBuf = ByteBuffer.fromBinary(packet.data)
+  const dataBuf = new BinaryParser(packet.data)
   const addrSize = dataBuf.readUint8()
   if (packet.data.length !== addrSize + 3) {
     return ['', '', 0, `parseNetworkRouteSharePacket: packet.data is ${packet.data.len}; expected ${addrSize + 3}`]
@@ -44,17 +44,17 @@ export function parseNetworkRouteSharePacket (packet) {
 }
 
 export function makeNetworkServiceSharePacket (hostAddr, serviceID, serviceLoad) {
-  const buf = new ByteBuffer(hostAddr.length + serviceID.length + 4)
+  const buf = new BinaryBuilder(hostAddr.length + serviceID.length + 4)
   buf.writeUint8(hostAddr.length)
   buf.writeUTF8String(hostAddr)
 
   buf.writeUint8(serviceID.length)
   buf.writeUTF8String(serviceID)
-  
+
   buf.writeUint16(serviceLoad)
   const p = new Packet()
   p.net = NET_SERVICE
-  p.data = buf.reset().toBinary()
+  p.data = buf.toBinary()
   p.sz = p.data.length
   return p
 }
@@ -64,7 +64,7 @@ export function parseNetworkServiceSharePacket (packet) {
   if (packet.net !== NET_SERVICE) {
     return ['', 0, 0, 'parseNetworkServiceSharePacket: packet.NetState != NET_ROUTE']
   }
-  const dataBuf = ByteBuffer.fromBinary(packet.data)
+  const dataBuf = new BinaryParser(packet.data)
   const addrSize = dataBuf.readUint8()
   const addr = dataBuf.readBytes(addrSize).toUTF8()
 

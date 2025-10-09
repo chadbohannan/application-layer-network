@@ -3,7 +3,7 @@ from alnmeshpy import TcpChannel, Router,Packet
 
 def main():
     sel = selectors.DefaultSelector()
-    router = Router(sel, "python-ping-client-1")
+    router = Router(sel, "python-browser-client-1")
     router.start()
 
     def on_pong(packet): # define the ping response handler

@@ -55,6 +55,10 @@ class Packet {
       src: this.src,
       dst: this.dst,
       nxt: this.nxt,
+      seq: this.seq,
+      ack: this.ack,
+      ctx: this.ctx,
+      typ: this.typ,
       data: this.data ? ByteBuffer.fromBinary(this.data).toString('base64') : null,
       data_sz: this.data ? this.data.length : 0
     })

@@ -1,5 +1,5 @@
-import ByteBuffer from 'bytebuffer'
-import { Packet } from './packet'
+import { base64ToBinary } from './binary-utils.js'
+import { Packet } from './packet.js'
 
 export class WebSocketChannel {
   constructor (ws) {
@@ -20,7 +20,7 @@ export class WebSocketChannel {
       if (obj.ack) packet.ack = obj.ack
       if (obj.ctx) packet.ctx = obj.ctx
       if (obj.typ) packet.typ = obj.typ
-      if (obj.data) packet.data = ByteBuffer.fromBase64(obj.data).toBinary()
+      if (obj.data) packet.data = base64ToBinary(obj.data)
       this.onPacket(packet)
     };
     ws.onerror = (event) => {
@@ -38,6 +38,24 @@ export class WebSocketChannel {
   }
 
   send(packet) {
-    this.ws.send(packet.toJson())
+    // Handle both Packet instances and plain objects
+    if (packet.toJson) {
+      this.ws.send(packet.toJson())
+    } else {
+      // Convert plain object to JSON
+      const pkt = new Packet()
+      if (packet.cf !== undefined) pkt.cf = packet.cf
+      if (packet.net !== undefined) pkt.net = packet.net
+      if (packet.srv) pkt.srv = packet.srv
+      if (packet.src) pkt.src = packet.src
+      if (packet.dst) pkt.dst = packet.dst
+      if (packet.nxt) pkt.nxt = packet.nxt
+      if (packet.seq !== undefined) pkt.seq = packet.seq
+      if (packet.ack !== undefined) pkt.ack = packet.ack
+      if (packet.ctx !== undefined) pkt.ctx = packet.ctx
+      if (packet.typ !== undefined) pkt.typ = packet.typ
+      if (packet.data) pkt.data = packet.data
+      this.ws.send(pkt.toJson())
+    }
   }
 }

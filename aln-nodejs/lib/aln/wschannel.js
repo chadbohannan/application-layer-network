@@ -5,7 +5,9 @@ class WebSocketChannel {
   constructor (ws) {
     this.ws = ws
     this.onPacket = () => { console.log('WebSocketChannel::onPacket; default') }
-    ws.on('message', function message (data) {
+    this.onClose = () => { console.log('WebSocketChannel::onClose; default') }
+
+    ws.on('message', (data) => {
       console.log('ws received: %s', data)
       const obj = JSON.parse(data)
       const packet = new Packet()
@@ -20,7 +22,18 @@ class WebSocketChannel {
       if (obj.ctx) packet.ctx = obj.ctx
       if (obj.typ) packet.typ = obj.typ
       if (obj.data) packet.data = ByteBuffer.fromBase64(obj.data).toBinary()
-      this.onPacket(new Packet(data))
+      this.onPacket(packet) // Fixed: use parsed packet, not raw data
+    })
+
+    ws.on('close', () => {
+      console.log('WebSocket connection closed')
+      this.onClose()
+    })
+
+    ws.on('error', (error) => {
+      console.log('WebSocket error:', error.message)
+      // Error usually leads to close, but call onClose just in case
+      this.onClose()
     })
   }
 

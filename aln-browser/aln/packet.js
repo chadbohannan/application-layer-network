@@ -1,4 +1,4 @@
-import ByteBuffer from 'bytebuffer'
+import { BinaryParser, binaryToBase64 } from './binary-utils.js'
 
 const CF_NETSTATE = 0x0400
 const CF_SERVICE = 0x0200
@@ -28,8 +28,8 @@ export class Packet {
     this.data = null
     this.crc = null
     if (content) {
-      const buf = ByteBuffer.fromBinary(content)
-      this.cf = buf.readUint16()
+      const buf = new BinaryParser(content)
+      this.cf = cfHamDecode(buf.readUint16())
       if (this.cf & CF_NETSTATE) this.net = buf.readUint8()
       if (this.cf & CF_SERVICE) this.srv = buf.readBytes(buf.readUint8()).toUTF8()
       if (this.cf & CF_SRCADDR) this.src = buf.readBytes(buf.readUint8()).toUTF8()
@@ -38,7 +38,7 @@ export class Packet {
       if (this.cf & CF_SEQNUM) this.seq = buf.readUint16()
       if (this.cf & CF_ACKBLOCK) this.ack = buf.readUint32()
       if (this.cf & CF_CONTEXTID) this.ctx = buf.readUint16()
-      if (this.typ & CF_DATATYPE) this.typ = buf.readUint8()
+      if (this.cf & CF_DATATYPE) this.typ = buf.readUint8()
       if (this.cf & CF_DATA) {
         this.sz = buf.readUint16()
         this.data = buf.readBytes(this.sz)
@@ -56,39 +56,34 @@ export class Packet {
       src: this.src,
       dst: this.dst,
       nxt: this.nxt,
-      data: this.data ? ByteBuffer.fromBinary(this.data).toString('base64') : null,
+      seq: this.seq,
+      ack: this.ack,
+      ctx: this.ctx,
+      typ: this.typ,
+      data: this.data ? binaryToBase64(this.data) : null,
       data_sz: this.data ? this.data.length : 0,
     })
   }
 
-  toBinary () {
-    const buf = new ByteBuffer(4096)
-    let cf = 0x0000
-    buf.writeUint16(cf)
-    if (this.net) (cf |= CF_NETSTATE) && buf.writeByte(this.net)
-    if (this.srv) (cf |= CF_SERVICE) && buf.writeByte(this.srv.length) && buf.writeUTF8String(this.srv)
-    if (this.src) (cf |= CF_SRCADDR) && buf.writeByte(this.src.length) && buf.writeUTF8String(this.src)
-    if (this.dst) (cf |= CF_DESTADDR) && buf.writeByte(this.dst.length) && buf.writeUTF8String(this.dst)
-    if (this.nxt) (cf |= CF_NEXTADDR) && buf.writeByte(this.nxt.length) && buf.writeUTF8String(this.nxt)
-    if (this.seq) (cf |= CF_SEQNUM) && buf.writeUint16(this.seq)
-    if (this.ack) (cf |= CF_ACKBLOCK) && buf.writeUint32(this.ack)
-    if (this.ctx) (cf |= CF_CONTEXTID) && buf.writeUint16(this.ctx)
-    if (this.typ) (cf |= CF_DATATYPE) && buf.writeUint8(this.typ)
-    if (this.data) {
-      cf |= CF_DATA
-      buf.writeUint16(this.data.length)
-      buf.writeUTF8String(this.data)
-    }
-    const offset = buf.offset
-    this.cf = cfHamEncode(cf)
-    buf.reset().writeUint16(this.cf)
-    const ret = buf.reset().toBinary(0, offset)
-    return ret
+  copy() {
+    // Create a shallow copy of all packet fields
+    // Note: toBinary() removed as it's unused in WebSocket-only context
+    const p = new Packet()
+    p.cf = this.cf
+    p.net = this.net
+    p.srv = this.srv
+    p.src = this.src
+    p.dst = this.dst
+    p.nxt = this.nxt
+    p.seq = this.seq
+    p.ack = this.ack
+    p.ctx = this.ctx
+    p.typ = this.typ
+    p.sz = this.sz
+    p.data = this.data
+    p.crc = this.crc
+    return p
   }
-}
-
-function copy() {
-  return new Packet(toBinary());
 }
 
 function intXOR (n) {
@@ -108,27 +103,27 @@ function cfHamEncode (value) {
     (intXOR(value & 0x026F) << 15)
 }
 
-// function cfHamDecode (value) {
-//   const hamDecodMap = {
-//     0x0F: 0x0001,
-//     0x07: 0x0002,
-//     0x0B: 0x0004,
-//     0x0D: 0x0008,
-//     0x0E: 0x0010,
-//     0x03: 0x0020,
-//     0x05: 0x0040,
-//     0x06: 0x0080,
-//     0x0A: 0x0100,
-//     0x09: 0x0200,
-//     0x0C: 0x0400
-//   }
-//   const err = intXOR(value & 0x826F) |
-//       (intXOR(value & 0x41B7) << 1) |
-//       (intXOR(value & 0x24DB) << 2) |
-//       (intXOR(value & 0x171D) << 3) &
-//       0xFF
+function cfHamDecode (value) {
+  const hamDecodMap = {
+    0x0F: 0x0001,
+    0x07: 0x0002,
+    0x0B: 0x0004,
+    0x0D: 0x0008,
+    0x0E: 0x0010,
+    0x03: 0x0020,
+    0x05: 0x0040,
+    0x06: 0x0080,
+    0x0A: 0x0100,
+    0x09: 0x0200,
+    0x0C: 0x0400
+  }
+  const err = intXOR(value & 0x826F) |
+      (intXOR(value & 0x41B7) << 1) |
+      (intXOR(value & 0x24DB) << 2) |
+      (intXOR(value & 0x171D) << 3) &
+      0xFF
 
-//   value ^= hamDecodMap.get(err, 0)
-//   return value
-// }
+  value ^= hamDecodMap[err] || 0
+  return value & 0x07FF
+}
 
