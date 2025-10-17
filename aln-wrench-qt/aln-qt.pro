@@ -23,6 +23,7 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     networkinterfacesitemmodel.cpp \
+    openportdialog.cpp \
     packetsenddialog.cpp
 
 HEADERS += \
@@ -39,6 +40,7 @@ HEADERS += \
     connectionitemmodel.h \
     mainwindow.h \
     networkinterfacesitemmodel.h \
+    openportdialog.h \
     packetsenddialog.h
 
 FORMS += \

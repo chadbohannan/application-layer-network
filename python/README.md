@@ -8,7 +8,7 @@ completely ignoring security as a concern. Don't use this for production.
 Install with `--no-deps` unless you need Bluetooth support (very experimental) which use `bleak` and `aiofiles`.
 
 ```sh
-pip install --no-deps -i https://test.pypi.org/simple/ alnmeshpy
+pip install --no-deps alnmeshpy
 ```
 
 The example app demonstrates a 3-node topology

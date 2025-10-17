@@ -49,6 +49,10 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::init() {
+    connect(ui->openPortButton, SIGNAL(clicked()),
+            this, SLOT(onOpenPortButtonClicked()));
+    connect(ui->closePortButton, SIGNAL(clicked()),
+            this, SLOT(onClosePortButtonClicked()));
     connect(ui->addChannelButton, SIGNAL(clicked()),
             this, SLOT(onAddChannelButtonClicked()));
 
@@ -72,18 +76,32 @@ void MainWindow::init() {
     connect(&serviceButtonGroup, SIGNAL(idClicked(int)),
             this, SLOT(onServiceButtonClicked(int)));
 
-    // network host interfaces model
-    connect(niim, SIGNAL(listenRequest(QString,QString,short,bool)),
-            this, SLOT(onListenRequest(QString,QString,short,bool)));
+    // network advertising panel - discover first available interface for defaults
+    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
+    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
+    QString defaultBroadcastAddr;
 
-    // network advertising panel
-    if (interfaces.isEmpty()) {
+    foreach(QNetworkInterface iFace, allInterfaces) {
+        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
+        foreach(QNetworkAddressEntry entry, entries) {
+            QHostAddress address = entry.ip();
+            if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
+                if (iFace.type() == QNetworkInterface::InterfaceType::Ethernet ||
+                    iFace.type() == QNetworkInterface::InterfaceType::Wifi) {
+                    defaultBroadcastAddr = entry.broadcast().toString();
+                    break;
+                }
+            }
+        }
+        if (!defaultBroadcastAddr.isEmpty()) break;
+    }
+
+    if (defaultBroadcastAddr.isEmpty()) {
         ui->bcastInterfaceLineEdit->setText("no network interfaces found");
         ui->bcastInterfaceLineEdit->setEnabled(false);
     } else {
-        QString interfaceName = interfaces.at(0)->broadcastAddress();
-        ui->bcastInterfaceLineEdit->setText(interfaceName);
-        ui->networkDiscoveryLineEdit->setText(interfaceName);
+        ui->bcastInterfaceLineEdit->setText(defaultBroadcastAddr);
+        ui->networkDiscoveryLineEdit->setText(defaultBroadcastAddr);
     }
 
     connect(ui->netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
@@ -213,43 +231,163 @@ void MainWindow::selfTest() {
 }
 
 void MainWindow::populateNetworkInterfaces() {
-    QStringList networkInterfaces, types, bcastAddresses;
-    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
-    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
-    foreach(QNetworkInterface iFace, allInterfaces) {
-        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
-            foreach(QNetworkAddressEntry entry, entries) {
-                QHostAddress address = entry.ip();
-                if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
-                    switch(iFace.type()){
-                    case QNetworkInterface::InterfaceType::Ethernet:
-                        networkInterfaces << address.toString();
-                        types << "eth";
-                        bcastAddresses << entry.broadcast().toString();
-                        break;
-                    case QNetworkInterface::InterfaceType::Wifi:
-                        networkInterfaces << address.toString();
-                        types << "wifi";
-                        bcastAddresses << entry.broadcast().toString();
-                        break;
-                    default:
-                        break;
-                    }
-                }
-            }
-    }
-
-    for(int i = 0; i < networkInterfaces.count(); i++) {
-        interfaces << new NetworkInterfaceItem(types.at(i), networkInterfaces.at(i), 8081, bcastAddresses.at(i));
-    }
-
+    // Start with empty table - ports will be added via "Open Port" button
     niim = new NetworkInterfacesItemModel(interfaces, this);
     ui->networkInterfacesTableView->setModel(niim);
+    ui->networkInterfacesTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->networkInterfacesTableView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Type, QHeaderView::ResizeToContents);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Scheme, QHeaderView::ResizeToContents);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
     ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
-    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Listen, QHeaderView::ResizeToContents);
+
+    // Connect selection changes to enable/disable close button
+    connect(ui->networkInterfacesTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onNetworkInterfaceSelectionChanged()));
+}
+
+void MainWindow::onOpenPortButtonClicked() {
+    // Discover available network interfaces
+    QStringList availableInterfaces;
+    QMap<QString, QString> interfaceToBroadcastMap;
+    QMap<QString, QString> interfaceToTypeMap;
+
+    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
+    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
+
+    foreach(QNetworkInterface iFace, allInterfaces) {
+        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
+        foreach(QNetworkAddressEntry entry, entries) {
+            QHostAddress address = entry.ip();
+            if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
+                QString addrStr = address.toString();
+                switch(iFace.type()){
+                case QNetworkInterface::InterfaceType::Ethernet:
+                    availableInterfaces << addrStr;
+                    interfaceToBroadcastMap.insert(addrStr, entry.broadcast().toString());
+                    interfaceToTypeMap.insert(addrStr, "eth");
+                    break;
+                case QNetworkInterface::InterfaceType::Wifi:
+                    availableInterfaces << addrStr;
+                    interfaceToBroadcastMap.insert(addrStr, entry.broadcast().toString());
+                    interfaceToTypeMap.insert(addrStr, "wifi");
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    if (availableInterfaces.isEmpty()) {
+        qWarning() << "No network interfaces available";
+        return;
+    }
+
+    // Show dialog
+    OpenPortDialog* dialog = new OpenPortDialog(availableInterfaces, this);
+    if (dialog->exec() == QDialog::Accepted) {
+        QString interface = dialog->selectedInterface();
+        int port = dialog->selectedPort();
+
+        // Check if this interface:port combo already exists
+        bool alreadyOpen = false;
+        foreach(NetworkInterfaceItem* item, interfaces) {
+            if (item->listenAddress() == interface && item->listenPort() == port) {
+                qWarning() << "Port" << port << "already open on" << interface;
+                alreadyOpen = true;
+                break;
+            }
+        }
+
+        if (!alreadyOpen) {
+            // Create new interface item
+            QString type = interfaceToTypeMap.value(interface, "unknown");
+            QString broadcastAddr = interfaceToBroadcastMap.value(interface, "");
+            NetworkInterfaceItem* newItem = new NetworkInterfaceItem(type, interface, port, broadcastAddr);
+            newItem->setIsListening(true);
+
+            // Add to interfaces list
+            interfaces.append(newItem);
+
+            // Update the model
+            QItemSelectionModel *oldSelectionModel = ui->networkInterfacesTableView->selectionModel();
+            ui->networkInterfacesTableView->setModel(new NetworkInterfacesItemModel(interfaces, this));
+            if (oldSelectionModel) delete oldSelectionModel;
+
+            ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Type, QHeaderView::ResizeToContents);
+            ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Scheme, QHeaderView::ResizeToContents);
+            ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
+            ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
+
+            // Reconnect selection handler after model change
+            connect(ui->networkInterfacesTableView->selectionModel(),
+                    SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+                    this, SLOT(onNetworkInterfaceSelectionChanged()));
+
+            // Actually open the port
+            onListenRequest("tcp+aln", interface, port, true);
+
+            // Update broadcast advertisement text if enabled
+            if (ui->netAdvertiseContent->isEnabled()) {
+                ui->netAdvertiseContent->setText(QString("tcp+aln://%1:%2").arg(interface).arg(port));
+                ui->bcastInterfaceLineEdit->setText(broadcastAddr);
+            }
+        }
+    }
+
+    dialog->deleteLater();
+}
+
+void MainWindow::onNetworkInterfaceSelectionChanged() {
+    // Enable Close Port button only when a row is selected
+    QModelIndexList selectedRows = ui->networkInterfacesTableView->selectionModel()->selectedRows();
+    ui->closePortButton->setEnabled(!selectedRows.isEmpty());
+}
+
+void MainWindow::onClosePortButtonClicked() {
+    QModelIndexList selectedRows = ui->networkInterfacesTableView->selectionModel()->selectedRows();
+    if (selectedRows.isEmpty()) {
+        return;
+    }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= interfaces.size()) {
+        qWarning() << "Invalid row selected:" << row;
+        return;
+    }
+
+    NetworkInterfaceItem* item = interfaces.at(row);
+    QString interface = item->listenAddress();
+    int port = item->listenPort();
+
+    // Close the listening port
+    onListenRequest("tcp+aln", interface, port, false);
+
+    // Remove from interfaces list
+    interfaces.removeAt(row);
+    delete item;
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->networkInterfacesTableView->selectionModel();
+    ui->networkInterfacesTableView->setModel(new NetworkInterfacesItemModel(interfaces, this));
+    if (oldSelectionModel) delete oldSelectionModel;
+
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Type, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Scheme, QHeaderView::ResizeToContents);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::Address, QHeaderView::Stretch);
+    ui->networkInterfacesTableView->horizontalHeader()->setSectionResizeMode(Column::ListenPort, QHeaderView::ResizeToContents);
+
+    // Reconnect selection handler after model change
+    connect(ui->networkInterfacesTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onNetworkInterfaceSelectionChanged()));
+
+    // Disable the close button since selection is now cleared
+    ui->closePortButton->setEnabled(false);
+
+    qInfo() << "Closed port" << port << "on interface" << interface;
 }
 
 void MainWindow::onAddChannelButtonClicked() {

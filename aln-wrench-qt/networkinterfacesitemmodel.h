@@ -9,7 +9,6 @@ enum Column {
     Scheme,
     Address,
     ListenPort,
-    Listen,
     NumColumns
 };
 

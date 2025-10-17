@@ -4,6 +4,7 @@
 #include "advertiserthread.h"
 #include "connectionitemmodel.h"
 #include "networkinterfacesitemmodel.h"
+#include "openportdialog.h"
 
 #include <QButtonGroup>
 #include <QMainWindow>
@@ -80,6 +81,9 @@ public slots:
     void clearLog();
     void onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 
+    void onOpenPortButtonClicked();
+    void onClosePortButtonClicked();
+    void onNetworkInterfaceSelectionChanged();
     void onAddChannelButtonClicked();
     void onChannelClosing(Channel*);
     void onConnectRequest(QString url);
