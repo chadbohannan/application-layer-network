@@ -10,6 +10,7 @@ CONFIG += c++17 testcase no_testcase_installs
 
 SOURCES += \
     addchanneldialog.cpp \
+    advertisementitemmodel.cpp \
     advertiserthread.cpp \
     aln/alntypes.cpp \
     aln/frame.cpp \
@@ -24,10 +25,12 @@ SOURCES += \
     mainwindow.cpp \
     networkinterfacesitemmodel.cpp \
     openportdialog.cpp \
-    packetsenddialog.cpp
+    packetsenddialog.cpp \
+    startadvertisementdialog.cpp
 
 HEADERS += \
     addchanneldialog.h \
+    advertisementitemmodel.h \
     advertiserthread.h \
     aln/alntypes.h \
     aln/frame.h \
@@ -41,7 +44,8 @@ HEADERS += \
     mainwindow.h \
     networkinterfacesitemmodel.h \
     openportdialog.h \
-    packetsenddialog.h
+    packetsenddialog.h \
+    startadvertisementdialog.h
 
 FORMS += \
     mainwindow.ui

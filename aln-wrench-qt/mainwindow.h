@@ -2,9 +2,11 @@
 #define MAINWINDOW_H
 
 #include "advertiserthread.h"
+#include "advertisementitemmodel.h"
 #include "connectionitemmodel.h"
 #include "networkinterfacesitemmodel.h"
 #include "openportdialog.h"
+#include "startadvertisementdialog.h"
 
 #include <QButtonGroup>
 #include <QMainWindow>
@@ -43,7 +45,7 @@ class MainWindow : public QMainWindow
     // TODO client sockets
 
     QList<NetworkInterfaceItem*> interfaces;
-    QMap<QString, AdvertiserThread*> urlAdvertisers;
+    QList<AdvertisementItem*> advertisements;
     QList<ConnectionItem*> connectionItems;
 
     QButtonGroup connectToHostButtonGroup;
@@ -84,6 +86,11 @@ public slots:
     void onOpenPortButtonClicked();
     void onClosePortButtonClicked();
     void onNetworkInterfaceSelectionChanged();
+
+    void onStartAdvertisementButtonClicked();
+    void onStopAdvertisementButtonClicked();
+    void onAdvertisementSelectionChanged();
+
     void onAddChannelButtonClicked();
     void onChannelClosing(Channel*);
     void onConnectRequest(QString url);
@@ -92,7 +99,6 @@ public slots:
     void onTcpListenPending();
     void onUdpBroadcastRx();
 
-    void onBroadcastAdvertRequest(int checkState);
     void onBroadcastListenRequest(int checkState); // TODO
 
     void btDiscoveryCheckboxChanged(bool);

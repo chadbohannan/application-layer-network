@@ -10,8 +10,9 @@ class AdvertiserThread : public QThread
     QString mUrl;
     QString mAddr;
     int mPort;
+    int mPeriodMs;
 public:
-    AdvertiserThread(QString url, QString addr, int port, QObject* parent = nullptr);
+    AdvertiserThread(QString url, QString addr, int port, int periodMs, QObject* parent = nullptr);
     void setUrl(QString);
     void stop();
 

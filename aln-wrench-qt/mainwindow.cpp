@@ -42,8 +42,9 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    foreach(AdvertiserThread* at, urlAdvertisers.values()) {
-        at->stop();
+    // Clean up advertisements
+    foreach(AdvertisementItem* ad, advertisements) {
+        delete ad;
     }
     delete ui;
 }
@@ -76,7 +77,23 @@ void MainWindow::init() {
     connect(&serviceButtonGroup, SIGNAL(idClicked(int)),
             this, SLOT(onServiceButtonClicked(int)));
 
-    // network advertising panel - discover first available interface for defaults
+    // Initialize advertisement table
+    ui->advertisementsTableView->setModel(new AdvertisementItemModel(advertisements, this));
+    ui->advertisementsTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->advertisementsTableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdMessage, QHeaderView::Stretch);
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdPeriod, QHeaderView::ResizeToContents);
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdStarted, QHeaderView::ResizeToContents);
+
+    connect(ui->startAdvertisementButton, SIGNAL(clicked()),
+            this, SLOT(onStartAdvertisementButtonClicked()));
+    connect(ui->stopAdvertisementButton, SIGNAL(clicked()),
+            this, SLOT(onStopAdvertisementButtonClicked()));
+    connect(ui->advertisementsTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onAdvertisementSelectionChanged()));
+
+    // Network broadcast discovery
     QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
     const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
     QString defaultBroadcastAddr;
@@ -96,16 +113,9 @@ void MainWindow::init() {
         if (!defaultBroadcastAddr.isEmpty()) break;
     }
 
-    if (defaultBroadcastAddr.isEmpty()) {
-        ui->bcastInterfaceLineEdit->setText("no network interfaces found");
-        ui->bcastInterfaceLineEdit->setEnabled(false);
-    } else {
-        ui->bcastInterfaceLineEdit->setText(defaultBroadcastAddr);
+    if (!defaultBroadcastAddr.isEmpty()) {
         ui->networkDiscoveryLineEdit->setText(defaultBroadcastAddr);
     }
-
-    connect(ui->netBroadcastEnableCheckbox, SIGNAL(stateChanged(int)),
-            this, SLOT(onBroadcastAdvertRequest(int)));
 
     connect(ui->broadcastListenCheckBox, SIGNAL(stateChanged(int)),
             this, SLOT(onBroadcastListenRequest(int)));
@@ -328,12 +338,6 @@ void MainWindow::onOpenPortButtonClicked() {
 
             // Actually open the port
             onListenRequest("tcp+aln", interface, port, true);
-
-            // Update broadcast advertisement text if enabled
-            if (ui->netAdvertiseContent->isEnabled()) {
-                ui->netAdvertiseContent->setText(QString("tcp+aln://%1:%2").arg(interface).arg(port));
-                ui->bcastInterfaceLineEdit->setText(broadcastAddr);
-            }
         }
     }
 
@@ -467,15 +471,6 @@ void MainWindow::onListenRequest(QString scheme, QString interface, short port, 
         qInfo() << "stopping server for " << key;
         srvr->close();
     }
-
-    if (ui->netAdvertiseContent->isEnabled()) {
-        ui->netAdvertiseContent->setText(QString("%1://%2:%3").arg(scheme).arg(interface).arg(port));
-        foreach(NetworkInterfaceItem* item, interfaces){
-            if (item->listenAddress() == interface) {
-                ui->bcastInterfaceLineEdit->setText(item->broadcastAddress());
-            }
-        };
-    }
 }
 
 void MainWindow::onTcpListenPending() {
@@ -499,11 +494,6 @@ void MainWindow::onBroadcastListenRequest(int checkState) {
     int port = ui->networkDiscoveryPortSpinBox->value();
     QString key = QString("%1:%2").arg(addr).arg(port);
 
-    if (urlAdvertisers.contains(key)) {
-        qWarning() << "cannot listen on advertising port";
-        return;
-    }
-
     QUdpSocket* udpSocket;
     if (udpSockets.contains(key)) {
         udpSocket = udpSockets.value(key);
@@ -522,6 +512,104 @@ void MainWindow::onBroadcastListenRequest(int checkState) {
             udpSockets.remove(key);
         delete udpSocket;
     }
+}
+
+void MainWindow::onStartAdvertisementButtonClicked() {
+    // Build list of available connection strings
+    QStringList connectionStrings;
+    foreach(NetworkInterfaceItem* item, interfaces) {
+        QString connString = QString("tcp+aln://%1:%2").arg(item->listenAddress()).arg(item->listenPort());
+        connectionStrings.append(connString);
+    }
+
+    // Get default broadcast address and port
+    QString defaultBroadcastAddr = ui->networkDiscoveryLineEdit->text();
+    int defaultBroadcastPort = ui->networkDiscoveryPortSpinBox->value();
+
+    // Show dialog with defaults
+    StartAdvertisementDialog* dialog = new StartAdvertisementDialog(connectionStrings, defaultBroadcastAddr, defaultBroadcastPort, this);
+    if (dialog->exec() == QDialog::Accepted) {
+        QString message = dialog->message();
+        int periodMs = dialog->broadcastPeriodMs();
+        QString broadcastAddr = dialog->broadcastAddress();
+        int broadcastPort = dialog->broadcastPort();
+
+        // Create and start advertiser thread with period
+        AdvertiserThread* thread = new AdvertiserThread(message, broadcastAddr, broadcastPort, periodMs);
+        thread->start(QThread::LowestPriority);
+
+        // Create advertisement item
+        AdvertisementItem* adItem = new AdvertisementItem(message, periodMs, broadcastAddr, broadcastPort, thread);
+        advertisements.append(adItem);
+
+        // Update the model
+        QItemSelectionModel *oldSelectionModel = ui->advertisementsTableView->selectionModel();
+        ui->advertisementsTableView->setModel(new AdvertisementItemModel(advertisements, this));
+        if (oldSelectionModel) delete oldSelectionModel;
+
+        ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdMessage, QHeaderView::Stretch);
+        ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdPeriod, QHeaderView::ResizeToContents);
+        ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdStarted, QHeaderView::ResizeToContents);
+
+        // Reconnect selection handler after model change
+        connect(ui->advertisementsTableView->selectionModel(),
+                SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+                this, SLOT(onAdvertisementSelectionChanged()));
+
+        qInfo() << "Started advertisement:" << message << "to" << broadcastAddr << ":" << broadcastPort << "every" << (periodMs/1000) << "seconds";
+    }
+
+    dialog->deleteLater();
+}
+
+void MainWindow::onAdvertisementSelectionChanged() {
+    // Enable Stop button only when a row is selected
+    QModelIndexList selectedRows = ui->advertisementsTableView->selectionModel()->selectedRows();
+    ui->stopAdvertisementButton->setEnabled(!selectedRows.isEmpty());
+}
+
+void MainWindow::onStopAdvertisementButtonClicked() {
+    QModelIndexList selectedRows = ui->advertisementsTableView->selectionModel()->selectedRows();
+    if (selectedRows.isEmpty()) {
+        return;
+    }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= advertisements.size()) {
+        qWarning() << "Invalid row selected:" << row;
+        return;
+    }
+
+    AdvertisementItem* item = advertisements.at(row);
+    QString message = item->message();
+
+    // Disconnect selection handler before model update to prevent signals during cleanup
+    disconnect(ui->advertisementsTableView->selectionModel(),
+               SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+               this, SLOT(onAdvertisementSelectionChanged()));
+
+    // Remove from advertisements list (destructor stops thread)
+    advertisements.removeAt(row);
+    delete item;
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->advertisementsTableView->selectionModel();
+    ui->advertisementsTableView->setModel(new AdvertisementItemModel(advertisements, this));
+    delete oldSelectionModel;
+
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdMessage, QHeaderView::Stretch);
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdPeriod, QHeaderView::ResizeToContents);
+    ui->advertisementsTableView->horizontalHeader()->setSectionResizeMode(AdvertisementColumn::AdStarted, QHeaderView::ResizeToContents);
+
+    // Reconnect selection handler after model change
+    connect(ui->advertisementsTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onAdvertisementSelectionChanged()));
+
+    // Disable the stop button since selection is now cleared
+    ui->stopAdvertisementButton->setEnabled(false);
+
+    qInfo() << "Stopped advertisement:" << message;
 }
 
 void MainWindow::onUdpBroadcastRx() {
@@ -659,34 +747,6 @@ void MainWindow::onServiceButtonClicked(int id) {
     dialog->setDest(nodeAddress);
     dialog->setService(service);
     dialog->show();
-}
-
-void MainWindow::onBroadcastAdvertRequest(int checkState) {
-    bool enable = checkState == Qt::CheckState::Checked;
-    QString addr = ui->bcastInterfaceLineEdit->text();
-    int port = ui->bcastPortSpinbox->value();
-    QString url = ui->netAdvertiseContent->text();
-
-    QString key = QString("%1:%2").arg(addr).arg(port);
-    AdvertiserThread* adThread;
-    if (urlAdvertisers.contains(key)) {
-        adThread = urlAdvertisers.value(key);
-    } else {
-        adThread = new AdvertiserThread(url, addr, port);
-        urlAdvertisers.insert(key, adThread);
-    }
-    if (adThread->isRunning() && !enable) {
-        qInfo() << "stopping broadcast on " << key;
-        adThread->stop();
-    } else if (!adThread->isRunning() && enable) {
-        qInfo() << "starting broadcast on " << key << " of " << url;
-        adThread->setUrl(url);
-        adThread->start(QThread::LowestPriority);
-    }
-
-    ui->bcastInterfaceLineEdit->setEnabled(!enable);
-    ui->bcastPortSpinbox->setEnabled(!enable);
-    ui->netAdvertiseContent->setEnabled(!enable);
 }
 
 void MainWindow::btDiscoveryCheckboxChanged(bool enabled) {

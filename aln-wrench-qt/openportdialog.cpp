@@ -8,23 +8,34 @@ OpenPortDialog::OpenPortDialog(QList<QString> interfaces, QWidget *parent)
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    // Interface selection
-    QLabel* interfaceLabel = new QLabel("Network Interface:", this);
+    // Horizontal layout for Host Interface and Port controls
+    QHBoxLayout* topControlsLayout = new QHBoxLayout();
+
+    // Host Interface
+    QVBoxLayout* interfaceLayout = new QVBoxLayout();
+    QLabel* interfaceLabel = new QLabel("Host Interface:", this);
     interfaceComboBox = new QComboBox(this);
     interfaceComboBox->addItems(interfaces);
+    interfaceComboBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    interfaceLayout->addWidget(interfaceLabel);
+    interfaceLayout->addWidget(interfaceComboBox);
+    interfaceLayout->setAlignment(Qt::AlignTop);
+    topControlsLayout->addLayout(interfaceLayout);
 
-    mainLayout->addWidget(interfaceLabel);
-    mainLayout->addWidget(interfaceComboBox);
-
-    // Port selection
+    // Port
+    QVBoxLayout* portLayout = new QVBoxLayout();
     QLabel* portLabel = new QLabel("Port:", this);
     portSpinBox = new QSpinBox(this);
     portSpinBox->setMinimum(1024);
     portSpinBox->setMaximum(65535);
     portSpinBox->setValue(8081);
+    portSpinBox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    portLayout->addWidget(portLabel);
+    portLayout->addWidget(portSpinBox);
+    portLayout->setAlignment(Qt::AlignTop);
+    topControlsLayout->addLayout(portLayout);
 
-    mainLayout->addWidget(portLabel);
-    mainLayout->addWidget(portSpinBox);
+    mainLayout->addLayout(topControlsLayout);
 
     // Error label (hidden by default)
     errorLabel = new QLabel(this);
@@ -47,7 +58,7 @@ OpenPortDialog::OpenPortDialog(QList<QString> interfaces, QWidget *parent)
     connect(cancelButton, SIGNAL(clicked()), this, SLOT(onCancelClicked()));
 
     setLayout(mainLayout);
-    resize(300, 200);
+    resize(400, 120);
 }
 
 QString OpenPortDialog::selectedInterface() const
