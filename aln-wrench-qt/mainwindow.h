@@ -3,10 +3,12 @@
 
 #include "advertiserthread.h"
 #include "advertisementitemmodel.h"
-#include "connectionitemmodel.h"
 #include "networkinterfacesitemmodel.h"
+#include "discoverylisteneritemmodel.h"
+#include "knownconnectionitemmodel.h"
 #include "openportdialog.h"
 #include "startadvertisementdialog.h"
+#include "startlistendialog.h"
 
 #include <QButtonGroup>
 #include <QMainWindow>
@@ -46,10 +48,8 @@ class MainWindow : public QMainWindow
 
     QList<NetworkInterfaceItem*> interfaces;
     QList<AdvertisementItem*> advertisements;
-    QList<ConnectionItem*> connectionItems;
-
-    QButtonGroup connectToHostButtonGroup;
-    QMap<int, QString> connectToHostButtonIdMap;
+    QList<DiscoveryListenerItem*> discoveryListeners;
+    QList<KnownConnectionItem*> knownConnections;
 
     QButtonGroup serviceButtonGroup;
     QMap<int, QPair<QString, QString>> serviceButtonIdMap;
@@ -75,8 +75,8 @@ public:
 private:
     void selfTest();
     void populateNetworkInterfaces();
-    void onNetworkDiscoveryChanged();
-    bool hasConnection(QString url);
+    void updateKnownConnectionsTable();
+    KnownConnectionItem* findKnownConnection(QString url);
 
 public slots:
     void addLogLine(QString msg);
@@ -91,15 +91,18 @@ public slots:
     void onStopAdvertisementButtonClicked();
     void onAdvertisementSelectionChanged();
 
-    void onAddChannelButtonClicked();
+    void onAddConnectionButtonClicked();
+    void onConnectButtonClicked();
+    void onDisconnectButtonClicked();
+    void onKnownConnectionSelectionChanged();
     void onChannelClosing(Channel*);
-    void onConnectRequest(QString url);
-    void onDisconnectRequest(QString url);
     void onListenRequest(QString scheme, QString interface, short port, bool enable);
     void onTcpListenPending();
     void onUdpBroadcastRx();
 
-    void onBroadcastListenRequest(int checkState); // TODO
+    void onStartListenButtonClicked();
+    void onStopListenButtonClicked();
+    void onDiscoveryListenerSelectionChanged();
 
     void btDiscoveryCheckboxChanged(bool);
     void deviceDiscovered(QBluetoothDeviceInfo);
@@ -111,7 +114,6 @@ public slots:
     void echoServicePacketHandler(Packet* packet);
 
     void onServiceButtonClicked(int id);
-    void onNetworkHostConnectButtonClicked(int id);
 
 signals:
     void logLineReady(QString);

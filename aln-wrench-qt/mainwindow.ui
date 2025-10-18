@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>953</width>
-    <height>651</height>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -87,7 +87,7 @@
         <item>
          <widget class="QLabel" name="label_2">
           <property name="text">
-           <string>Active Advertisements</string>
+           <string>Broadcast Advertisements</string>
           </property>
          </widget>
         </item>
@@ -101,12 +101,12 @@
           </property>
           <property name="maximumSize">
            <size>
-            <width>150</width>
+            <width>100</width>
             <height>40</height>
            </size>
           </property>
           <property name="text">
-           <string>Start Advertisement</string>
+           <string>Start Sending</string>
           </property>
          </widget>
         </item>
@@ -123,12 +123,12 @@
           </property>
           <property name="maximumSize">
            <size>
-            <width>150</width>
+            <width>100</width>
             <height>40</height>
            </size>
           </property>
           <property name="text">
-           <string>Stop Advertisement</string>
+           <string>Stop</string>
           </property>
          </widget>
         </item>
@@ -145,62 +145,74 @@
        </widget>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBox_3">
-        <property name="title">
-         <string>Network Broadcast Discovery</string>
+       <widget class="QFrame" name="frame_2">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_11">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <layout class="QHBoxLayout" name="discoveryHeaderLayout">
            <item>
-            <widget class="QLineEdit" name="networkDiscoveryLineEdit"/>
-           </item>
-           <item>
-            <widget class="QSpinBox" name="networkDiscoveryPortSpinBox">
-             <property name="minimumSize">
-              <size>
-               <width>0</width>
-               <height>0</height>
-              </size>
-             </property>
-             <property name="maximum">
-              <number>65000</number>
-             </property>
-             <property name="value">
-              <number>8082</number>
+            <widget class="QLabel" name="label_5">
+             <property name="text">
+              <string>Broadcast Discovery</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QCheckBox" name="broadcastListenCheckBox">
-             <property name="minimumSize">
+            <widget class="QPushButton" name="startListenButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
               <size>
                <width>100</width>
-               <height>0</height>
+               <height>40</height>
               </size>
              </property>
              <property name="text">
-              <string>Listen</string>
+              <string>Start Listening</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="stopListenButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Stop</string>
              </property>
             </widget>
            </item>
           </layout>
          </item>
          <item>
-          <widget class="QScrollArea" name="netDiscoveryScrollArea">
-           <property name="widgetResizable">
-            <bool>true</bool>
+          <widget class="QTableView" name="discoveryListenersTableView">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>100</height>
+            </size>
            </property>
-           <widget class="QWidget" name="scrollAreaWidgetContents_3">
-            <property name="geometry">
-             <rect>
-              <x>0</x>
-              <y>0</y>
-              <width>437</width>
-              <height>68</height>
-             </rect>
-            </property>
-           </widget>
           </widget>
          </item>
         </layout>
@@ -237,8 +249,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>437</width>
-              <height>68</height>
+              <width>426</width>
+              <height>72</height>
              </rect>
             </property>
            </widget>
@@ -257,16 +269,16 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout">
+          <layout class="QHBoxLayout" name="knownConnectionsHeaderLayout">
            <item>
-            <widget class="QLabel" name="channelsLabel">
+            <widget class="QLabel" name="knownConnectionsLabel">
              <property name="text">
-              <string>Connected Channels</string>
+              <string>Known Connections</string>
              </property>
             </widget>
            </item>
            <item>
-            <widget class="QPushButton" name="addChannelButton">
+            <widget class="QPushButton" name="addConnectionButton">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                <horstretch>0</horstretch>
@@ -284,27 +296,59 @@
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QPushButton" name="connectButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Connect</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="disconnectButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Disconnect</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
          <item>
-          <widget class="QListView" name="channelsListView">
+          <widget class="QTableView" name="knownConnectionsTableView">
            <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>600</height>
-            </size>
-           </property>
-           <property name="baseSize">
-            <size>
-             <width>0</width>
-             <height>0</height>
-            </size>
            </property>
           </widget>
          </item>
@@ -341,8 +385,8 @@
              <rect>
               <x>0</x>
               <y>0</y>
-              <width>440</width>
-              <height>144</height>
+              <width>429</width>
+              <height>208</height>
              </rect>
             </property>
            </widget>
@@ -484,7 +528,7 @@
      <x>0</x>
      <y>0</y>
      <width>953</width>
-     <height>20</height>
+     <height>37</height>
     </rect>
    </property>
   </widget>

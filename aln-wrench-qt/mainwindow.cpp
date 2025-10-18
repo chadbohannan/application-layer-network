@@ -46,6 +46,10 @@ MainWindow::~MainWindow()
     foreach(AdvertisementItem* ad, advertisements) {
         delete ad;
     }
+    // Clean up discovery listeners
+    foreach(DiscoveryListenerItem* listener, discoveryListeners) {
+        delete listener;
+    }
     delete ui;
 }
 
@@ -54,8 +58,6 @@ void MainWindow::init() {
             this, SLOT(onOpenPortButtonClicked()));
     connect(ui->closePortButton, SIGNAL(clicked()),
             this, SLOT(onClosePortButtonClicked()));
-    connect(ui->addChannelButton, SIGNAL(clicked()),
-            this, SLOT(onAddChannelButtonClicked()));
 
     alnRouter = new Router();
     PacketSignaler* logSignaler = new PacketSignaler();
@@ -72,7 +74,23 @@ void MainWindow::init() {
     selfTest();
 
     populateNetworkInterfaces();
-    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
+
+    // Initialize known connections table
+    ui->knownConnectionsTableView->setModel(new KnownConnectionItemModel(knownConnections, this));
+    ui->knownConnectionsTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->knownConnectionsTableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->knownConnectionsTableView->horizontalHeader()->setSectionResizeMode(KnownConnectionColumn::ConnectionUrl, QHeaderView::Stretch);
+    ui->knownConnectionsTableView->horizontalHeader()->setSectionResizeMode(KnownConnectionColumn::ConnectionStatusColumn, QHeaderView::ResizeToContents);
+
+    connect(ui->addConnectionButton, SIGNAL(clicked()),
+            this, SLOT(onAddConnectionButtonClicked()));
+    connect(ui->connectButton, SIGNAL(clicked()),
+            this, SLOT(onConnectButtonClicked()));
+    connect(ui->disconnectButton, SIGNAL(clicked()),
+            this, SLOT(onDisconnectButtonClicked()));
+    connect(ui->knownConnectionsTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onKnownConnectionSelectionChanged()));
 
     connect(&serviceButtonGroup, SIGNAL(idClicked(int)),
             this, SLOT(onServiceButtonClicked(int)));
@@ -93,35 +111,22 @@ void MainWindow::init() {
             SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
             this, SLOT(onAdvertisementSelectionChanged()));
 
-    // Network broadcast discovery
-    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
-    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
-    QString defaultBroadcastAddr;
+    // Initialize discovery listeners table
+    ui->discoveryListenersTableView->setModel(new DiscoveryListenerItemModel(discoveryListeners, this));
+    ui->discoveryListenersTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->discoveryListenersTableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerAddress, QHeaderView::Stretch);
+    ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerPort, QHeaderView::ResizeToContents);
 
-    foreach(QNetworkInterface iFace, allInterfaces) {
-        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
-        foreach(QNetworkAddressEntry entry, entries) {
-            QHostAddress address = entry.ip();
-            if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
-                if (iFace.type() == QNetworkInterface::InterfaceType::Ethernet ||
-                    iFace.type() == QNetworkInterface::InterfaceType::Wifi) {
-                    defaultBroadcastAddr = entry.broadcast().toString();
-                    break;
-                }
-            }
-        }
-        if (!defaultBroadcastAddr.isEmpty()) break;
-    }
+    connect(ui->discoveryListenersTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onDiscoveryListenerSelectionChanged()));
 
-    if (!defaultBroadcastAddr.isEmpty()) {
-        ui->networkDiscoveryLineEdit->setText(defaultBroadcastAddr);
-    }
-
-    connect(ui->broadcastListenCheckBox, SIGNAL(stateChanged(int)),
-            this, SLOT(onBroadcastListenRequest(int)));
-
-    connect(&connectToHostButtonGroup, SIGNAL(idClicked(int)),
-            this, SLOT(onNetworkHostConnectButtonClicked(int)));
+    // Network broadcast discovery buttons
+    connect(ui->startListenButton, SIGNAL(clicked()),
+            this, SLOT(onStartListenButtonClicked()));
+    connect(ui->stopListenButton, SIGNAL(clicked()),
+            this, SLOT(onStopListenButtonClicked()));
 
     // bluetooth discovery
     btDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
@@ -394,34 +399,98 @@ void MainWindow::onClosePortButtonClicked() {
     qInfo() << "Closed port" << port << "on interface" << interface;
 }
 
-void MainWindow::onAddChannelButtonClicked() {
+void MainWindow::onAddConnectionButtonClicked() {
     AddChannelDialog* dialog = new AddChannelDialog(this);
-    connect(dialog, SIGNAL(connectRequest(QString)), this, SLOT(onConnectRequest(QString)));
+    // When user enters a URL in the dialog, add it to known connections
+    connect(dialog, &AddChannelDialog::connectRequest, this, [this](QString url) {
+        // Check if already in known connections
+        KnownConnectionItem* existing = findKnownConnection(url);
+        if (!existing) {
+            // Add new connection as disconnected
+            KnownConnectionItem* newItem = new KnownConnectionItem(url, Disconnected, nullptr);
+            knownConnections.append(newItem);
+            updateKnownConnectionsTable();
+            qInfo() << "Added connection:" << url;
+        }
+        // Auto-connect
+        onConnectButtonClicked();
+    });
     dialog->show();
 }
 
-void MainWindow::onChannelClosing(Channel* ch)
-{
-    for(int i = 0; i < connectionItems.length(); i++) {
-        if (connectionItems.at(i)->channel() == ch) {
-            connectionItems.removeAt(i);
-            break;
+KnownConnectionItem* MainWindow::findKnownConnection(QString url) {
+    foreach(KnownConnectionItem* item, knownConnections) {
+        if (item->url() == url) {
+            return item;
         }
     }
-    QItemSelectionModel *m = ui->channelsListView->selectionModel();
-    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
-    if (m) delete m;
-    onNetworkDiscoveryChanged();
+    return nullptr;
 }
 
-void MainWindow::onConnectRequest(QString urlString) {
-    QUrl url = QUrl::fromEncoded(urlString.toUtf8());
-    foreach(ConnectionItem* item, connectionItems) {
-        if (item->info() == urlString) {
-            qInfo() << "already connected to " << urlString;
-            return;
-        }
+void MainWindow::updateKnownConnectionsTable() {
+    // Disconnect selection handler before model update
+    disconnect(ui->knownConnectionsTableView->selectionModel(),
+               SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+               this, SLOT(onKnownConnectionSelectionChanged()));
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->knownConnectionsTableView->selectionModel();
+    ui->knownConnectionsTableView->setModel(new KnownConnectionItemModel(knownConnections, this));
+    delete oldSelectionModel;
+
+    ui->knownConnectionsTableView->horizontalHeader()->setSectionResizeMode(KnownConnectionColumn::ConnectionUrl, QHeaderView::Stretch);
+    ui->knownConnectionsTableView->horizontalHeader()->setSectionResizeMode(KnownConnectionColumn::ConnectionStatusColumn, QHeaderView::ResizeToContents);
+
+    // Reconnect selection handler after model change
+    connect(ui->knownConnectionsTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onKnownConnectionSelectionChanged()));
+}
+
+void MainWindow::onKnownConnectionSelectionChanged() {
+    QModelIndexList selectedRows = ui->knownConnectionsTableView->selectionModel()->selectedRows();
+
+    if (selectedRows.isEmpty()) {
+        ui->connectButton->setEnabled(false);
+        ui->disconnectButton->setEnabled(false);
+        return;
     }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= knownConnections.size()) {
+        ui->connectButton->setEnabled(false);
+        ui->disconnectButton->setEnabled(false);
+        return;
+    }
+
+    KnownConnectionItem* item = knownConnections.at(row);
+    bool isConnected = (item->status() == Connected);
+
+    ui->connectButton->setEnabled(!isConnected);
+    ui->disconnectButton->setEnabled(isConnected);
+}
+
+void MainWindow::onConnectButtonClicked() {
+    QModelIndexList selectedRows = ui->knownConnectionsTableView->selectionModel()->selectedRows();
+    if (selectedRows.isEmpty()) {
+        return;
+    }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= knownConnections.size()) {
+        qWarning() << "Invalid row selected:" << row;
+        return;
+    }
+
+    KnownConnectionItem* item = knownConnections.at(row);
+    if (item->status() == Connected) {
+        qInfo() << "Already connected to" << item->url();
+        return;
+    }
+
+    QString urlString = item->url();
+    QUrl url = QUrl::fromEncoded(urlString.toUtf8());
+
     TcpChannel* channel;
     if (url.scheme().startsWith("tls")) {
         QSslSocket* socket = new QSslSocket(this);
@@ -432,25 +501,68 @@ void MainWindow::onConnectRequest(QString urlString) {
         socket->connectToHost(url.host(), url.port());
         channel = new TcpChannel(socket);
     }
+
     if (url.scheme().endsWith("maln")) {
         QString malnAddr = url.path().remove("/");
         channel->send(new Packet(malnAddr, QByteArray()));
     }
 
     alnRouter->addChannel(channel);
-    connectionItems.append(new ConnectionItem(channel, urlString));
-    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
     connect(channel, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
+
+    // Update item status
+    item->setStatus(Connected);
+    item->setChannel(channel);
+    updateKnownConnectionsTable();
+
+    qInfo() << "Connected to" << urlString;
 }
 
-void MainWindow::onDisconnectRequest(QString url) {
-    foreach(ConnectionItem *item, connectionItems) {
-        if (item->info() == url)  {
-            item->channel()->disconnect();
+void MainWindow::onDisconnectButtonClicked() {
+    QModelIndexList selectedRows = ui->knownConnectionsTableView->selectionModel()->selectedRows();
+    if (selectedRows.isEmpty()) {
+        return;
+    }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= knownConnections.size()) {
+        qWarning() << "Invalid row selected:" << row;
+        return;
+    }
+
+    KnownConnectionItem* item = knownConnections.at(row);
+    if (item->status() == Disconnected) {
+        qInfo() << "Already disconnected from" << item->url();
+        return;
+    }
+
+    Channel* channel = item->channel();
+    if (channel) {
+        channel->disconnect();
+    }
+
+    // Update item status
+    item->setStatus(Disconnected);
+    item->setChannel(nullptr);
+    updateKnownConnectionsTable();
+
+    qInfo() << "Disconnected from" << item->url();
+}
+
+void MainWindow::onChannelClosing(Channel* ch)
+{
+    // Find the connection and update its status to Disconnected
+    foreach(KnownConnectionItem* item, knownConnections) {
+        if (item->channel() == ch) {
+            item->setStatus(Disconnected);
+            item->setChannel(nullptr);
+            updateKnownConnectionsTable();
+            qInfo() << "Connection closed:" << item->url();
             break;
         }
     }
 }
+
 
 void MainWindow::onListenRequest(QString scheme, QString interface, short port, bool enable) {
     QTcpServer* srvr;
@@ -479,39 +591,151 @@ void MainWindow::onTcpListenPending() {
             QTcpSocket* s = srvr->nextPendingConnection();
             TcpChannel* ch = new TcpChannel(s, this);
             QString url = QString("tcp+aln://%1:%2").arg(srvr->serverAddress().toString()).arg(srvr->serverPort());
-            connectionItems.append(new ConnectionItem(ch, url));
+
+            // Check if this connection is already known
+            KnownConnectionItem* existing = findKnownConnection(url);
+            if (existing) {
+                // Update existing connection
+                existing->setStatus(Connected);
+                existing->setChannel(ch);
+            } else {
+                // Add new connection
+                KnownConnectionItem* newItem = new KnownConnectionItem(url, Connected, ch);
+                knownConnections.append(newItem);
+            }
+
             connect(ch, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
             alnRouter->addChannel(ch);
-            qInfo() << "accepting " <<s->peerAddress().toString() << " via" << url;
+            updateKnownConnectionsTable();
+            qInfo() << "Accepting" << s->peerAddress().toString() << "via" << url;
         }
     }
-    ui->channelsListView->setModel(new ConnectionItemModel(connectionItems, this));
 }
 
-void MainWindow::onBroadcastListenRequest(int checkState) {
-    bool enable = checkState == Qt::Checked;
-    QString addr = ui->networkDiscoveryLineEdit->text();
-    int port = ui->networkDiscoveryPortSpinBox->value();
+void MainWindow::onStartListenButtonClicked() {
+    // Get default broadcast address
+    QString defaultBroadcastAddr;
+    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
+    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
+
+    foreach(QNetworkInterface iFace, allInterfaces) {
+        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
+        foreach(QNetworkAddressEntry entry, entries) {
+            QHostAddress address = entry.ip();
+            if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
+                if (iFace.type() == QNetworkInterface::InterfaceType::Ethernet ||
+                    iFace.type() == QNetworkInterface::InterfaceType::Wifi) {
+                    defaultBroadcastAddr = entry.broadcast().toString();
+                    break;
+                }
+            }
+        }
+        if (!defaultBroadcastAddr.isEmpty()) break;
+    }
+
+    // Show dialog
+    StartListenDialog* dialog = new StartListenDialog(defaultBroadcastAddr, 8082, this);
+    if (dialog->exec() == QDialog::Accepted) {
+        QString addr = dialog->broadcastAddress();
+        int port = dialog->port();
+        QString key = QString("%1:%2").arg(addr).arg(port);
+
+        // Check if already listening on this address:port
+        foreach(DiscoveryListenerItem* item, discoveryListeners) {
+            if (item->address() == addr && item->port() == port) {
+                qWarning() << "Already listening on" << key;
+                dialog->deleteLater();
+                return;
+            }
+        }
+
+        // Create and bind UDP socket
+        QUdpSocket* udpSocket = new QUdpSocket(this);
+        connect(udpSocket, SIGNAL(readyRead()), this, SLOT(onUdpBroadcastRx()));
+
+        if (udpSocket->bind(port, QUdpSocket::ShareAddress)) {
+            // Create listener item
+            DiscoveryListenerItem* listenerItem = new DiscoveryListenerItem(addr, port, udpSocket);
+            discoveryListeners.append(listenerItem);
+
+            // Also add to udpSockets map for compatibility
+            udpSockets.insert(key, udpSocket);
+
+            // Update the model
+            QItemSelectionModel *oldSelectionModel = ui->discoveryListenersTableView->selectionModel();
+            ui->discoveryListenersTableView->setModel(new DiscoveryListenerItemModel(discoveryListeners, this));
+            delete oldSelectionModel;
+
+            ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerAddress, QHeaderView::Stretch);
+            ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerPort, QHeaderView::ResizeToContents);
+
+            // Reconnect selection handler after model change
+            connect(ui->discoveryListenersTableView->selectionModel(),
+                    SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+                    this, SLOT(onDiscoveryListenerSelectionChanged()));
+
+            qInfo() << "Started listening for broadcasts on" << addr << ":" << port;
+        } else {
+            qWarning() << "Failed to bind to port" << port;
+            delete udpSocket;
+        }
+    }
+
+    dialog->deleteLater();
+}
+
+void MainWindow::onDiscoveryListenerSelectionChanged() {
+    // Enable Stop button only when a row is selected
+    QModelIndexList selectedRows = ui->discoveryListenersTableView->selectionModel()->selectedRows();
+    ui->stopListenButton->setEnabled(!selectedRows.isEmpty());
+}
+
+void MainWindow::onStopListenButtonClicked() {
+    QModelIndexList selectedRows = ui->discoveryListenersTableView->selectionModel()->selectedRows();
+    if (selectedRows.isEmpty()) {
+        return;
+    }
+
+    int row = selectedRows.first().row();
+    if (row < 0 || row >= discoveryListeners.size()) {
+        qWarning() << "Invalid row selected:" << row;
+        return;
+    }
+
+    DiscoveryListenerItem* item = discoveryListeners.at(row);
+    QString addr = item->address();
+    int port = item->port();
     QString key = QString("%1:%2").arg(addr).arg(port);
 
-    QUdpSocket* udpSocket;
-    if (udpSockets.contains(key)) {
-        udpSocket = udpSockets.value(key);
-    } else {
-        udpSocket = new QUdpSocket(this);
-        udpSockets.insert(key, udpSocket);
-        connect(udpSocket, SIGNAL(readyRead()), this, SLOT(onUdpBroadcastRx()));
-    }
-    if (enable && !udpSocket->isOpen()) {
-        udpSocket->bind(port, QUdpSocket::ShareAddress);
-    }
-    if (!enable){
-        if (udpSocket->isOpen())
-            udpSocket->disconnectFromHost();
-        if (udpSockets.contains(key))
-            udpSockets.remove(key);
-        delete udpSocket;
-    }
+    // Disconnect selection handler before model update
+    disconnect(ui->discoveryListenersTableView->selectionModel(),
+               SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+               this, SLOT(onDiscoveryListenerSelectionChanged()));
+
+    // Remove from udpSockets map
+    udpSockets.remove(key);
+
+    // Remove from listeners list (destructor closes socket)
+    discoveryListeners.removeAt(row);
+    delete item;
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->discoveryListenersTableView->selectionModel();
+    ui->discoveryListenersTableView->setModel(new DiscoveryListenerItemModel(discoveryListeners, this));
+    delete oldSelectionModel;
+
+    ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerAddress, QHeaderView::Stretch);
+    ui->discoveryListenersTableView->horizontalHeader()->setSectionResizeMode(DiscoveryListenerColumn::ListenerPort, QHeaderView::ResizeToContents);
+
+    // Reconnect selection handler after model change
+    connect(ui->discoveryListenersTableView->selectionModel(),
+            SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
+            this, SLOT(onDiscoveryListenerSelectionChanged()));
+
+    // Disable the stop button since selection is now cleared
+    ui->stopListenButton->setEnabled(false);
+
+    qInfo() << "Stopped listening for broadcasts on" << addr << ":" << port;
 }
 
 void MainWindow::onStartAdvertisementButtonClicked() {
@@ -522,9 +746,27 @@ void MainWindow::onStartAdvertisementButtonClicked() {
         connectionStrings.append(connString);
     }
 
-    // Get default broadcast address and port
-    QString defaultBroadcastAddr = ui->networkDiscoveryLineEdit->text();
-    int defaultBroadcastPort = ui->networkDiscoveryPortSpinBox->value();
+    // Get default broadcast address
+    QString defaultBroadcastAddr;
+    QList<QNetworkInterface> allInterfaces = QNetworkInterface::allInterfaces();
+    const QHostAddress &localhost = QHostAddress(QHostAddress::LocalHost);
+
+    foreach(QNetworkInterface iFace, allInterfaces) {
+        QList<QNetworkAddressEntry> entries = iFace.addressEntries();
+        foreach(QNetworkAddressEntry entry, entries) {
+            QHostAddress address = entry.ip();
+            if (address.protocol() == QAbstractSocket::IPv4Protocol && address != localhost) {
+                if (iFace.type() == QNetworkInterface::InterfaceType::Ethernet ||
+                    iFace.type() == QNetworkInterface::InterfaceType::Wifi) {
+                    defaultBroadcastAddr = entry.broadcast().toString();
+                    break;
+                }
+            }
+        }
+        if (!defaultBroadcastAddr.isEmpty()) break;
+    }
+
+    int defaultBroadcastPort = 8082;
 
     // Show dialog with defaults
     StartAdvertisementDialog* dialog = new StartAdvertisementDialog(connectionStrings, defaultBroadcastAddr, defaultBroadcastPort, this);
@@ -618,66 +860,23 @@ void MainWindow::onUdpBroadcastRx() {
         while (socket->hasPendingDatagrams()) {
             datagram.resize(int(socket->pendingDatagramSize()));
             socket->readDatagram(datagram.data(), datagram.size());
-            if (!udpAdverts.contains(datagram.constData())) {
-                udpAdverts[datagram.constData()] = true;
-                onNetworkDiscoveryChanged();
+            QString url = QString::fromUtf8(datagram.constData());
+
+            // Check if this connection is already known
+            KnownConnectionItem* existing = findKnownConnection(url);
+            if (!existing) {
+                // Add new discovered connection as disconnected
+                KnownConnectionItem* newItem = new KnownConnectionItem(url, Disconnected, nullptr);
+                knownConnections.append(newItem);
+                updateKnownConnectionsTable();
+                qInfo() << "Discovered connection via broadcast:" << url;
             }
-            qDebug() << "bcast recvd:" << datagram.constData();
+
+            qDebug() << "Broadcast received:" << url;
         }
     }
 }
 
-void MainWindow::onNetworkDiscoveryChanged() {
-    // clear QButtonGroup
-    foreach(QAbstractButton* button, connectToHostButtonGroup.buttons()) {
-        connectToHostButtonGroup.removeButton(button);
-    }
-    connectToHostButtonIdMap.clear();
-
-    QVBoxLayout* layout = new QVBoxLayout();
-    foreach(QString advert, udpAdverts.keys()) {
-        QHBoxLayout* rowLayout = new QHBoxLayout();
-        QPushButton* connectButton = new QPushButton(hasConnection(advert) ? "disconnect" : "connect");
-
-        int buttonID = connectToHostButtonIdMap.size();
-        connectToHostButtonIdMap.insert(buttonID, advert);
-        connectToHostButtonGroup.addButton(connectButton, buttonID);
-
-        rowLayout->addWidget(connectButton);
-        rowLayout->addStretch();
-        rowLayout->addWidget(new QLabel(advert));
-        layout->addLayout(rowLayout);
-    }
-
-    layout->addStretch();
-    QWidget* widget = new QWidget();
-    if (ui->netDiscoveryScrollArea->widget()) {
-        ui->netDiscoveryScrollArea->takeWidget()->deleteLater();
-    }
-    widget->setLayout(layout);
-    ui->netDiscoveryScrollArea->setWidget(widget);
-    widget->show();
-}
-
-bool MainWindow::hasConnection(QString url) {
-    bool connected = false;
-    foreach(ConnectionItem *item, connectionItems) {
-        if (item->info() == url)  {
-            connected = true;
-            break;
-        }
-    }
-    return connected;
-}
-
-void MainWindow::onNetworkHostConnectButtonClicked(int id) {
-    QString url = connectToHostButtonIdMap.value(id);
-    if (hasConnection(url)) {
-        onDisconnectRequest(url);
-    } else {
-        onConnectRequest(url);
-    }
-}
 
 void MainWindow::onNetStateChanged() {
 
@@ -734,9 +933,6 @@ void MainWindow::onNetStateChanged() {
     widget->setLayout(layout);
     ui->scrollArea->setWidget(widget);
     widget->show();
-
-    // update discovery button text
-    onNetworkDiscoveryChanged();
 }
 
 void MainWindow::onServiceButtonClicked(int id) {

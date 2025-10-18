@@ -47,9 +47,9 @@ StartAdvertisementDialog::StartAdvertisementDialog(QStringList connectionStrings
     mainLayout->addLayout(topControlsLayout);
 
     // Connection string helper
-    QLabel* helperLabel = new QLabel("Quick Fill from Active Connections:", this);
+    QLabel* helperLabel = new QLabel("Quick fill from open ports:", this);
     connectionStringComboBox = new QComboBox(this);
-    connectionStringComboBox->addItem("(Select a connection...)");
+    connectionStringComboBox->addItem("(Select...)");
     connectionStringComboBox->addItems(connectionStrings);
 
     mainLayout->addWidget(helperLabel);

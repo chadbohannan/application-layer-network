@@ -20,13 +20,15 @@ SOURCES += \
     aln/parser.cpp \
     aln/router.cpp \
     aln/tcpchannel.cpp \
-    connectionitemmodel.cpp \
+    discoverylisteneritemmodel.cpp \
+    knownconnectionitemmodel.cpp \
     main.cpp \
     mainwindow.cpp \
     networkinterfacesitemmodel.cpp \
     openportdialog.cpp \
     packetsenddialog.cpp \
-    startadvertisementdialog.cpp
+    startadvertisementdialog.cpp \
+    startlistendialog.cpp
 
 HEADERS += \
     addchanneldialog.h \
@@ -40,12 +42,14 @@ HEADERS += \
     aln/parser.h \
     aln/router.h \
     aln/tcpchannel.h \
-    connectionitemmodel.h \
+    discoverylisteneritemmodel.h \
+    knownconnectionitemmodel.h \
     mainwindow.h \
     networkinterfacesitemmodel.h \
     openportdialog.h \
     packetsenddialog.h \
-    startadvertisementdialog.h
+    startadvertisementdialog.h \
+    startlistendialog.h
 
 FORMS += \
     mainwindow.ui
