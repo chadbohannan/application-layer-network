@@ -21,6 +21,7 @@ PacketSendDialog::PacketSendDialog(Router* alnRouter, QWidget *parent, Qt::Windo
     contextID = alnRouter->registerContextHandler(new ResponseHandler(this));
     setLayout(createLayout());
     connect(this, SIGNAL(finished(int)), SLOT(onClose()));
+    resize(500, sizeHint().height());  // Set initial width to 500px
 }
 
 void PacketSendDialog::setDest(QString destAddress) {

@@ -22,6 +22,8 @@ SOURCES += \
     aln/tcpchannel.cpp \
     discoverylisteneritemmodel.cpp \
     knownconnectionitemmodel.cpp \
+    logserviceitemmodel.cpp \
+    statuslogitemmodel.cpp \
     main.cpp \
     mainwindow.cpp \
     networkinterfacesitemmodel.cpp \
@@ -44,6 +46,8 @@ HEADERS += \
     aln/tcpchannel.h \
     discoverylisteneritemmodel.h \
     knownconnectionitemmodel.h \
+    logserviceitemmodel.h \
+    statuslogitemmodel.h \
     mainwindow.h \
     networkinterfacesitemmodel.h \
     openportdialog.h \

@@ -6,6 +6,8 @@
 #include "networkinterfacesitemmodel.h"
 #include "discoverylisteneritemmodel.h"
 #include "knownconnectionitemmodel.h"
+#include "logserviceitemmodel.h"
+#include "statuslogitemmodel.h"
 #include "openportdialog.h"
 #include "startadvertisementdialog.h"
 #include "startlistendialog.h"
@@ -61,8 +63,8 @@ class MainWindow : public QMainWindow
     QMap<int, QString> btConnectIdToAddressMap;
     QMap<QString, QBluetoothSocket*> btAddressSocketMap;
 
-    QList<QString> debugBufferList;
-    QList<QString> logServiceBufferList;
+    QList<StatusLogItem*> statusLogItems;
+    QList<LogServiceItem*> logServiceItems;
 
     Ui::MainWindow *ui;
     bool testFlag = false;
@@ -79,7 +81,7 @@ private:
     KnownConnectionItem* findKnownConnection(QString url);
 
 public slots:
-    void addLogLine(QString msg);
+    void addLogLine(QString level, QString msg);
     void clearLog();
     void onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 
@@ -116,7 +118,7 @@ public slots:
     void onServiceButtonClicked(int id);
 
 signals:
-    void logLineReady(QString);
+    void logLineReady(QString level, QString msg);
     void connectionAdded(QString url);
 };
 #endif // MAINWINDOW_H

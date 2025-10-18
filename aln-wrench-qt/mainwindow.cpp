@@ -28,7 +28,8 @@ class PacketSignaler: public PacketHandler {
 public:
     PacketSignaler() { }
     void onPacket(Packet *packet) {
-        emit packetReceived(packet);
+        // Make a copy since the original packet may be deleted before queued signal delivery
+        emit packetReceived(packet->copy());
     }
 };
 
@@ -37,7 +38,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    connect(this, SIGNAL(logLineReady(QString)), SLOT(addLogLine(QString)), Qt::QueuedConnection);
+    connect(this, SIGNAL(logLineReady(QString,QString)), SLOT(addLogLine(QString,QString)), Qt::QueuedConnection);
 }
 
 MainWindow::~MainWindow()
@@ -49,6 +50,14 @@ MainWindow::~MainWindow()
     // Clean up discovery listeners
     foreach(DiscoveryListenerItem* listener, discoveryListeners) {
         delete listener;
+    }
+    // Clean up status log items
+    foreach(StatusLogItem* item, statusLogItems) {
+        delete item;
+    }
+    // Clean up log service items
+    foreach(LogServiceItem* item, logServiceItems) {
+        delete item;
     }
     delete ui;
 }
@@ -66,7 +75,7 @@ void MainWindow::init() {
     connect(ui->clearLogButton, SIGNAL(clicked()), this, SLOT(clearLog()));
 
     PacketSignaler* echoSignaler = new PacketSignaler();
-    connect(echoSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(echoServicePacketHandler(Packet*)));
+    connect(echoSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(echoServicePacketHandler(Packet*)), Qt::QueuedConnection);
     alnRouter->registerService("echo", echoSignaler );
 
     connect(alnRouter, SIGNAL(netStateChanged()),
@@ -139,6 +148,31 @@ void MainWindow::init() {
 
     ui->btDiscoveryGroupBox->setVisible(false);
 
+    // Initialize log service table
+    ui->logServiceListView->setModel(new LogServiceItemModel(logServiceItems, this));
+    ui->logServiceListView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->logServiceListView->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->logServiceListView->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::Timestamp, QHeaderView::ResizeToContents);
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::SourceAddress, QHeaderView::ResizeToContents);
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::DataPayload, QHeaderView::ResizeToContents);
+
+    // Configure splitter - left column at fixed initial width, right column takes remaining space
+    ui->splitter->setStretchFactor(0, 0);  // Left column doesn't stretch
+    ui->splitter->setStretchFactor(1, 1);  // Right column gets all extra space
+    QList<int> sizes;
+    sizes << 350 << 1000;  // Left at reasonable initial width, right gets remaining space
+    ui->splitter->setSizes(sizes);
+
+    // Initialize status log table
+    ui->statusLogListView->setModel(new StatusLogItemModel(statusLogItems, this));
+    ui->statusLogListView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->statusLogListView->setSelectionMode(QAbstractItemView::SingleSelection);
+    ui->statusLogListView->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusTimestamp, QHeaderView::ResizeToContents);
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusLevel, QHeaderView::ResizeToContents);
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusData, QHeaderView::ResizeToContents);
+
     this->statusBar()->showMessage("This node's Application Layer Network address: " + alnRouter->address());
 
     serviceUuidToNameMap.insert("94f39d29-7d6d-437d-973b-fba39e49d4ee", "rfcomm-client");
@@ -148,60 +182,109 @@ void MainWindow::init() {
 }
 
 void MainWindow::logServicePacketHandler(Packet* packet) {
-    while (logServiceBufferList.size() > 20)
-        logServiceBufferList.removeFirst();
-    logServiceBufferList.append(QString("%0 - %1").arg(packet->srcAddress).arg(packet->data));
-    ui->logServiceListView->setModel(new QStringListModel(logServiceBufferList));
+    // Limit to 20 most recent items
+    while (logServiceItems.size() >= 20) {
+        LogServiceItem* oldItem = logServiceItems.takeFirst();
+        delete oldItem;
+    }
+
+    // Create new log item with current timestamp
+    LogServiceItem* newItem = new LogServiceItem(
+        QDateTime::currentDateTime(),
+        packet->srcAddress,
+        QString::fromUtf8(packet->data)
+    );
+    logServiceItems.append(newItem);
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->logServiceListView->selectionModel();
+    ui->logServiceListView->setModel(new LogServiceItemModel(logServiceItems, this));
+    delete oldSelectionModel;
+
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::Timestamp, QHeaderView::ResizeToContents);
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::SourceAddress, QHeaderView::ResizeToContents);
+    ui->logServiceListView->horizontalHeader()->setSectionResizeMode(LogServiceColumn::DataPayload, QHeaderView::ResizeToContents);
+
+    // Scroll to bottom to show the new entry
+    ui->logServiceListView->scrollToBottom();
+
+    delete packet;  // Clean up the copied packet
 }
 
 void MainWindow::echoServicePacketHandler(Packet* packet) {
     if (packet->srcAddress.length() == 0) {
         qWarning() << "echo service cannot respond to an empty address";
+        delete packet;  // Clean up the copied packet
         return;
     }
     if (packet->ctx == 0) {
         qWarning() << "echo service cannot respond to null context (context id is zero)";
+        delete packet;  // Clean up the copied packet
         return;
     }
     qDebug() << "echo service returning " << packet->data << " to " << packet->srcAddress << ":" << packet->ctx;
     alnRouter->send(new Packet(packet->srcAddress, packet->ctx, packet->data));
+    delete packet;  // Clean up the copied packet
 }
 
-void MainWindow::addLogLine(QString msg) {
-    while (debugBufferList.size() > 20)
-        debugBufferList.removeFirst();
-    debugBufferList.append(msg);
-    ui->statusLogListView->setModel(new QStringListModel(debugBufferList));
+void MainWindow::addLogLine(QString level, QString msg) {
+    // Limit to 20 most recent items
+    while (statusLogItems.size() >= 20) {
+        StatusLogItem* oldItem = statusLogItems.takeFirst();
+        delete oldItem;
+    }
+
+    // Create new status log item with current timestamp
+    StatusLogItem* newItem = new StatusLogItem(
+        QDateTime::currentDateTime(),
+        level,
+        msg
+    );
+    statusLogItems.append(newItem);
+
+    // Update the model
+    QItemSelectionModel *oldSelectionModel = ui->statusLogListView->selectionModel();
+    ui->statusLogListView->setModel(new StatusLogItemModel(statusLogItems, this));
+    delete oldSelectionModel;
+
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusTimestamp, QHeaderView::ResizeToContents);
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusLevel, QHeaderView::ResizeToContents);
+    ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusData, QHeaderView::ResizeToContents);
+
+    // Scroll to bottom to show the new entry
+    ui->statusLogListView->scrollToBottom();
 }
 
 void MainWindow::clearLog() {
-    debugBufferList.clear();
-    ui->statusLogListView->setModel(new QStringListModel(debugBufferList));
+    // Clean up all status log items
+    foreach(StatusLogItem* item, statusLogItems) {
+        delete item;
+    }
+    statusLogItems.clear();
+    ui->statusLogListView->setModel(new StatusLogItemModel(statusLogItems, this));
 }
 
 void MainWindow::onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
-    QString line;
-
     QByteArray localMsg = msg.toLocal8Bit();
     const char *file = context.file ? context.file : "";
     const char *function = context.function ? context.function : "";
     switch (type) {
     case QtDebugMsg:
         if (ui->logDebugCheckBox->isChecked())
-            emit logLineReady(QString("%0 DEBUG %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady("DEBUG", msg);
         break;
     case QtInfoMsg:
         if (ui->logInfoCheckBox->isChecked())
-            emit logLineReady(QString("%0 INFO %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady("INFO", msg);
         break;
     case QtWarningMsg:
         if (ui->logErrorCheckBox->isChecked())
-            emit logLineReady(QString("%0 WARNING %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady("WARNING", msg);
         fprintf(stderr, "Warning: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtCriticalMsg:
         if (ui->logErrorCheckBox->isChecked())
-            emit logLineReady(QString("%0 CRITICAL %1").arg(QDateTime::currentDateTime().toString( Qt::ISODateWithMs)).arg(msg));
+            emit logLineReady("CRITICAL", msg);
         fprintf(stderr, "Critical: %s (%s:%u, %s)\n", localMsg.constData(), file, context.line, function);
         break;
     case QtFatalMsg:

@@ -16,61 +16,78 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout_3">
     <item>
-     <layout class="QVBoxLayout" name="verticalLayout_7">
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QWidget" name="layoutWidget">
+       <layout class="QVBoxLayout" name="verticalLayout_7">
       <item>
-       <layout class="QHBoxLayout" name="networkInterfacesHeaderLayout">
-        <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Network Host Interfaces</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="openPortButton">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>100</width>
-            <height>40</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Open Port</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="closePortButton">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>100</width>
-            <height>40</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Close Port</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <widget class="QTableView" name="networkInterfacesTableView"/>
+       <widget class="QFrame" name="frame_4">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_4">
+         <item>
+          <layout class="QHBoxLayout" name="networkInterfacesHeaderLayout">
+           <item>
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Network Host Interfaces</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="openPortButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Open Port</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="closePortButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Close Port</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableView" name="networkInterfacesTableView"/>
+         </item>
+        </layout>
+       </widget>
       </item>
       <item>
        <widget class="QFrame" name="frame">
@@ -83,65 +100,77 @@
        </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="advertisementHeaderLayout">
-        <item>
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>Broadcast Advertisements</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="startAdvertisementButton">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>100</width>
-            <height>40</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Start Sending</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="stopAdvertisementButton">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>100</width>
-            <height>40</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Stop</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <widget class="QTableView" name="advertisementsTableView">
-        <property name="maximumSize">
-         <size>
-          <width>16777215</width>
-          <height>150</height>
-         </size>
+       <widget class="QFrame" name="frame_5">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
         </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_6">
+         <item>
+          <layout class="QHBoxLayout" name="advertisementHeaderLayout">
+           <item>
+            <widget class="QLabel" name="label_2">
+             <property name="text">
+              <string>Broadcast Advertisements</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="startAdvertisementButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Start Sending</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="stopAdvertisementButton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>100</width>
+               <height>40</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Stop</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableView" name="advertisementsTableView">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>150</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
       <item>
@@ -356,8 +385,8 @@
        </widget>
       </item>
      </layout>
-    </item>
-    <item>
+    </widget>
+    <widget class="QWidget" name="layoutWidget2">
      <layout class="QVBoxLayout" name="verticalLayout_10">
       <item>
        <widget class="QFrame" name="frame_6">
@@ -371,7 +400,7 @@
          <item>
           <widget class="QLabel" name="label_3">
            <property name="text">
-            <string>Mesh Services</string>
+            <string>Available Services</string>
            </property>
           </widget>
          </item>
@@ -407,12 +436,12 @@
          <item>
           <widget class="QLabel" name="label_6">
            <property name="text">
-            <string>Log Service</string>
+            <string>Log Service (local node)</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QListView" name="logServiceListView">
+          <widget class="QTableView" name="logServiceListView">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
              <horstretch>0</horstretch>
@@ -500,7 +529,7 @@
           </layout>
          </item>
          <item>
-          <widget class="QListView" name="statusLogListView">
+          <widget class="QTableView" name="statusLogListView">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
              <horstretch>0</horstretch>
@@ -519,6 +548,8 @@
        </widget>
       </item>
      </layout>
+    </widget>
+   </widget>
     </item>
    </layout>
   </widget>
