@@ -11,16 +11,19 @@ QModelIndex LogServiceItemModel::index(int row, int column, const QModelIndex&) 
 
 QModelIndex LogServiceItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int LogServiceItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return mItems.length();
 }
 
 int LogServiceItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumLogServiceColumns;
 }
 

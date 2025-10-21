@@ -4,6 +4,9 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17 testcase no_testcase_installs
 
+# Include the core library
+include(../aln-cpp-core/aln-cpp-core.pri)
+
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
@@ -12,14 +15,6 @@ SOURCES += \
     addchanneldialog.cpp \
     advertisementitemmodel.cpp \
     advertiserthread.cpp \
-    aln/alntypes.cpp \
-    aln/frame.cpp \
-    aln/channel.cpp \
-    aln/localchannel.cpp \
-    aln/packet.cpp \
-    aln/parser.cpp \
-    aln/router.cpp \
-    aln/tcpchannel.cpp \
     discoverylisteneritemmodel.cpp \
     knownconnectionitemmodel.cpp \
     logserviceitemmodel.cpp \
@@ -36,14 +31,6 @@ HEADERS += \
     addchanneldialog.h \
     advertisementitemmodel.h \
     advertiserthread.h \
-    aln/alntypes.h \
-    aln/frame.h \
-    aln/channel.h \
-    aln/localchannel.h \
-    aln/packet.h \
-    aln/parser.h \
-    aln/router.h \
-    aln/tcpchannel.h \
     discoverylisteneritemmodel.h \
     knownconnectionitemmodel.h \
     logserviceitemmodel.h \

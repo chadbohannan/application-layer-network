@@ -648,6 +648,7 @@ void MainWindow::onChannelClosing(Channel* ch)
 
 
 void MainWindow::onListenRequest(QString scheme, QString interface, short port, bool enable) {
+    Q_UNUSED(scheme);
     QTcpServer* srvr;
     QString key = QString("%1:%2").arg(interface).arg(port);
     if (tcpServers.contains(key)) {

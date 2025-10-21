@@ -16,16 +16,19 @@ QModelIndex KnownConnectionItemModel::index(int row, int column, const QModelInd
 
 QModelIndex KnownConnectionItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int KnownConnectionItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return mItems.length();
 }
 
 int KnownConnectionItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumKnownConnectionColumns;
 }
 

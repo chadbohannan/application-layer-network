@@ -1,8 +1,8 @@
 #include "advertisementitemmodel.h"
 
 AdvertisementItem::AdvertisementItem(QString message, int periodMs, QString broadcastAddr, int broadcastPort, AdvertiserThread* thread)
-    : mMessage(message), mPeriodMs(periodMs), mBroadcastAddress(broadcastAddr),
-      mBroadcastPort(broadcastPort), mThread(thread)
+    : mMessage(message), mPeriodMs(periodMs), mThread(thread),
+      mBroadcastAddress(broadcastAddr), mBroadcastPort(broadcastPort)
 {
     mStartTime = QDateTime::currentDateTime();
 }
@@ -33,16 +33,19 @@ QModelIndex AdvertisementItemModel::index(int row, int column, const QModelIndex
 
 QModelIndex AdvertisementItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int AdvertisementItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return mItems.length();
 }
 
 int AdvertisementItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumAdvertisementColumns;
 }
 

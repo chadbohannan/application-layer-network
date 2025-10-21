@@ -11,16 +11,19 @@ QModelIndex StatusLogItemModel::index(int row, int column, const QModelIndex&) c
 
 QModelIndex StatusLogItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int StatusLogItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return mItems.length();
 }
 
 int StatusLogItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumStatusLogColumns;
 }
 

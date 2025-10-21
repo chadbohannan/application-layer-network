@@ -12,16 +12,19 @@ QModelIndex NetworkInterfacesItemModel::index(int row, int column, const QModelI
 
 QModelIndex NetworkInterfacesItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int NetworkInterfacesItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return interfaces.length();
 }
 
 int NetworkInterfacesItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumColumns;
 }
 
@@ -67,6 +70,9 @@ QVariant NetworkInterfacesItemModel::data(const QModelIndex &index, int role) co
 
 bool NetworkInterfacesItemModel::setData(const QModelIndex &index, const QVariant &value, int role)
 {
+    Q_UNUSED(index);
+    Q_UNUSED(value);
+    Q_UNUSED(role);
     // No editing allowed - all changes handled via OpenPortDialog
     return false;
 }

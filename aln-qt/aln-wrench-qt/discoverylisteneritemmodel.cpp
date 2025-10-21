@@ -26,16 +26,19 @@ QModelIndex DiscoveryListenerItemModel::index(int row, int column, const QModelI
 
 QModelIndex DiscoveryListenerItemModel::parent(const QModelIndex &child) const
 {
+    Q_UNUSED(child);
     return QModelIndex();
 }
 
 int DiscoveryListenerItemModel::rowCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return mItems.length();
 }
 
 int DiscoveryListenerItemModel::columnCount(const QModelIndex &parent) const
 {
+    Q_UNUSED(parent);
     return NumDiscoveryListenerColumns;
 }
 
