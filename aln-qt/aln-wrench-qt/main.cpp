@@ -14,6 +14,8 @@ int main(int argc, char *argv[])
 {
     qInstallMessageHandler(myMessageOutput);
     QApplication a(argc, argv);
+    a.setOrganizationName("ALN");
+    a.setApplicationName("ALN Wrench Qt");
 
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();

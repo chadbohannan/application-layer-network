@@ -10,6 +10,9 @@
 #include <QDebug>
 #include <QNetworkInterface>
 #include <QSslSocket>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QSettings>
 #include <QStringListModel>
 #include <QUuid>
 
@@ -74,6 +77,7 @@ void MainWindow::init() {
     connect(logSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(logServicePacketHandler(Packet*)));
     alnRouter->registerService("log", logSignaler);
     connect(ui->clearLogButton, SIGNAL(clicked()), this, SLOT(clearLog()));
+    connect(ui->copyLogButton, SIGNAL(clicked()), this, SLOT(copyLogLine()));
 
     PacketSignaler* echoSignaler = new PacketSignaler();
     connect(echoSignaler, SIGNAL(packetReceived(Packet*)), this, SLOT(echoServicePacketHandler(Packet*)), Qt::QueuedConnection);
@@ -85,7 +89,8 @@ void MainWindow::init() {
 
     populateNetworkInterfaces();
 
-    // Initialize known connections table
+    // Load saved known connections and initialize table
+    loadKnownConnections();
     ui->knownConnectionsTableView->setModel(new KnownConnectionItemModel(knownConnections, this));
     ui->knownConnectionsTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->knownConnectionsTableView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -173,6 +178,7 @@ void MainWindow::init() {
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusTimestamp, QHeaderView::ResizeToContents);
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusLevel, QHeaderView::ResizeToContents);
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusData, QHeaderView::ResizeToContents);
+    connect(ui->statusLogListView->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)), this, SLOT(onStatusLogSelectionChanged()));
 
     this->statusBar()->showMessage("This node's Application Layer Network address: " + alnRouter->address());
 
@@ -251,6 +257,8 @@ void MainWindow::addLogLine(QString level, QString msg) {
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusTimestamp, QHeaderView::ResizeToContents);
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusLevel, QHeaderView::ResizeToContents);
     ui->statusLogListView->horizontalHeader()->setSectionResizeMode(StatusLogColumn::StatusData, QHeaderView::ResizeToContents);
+    connect(ui->statusLogListView->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)), this, SLOT(onStatusLogSelectionChanged()));
+    ui->copyLogButton->setEnabled(false);
 
     // Scroll to bottom to show the new entry
     ui->statusLogListView->scrollToBottom();
@@ -263,6 +271,25 @@ void MainWindow::clearLog() {
     }
     statusLogItems.clear();
     ui->statusLogListView->setModel(new StatusLogItemModel(statusLogItems, this));
+    connect(ui->statusLogListView->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)), this, SLOT(onStatusLogSelectionChanged()));
+    ui->copyLogButton->setEnabled(false);
+}
+
+void MainWindow::copyLogLine() {
+    QModelIndexList selected = ui->statusLogListView->selectionModel()->selectedRows();
+    if (selected.isEmpty())
+        return;
+    int row = selected.first().row();
+    if (row < 0 || row >= statusLogItems.size())
+        return;
+    StatusLogItem* item = statusLogItems.at(row);
+    QString text = item->timestamp().toString(Qt::ISODateWithMs) + " [" + item->level() + "] " + item->data();
+    QGuiApplication::clipboard()->setText(text);
+}
+
+void MainWindow::onStatusLogSelectionChanged() {
+    bool hasSelection = ui->statusLogListView->selectionModel()->hasSelection();
+    ui->copyLogButton->setEnabled(hasSelection);
 }
 
 void MainWindow::onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
@@ -493,6 +520,7 @@ void MainWindow::onAddConnectionButtonClicked() {
             // Add new connection as disconnected
             KnownConnectionItem* newItem = new KnownConnectionItem(url, Disconnected, nullptr);
             knownConnections.append(newItem);
+            saveKnownConnections();
             updateKnownConnectionsTable();
             qInfo() << "Added connection:" << url;
         }
@@ -509,6 +537,23 @@ KnownConnectionItem* MainWindow::findKnownConnection(QString url) {
         }
     }
     return nullptr;
+}
+
+void MainWindow::saveKnownConnections() {
+    QSettings settings;
+    QStringList urls;
+    foreach(KnownConnectionItem* item, knownConnections) {
+        urls.append(item->url());
+    }
+    settings.setValue("knownConnections", urls);
+}
+
+void MainWindow::loadKnownConnections() {
+    QSettings settings;
+    QStringList urls = settings.value("knownConnections").toStringList();
+    foreach(const QString &url, urls) {
+        knownConnections.append(new KnownConnectionItem(url, Disconnected, nullptr));
+    }
 }
 
 void MainWindow::updateKnownConnectionsTable() {
@@ -687,6 +732,7 @@ void MainWindow::onTcpListenPending() {
                 // Add new connection
                 KnownConnectionItem* newItem = new KnownConnectionItem(url, Connected, ch);
                 knownConnections.append(newItem);
+                saveKnownConnections();
             }
 
             connect(ch, SIGNAL(closing(Channel*)), this, SLOT(onChannelClosing(Channel*)), Qt::QueuedConnection);
@@ -953,6 +999,7 @@ void MainWindow::onUdpBroadcastRx() {
                 // Add new discovered connection as disconnected
                 KnownConnectionItem* newItem = new KnownConnectionItem(url, Disconnected, nullptr);
                 knownConnections.append(newItem);
+                saveKnownConnections();
                 updateKnownConnectionsTable();
                 qInfo() << "Discovered connection via broadcast:" << url;
             }

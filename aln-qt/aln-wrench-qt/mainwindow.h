@@ -78,11 +78,15 @@ private:
     void selfTest();
     void populateNetworkInterfaces();
     void updateKnownConnectionsTable();
+    void saveKnownConnections();
+    void loadKnownConnections();
     KnownConnectionItem* findKnownConnection(QString url);
 
 public slots:
     void addLogLine(QString level, QString msg);
     void clearLog();
+    void copyLogLine();
+    void onStatusLogSelectionChanged();
     void onDebugMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 
     void onOpenPortButtonClicked();
