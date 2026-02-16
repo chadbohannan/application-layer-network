@@ -1,5 +1,5 @@
 QMAKE_MAC_SDK.macosx.Path = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
-QMAKE_MAC_SDK.macosx.SDKVersion = 15.5
+QMAKE_MAC_SDK.macosx.SDKVersion = 26.2
 QMAKE_MAC_SDK.macx-clang.macosx.QMAKE_CC = /Library/Developer/CommandLineTools/usr/bin/clang
 QMAKE_MAC_SDK.macx-clang.macosx.QMAKE_CXX = /Library/Developer/CommandLineTools/usr/bin/clang++
 QMAKE_MAC_SDK.macx-clang.macosx.QMAKE_FIX_RPATH = \
@@ -40,6 +40,9 @@ QMAKE_CXX.INCDIRS = \
 QMAKE_CXX.LIBDIRS = \
     /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib \
     /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/swift
-QMAKE_MAC_SDK.macosx.SDKVersion = 15.5
+QMAKE_MAC_SDK.macosx.SDKVersion = 26.2
 QMAKE_MAC_SDK.macosx.Path = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 QMAKE_XCODE_DEVELOPER_PATH = /Library/Developer/CommandLineTools
+QMAKE_MAC_SDK.macosx.PlatformPath = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform
+QMAKE_MAC_SDK.macx-clang.macosx.QMAKE_ACTOOL = /Applications/Xcode.app/Contents/Developer/usr/bin/actool
+QMAKE_XCODE_VERSION = 26.2

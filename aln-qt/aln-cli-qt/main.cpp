@@ -1,24 +1,25 @@
 #include <QCoreApplication>
-#include <QDebug>
-#include <aln/router.h>
-#include <aln/tcpchannel.h>
+#include <QTest>
+#include "test_router.h"
+#include "test_ping_service.h"
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
 
-    qDebug() << "ALN CLI Tool";
-    qDebug() << "Starting router...";
+    int status = 0;
 
-    // Create a router with a unique address
-    Router* router = new Router("cli-node-" + QUuid::createUuid().toString());
-    qDebug() << "Router address:" << router->address();
+    // Run router tests
+    {
+        TestRouter testRouter;
+        status |= QTest::qExec(&testRouter, argc, argv);
+    }
 
-    // TODO: Add CLI functionality here
-    // - Command line argument parsing
-    // - TCP listener setup
-    // - Service registration
-    // - Interactive command processing
+    // Run ping service tests
+    {
+        TestPingService testPingService;
+        status |= QTest::qExec(&testPingService, argc, argv);
+    }
 
-    return app.exec();
+    return status;
 }

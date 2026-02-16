@@ -1,0 +1,7 @@
+go 1.22
+
+use (
+	./go/aln
+	./go/examples/local_host
+	./go/examples/local_client
+)

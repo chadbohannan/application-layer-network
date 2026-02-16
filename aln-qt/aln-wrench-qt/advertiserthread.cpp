@@ -1,5 +1,6 @@
 #include "advertiserthread.h"
 
+#include <QDebug>
 #include <QUdpSocket>
 #include <QUrl>
 

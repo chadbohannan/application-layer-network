@@ -7,6 +7,7 @@
 #include <aln/localchannel.h>
 
 #include <QDateTime>
+#include <QDebug>
 #include <QNetworkInterface>
 #include <QSslSocket>
 #include <QStringListModel>

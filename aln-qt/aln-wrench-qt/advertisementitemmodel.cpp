@@ -1,5 +1,7 @@
 #include "advertisementitemmodel.h"
 
+#include <QDebug>
+
 AdvertisementItem::AdvertisementItem(QString message, int periodMs, QString broadcastAddr, int broadcastPort, AdvertiserThread* thread)
     : mMessage(message), mPeriodMs(periodMs), mThread(thread),
       mBroadcastAddress(broadcastAddr), mBroadcastPort(broadcastPort)

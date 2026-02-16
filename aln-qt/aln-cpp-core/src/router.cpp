@@ -1,4 +1,5 @@
 #include "aln/router.h"
+#include <QDebug>
 #include <QRandomGenerator>
 
 Router::Router(QString address) {
@@ -43,18 +44,19 @@ QString Router::send(Packet* p) {
     }
 
     if (p->destAddress == mAddress) {
-        PacketHandler* handler;
-        QMutexLocker lock = QMutexLocker(&mMutex);
-        if (serviceHandlerMap.contains(p->srv)) {
-            handler = serviceHandlerMap[p->srv];
-        } else if (contextHandlerMap.contains(p->ctx)) {
-            handler = contextHandlerMap[p->ctx];
-        } else {
-            return QString("service '%1' not registered\n").arg(p->srv);
+        PacketHandler* handler = nullptr;
+        {
+            QMutexLocker lock(&mMutex);
+            if (serviceHandlerMap.contains(p->srv)) {
+                handler = serviceHandlerMap[p->srv];
+            } else if (contextHandlerMap.contains(p->ctx)) {
+                handler = contextHandlerMap[p->ctx];
+            } else {
+                return QString("service '%1' not registered\n").arg(p->srv);
+            }
         }
         if (handler)
             handler->onPacket(p);
-        lock.unlock();
         delete p;
     } else if (p->nxtAddress.length() == 0 || p->nxtAddress == mAddress) {
         if (remoteNodeMap.contains(p->destAddress)) {

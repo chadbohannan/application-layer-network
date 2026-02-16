@@ -4,6 +4,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17 testcase no_testcase_installs
 
+
 # Include the core library
 include(../aln-cpp-core/aln-cpp-core.pri)
 
