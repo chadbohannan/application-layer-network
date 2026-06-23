@@ -1,6 +1,6 @@
-#!/bin/bash
-DYLD_FRAMEWORK_PATH=/Users/chadbohannan/Qt/6.10.2/macos/lib${DYLD_FRAMEWORK_PATH:+:$DYLD_FRAMEWORK_PATH}
-export DYLD_FRAMEWORK_PATH
-QT_PLUGIN_PATH=/Users/chadbohannan/Qt/6.10.2/macos/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}
+#!/bin/sh
+LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH
+QT_PLUGIN_PATH=/usr/lib/aarch64-linux-gnu/qt6/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}
 export QT_PLUGIN_PATH
 exec "$@"

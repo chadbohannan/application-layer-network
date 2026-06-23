@@ -2,11 +2,13 @@ TEMPLATE = subdirs
 
 SUBDIRS = \
     aln-wrench-qt \
-    aln-cli-qt
+    aln-cli-qt \
+    aln-core-tests
 
 # Specify the exact .pro file paths (needed when .pro name doesn't match directory)
 aln-wrench-qt.file = aln-wrench-qt/aln-wrench-qt.pro
 aln-cli-qt.file = aln-cli-qt/aln-cli-qt.pro
+aln-core-tests.file = aln-core-tests/aln-core-tests.pro
 
 # Note: With .pri approach, no build dependencies needed
 # Each project compiles the core independently
