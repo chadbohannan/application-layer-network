@@ -25,7 +25,7 @@ func main() {
 	router.RegisterService("ping", func(packet *aln.Packet) {
 		log.Printf("ping from '%s'", packet.SrcAddr)
 		response := &aln.Packet{
-			SrcAddr:   alnHostAddress,  // Add source address for proper routing
+			SrcAddr:   alnHostAddress, // Add source address for proper routing
 			DestAddr:  packet.SrcAddr,
 			ContextID: packet.ContextID,
 			Data:      []byte("pong!"),

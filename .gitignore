@@ -27,6 +27,11 @@ build
 
 # Qt build folder
 build-aln-*
+aln-qt/Makefile
+aln-qt/**/.qtcreator/*.pro.user
+aln-qt/**/.qtcreator/*.pro.user.*
+aln-qt/**/moc_predefs.h
+aln-qt/aln-wrench-qt/aln-wrench-qt
 
 # Android build folder
 java-android/app/build

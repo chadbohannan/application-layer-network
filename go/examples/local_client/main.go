@@ -17,7 +17,7 @@ func main() {
 	router := aln.NewRouter(localAddress)
 
 	// Connect to the host
-	conn, err := net.Dial("tcp", "localhost:8081")
+	conn, err := net.Dial("tcp", "localhost:8000")
 	if err != nil {
 		fmt.Println("dial failed:" + err.Error())
 		os.Exit(-1)
@@ -85,16 +85,12 @@ func main() {
 	// Send ping to discovered service (no hardcoded address!)
 	log.Printf("🏓 Sending ping to discovered service at '%s' with contextID %d", pingServiceAddress, ctx)
 	pingPacket := &aln.Packet{
+		NextAddr:  "bf14edaf-f51c-4e58-90c4-05fa74914cc7",
 		DestAddr:  pingServiceAddress, // Use discovered address
 		Service:   "ping",
 		ContextID: ctx,
 		Data:      []byte("Hello from event-driven client!"),
 	}
-
-	log.Printf("📤 Ping packet: DestAddr='%s', Service='%s', ContextID=%d, SrcAddr='%s'",
-		pingPacket.DestAddr, pingPacket.Service, pingPacket.ContextID, localAddress)
-
-	time.Sleep(time.Second)
 
 	if err := router.Send(pingPacket); err != nil {
 		log.Printf("❌ Failed to send ping: %s", err.Error())
